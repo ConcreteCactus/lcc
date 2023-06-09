@@ -8,11 +8,7 @@ data Expression
         formula :: Expression
       }
   | Identifier String
+  deriving (Show)
 
 lambdaExpression :: Parser Expression
-lambdaExpression = do
-  lambda
-  param <- identifier
-  dot
-  formula <- identifier
-  return $ Lambda param $ Identifier formula
+lambdaExpression = Lambda <$> (lambda *> identifier <* dot) <*> (Identifier <$> identifier)

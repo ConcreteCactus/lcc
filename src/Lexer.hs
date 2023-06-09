@@ -3,6 +3,7 @@
 module Lexer
   ( LexicalError,
     Parser,
+    runParser,
     lambda,
     dot,
     openParen,
@@ -13,26 +14,24 @@ where
 
 import Control.Applicative
 import Control.Monad
+import Data.Bifunctor
 import Data.Char
 
 data LexicalError = UnexpectedEndOfFile | LambdaExpressionExpected | InvalidLambdaExpression | OtherError deriving (Show) -- Todo: remove OtherError
 
-newtype Parser t = Parser {runParser :: String -> Either LexicalError (t, String)} deriving (Functor)
+newtype Parser t = Parser {runParser :: String -> Either LexicalError (t, String)}
+
+instance Functor Parser where
+  fmap f (Parser a) = Parser $ fmap (first f) . a
 
 instance Applicative Parser where
-  pure :: a -> Parser a
   pure a = Parser (\s -> Right (a, s))
-
-  (<*>) :: Parser (a -> b) -> Parser a -> Parser b
   f <*> a = do
     x <- f
     x <$> a
 
 instance Alternative Parser where
-  empty :: Parser a
   empty = Parser $ const $ Left OtherError
-
-  (<|>) :: Parser a -> Parser a -> Parser a
   (Parser a) <|> (Parser b) = Parser (\s -> a s `or'` b s)
     where
       or' :: Either LexicalError a -> Either LexicalError a -> Either LexicalError a
@@ -40,7 +39,6 @@ instance Alternative Parser where
       or' (Left _) e = e
 
 instance Monad Parser where
-  (>>=) :: Parser a -> (a -> Parser b) -> Parser b
   (Parser a) >>= f = Parser (a >=> (\(b, sb) -> runParser (f b) sb))
 
 satisfyE :: LexicalError -> (Char -> Bool) -> Parser Char
