@@ -25,7 +25,9 @@ source-repository head
 
 library
   exposed-modules:
+      Lexer
       Lib
+      SyntacticAnalyzer
   other-modules:
       Paths_lambda_compiler
   hs-source-dirs:
