@@ -1,14 +1,18 @@
 {-# OPTIONS_GHC -Wincomplete-patterns #-}
 
 module Lexer
-  ( LexicalError,
+  ( LexicalError (..),
     Parser,
     runParser,
+    whiteSpace,
+    whiteSpaceO,
     lambda,
     dot,
     openParen,
     closeParen,
     identifier,
+    sepBy1,
+    (<|>),
   )
 where
 
@@ -17,7 +21,7 @@ import Control.Monad
 import Data.Bifunctor
 import Data.Char
 
-data LexicalError = UnexpectedEndOfFile | LambdaExpressionExpected | InvalidLambdaExpression | OtherError deriving (Show) -- Todo: remove OtherError
+data LexicalError = UnexpectedEndOfFile | LambdaExpressionExpected | InvalidLambdaExpression | OtherError deriving (Show, Eq) -- Todo: remove OtherError
 
 newtype Parser t = Parser {runParser :: String -> Either LexicalError (t, String)}
 
@@ -54,6 +58,18 @@ charE e c = satisfyE e (== c)
 -- stringE :: LexicalError -> String -> Parser String
 -- stringE e = mapM (charE e)
 
+sepBy1 :: Parser () -> Parser a -> Parser [a]
+sepBy1 separator token = (:) <$> token <*> many (separator *> token)
+
+whiteSpace :: Parser ()
+whiteSpace = void $ some $ satisfyE OtherError isSpace
+
+nothing :: Parser ()
+nothing = Parser (\s -> Right ((), s))
+
+whiteSpaceO :: Parser ()
+whiteSpaceO = whiteSpace <|> nothing
+
 lambda :: Parser ()
 lambda = void (charE LambdaExpressionExpected '\\')
 
@@ -67,4 +83,4 @@ closeParen :: Parser ()
 closeParen = void (charE OtherError ')')
 
 identifier :: Parser String
-identifier = some $ satisfyE OtherError isAlpha
+identifier = some (satisfyE OtherError isAlpha)
