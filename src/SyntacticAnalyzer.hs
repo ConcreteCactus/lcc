@@ -2,76 +2,80 @@
 {-# OPTIONS_GHC -Wno-partial-fields #-}
 
 module SyntacticAnalyzer
-  ( Expression (..),
+  ( SynExpression (..),
     parseExpression,
   )
 where
 
 import Control.Applicative
+import Errors
 import Lexer
 
-data Expression
+data SynExpression
   = Id String
-  | Lambda String Expression
-  | Application Expression Expression
+  | Lambda String SynExpression
+  | Application SynExpression SynExpression
   deriving (Show, Eq)
 
-parseId :: Parser Expression
-parseId = Id <$> identifier
+idParser :: Parser SynExpression
+idParser = Id <$> identifier
 
-parseLambda :: Parser Expression
-parseLambda =
+lambdaParser :: Parser SynExpression
+lambdaParser =
   Lambda
     <$> ( lambda
             *> (whiteSpaceO *> identifier <* whiteSpaceO)
             <* (dot <* whiteSpaceO)
         )
-    <*> parseExpression
+    <*> expressionParser
 
-parseApplications :: Parser Expression
-parseApplications = foldl1 Application <$> sepBy1 whiteSpace parseExpressionWithoutApplication
+applicationsParser :: Parser SynExpression
+applicationsParser = foldl1 Application <$> sepBy1 whiteSpace parseExpressionWithoutApplication
 
-parseExpressionWithoutApplication :: Parser Expression
+parseExpressionWithoutApplication :: Parser SynExpression
 parseExpressionWithoutApplication =
-  parseId
-    <|> parseLambda
-    <|> (openParen *> parseExpression <* closeParen)
+  idParser
+    <|> lambdaParser
+    <|> (openParen *> expressionParser <* closeParen)
 
-parseExpression :: Parser Expression
-parseExpression =
-  parseApplications
-    <|> parseId
-    <|> parseLambda
+expressionParser :: Parser SynExpression
+expressionParser =
+  applicationsParser
+    <|> idParser
+    <|> lambdaParser
     <|> ( whiteSpaceO
             *> ( openParen
-                   *> (whiteSpaceO *> parseExpression <* whiteSpaceO)
+                   *> (whiteSpaceO *> expressionParser <* whiteSpaceO)
                    <* closeParen
                )
         )
+
+parseExpression :: String -> Either CompilerError SynExpression
+parseExpression s = fst <$> runParser expressionParser s
 
 -- Unit tests
 
 tests :: [Bool]
 tests =
   -- Id tests
-  [ runParser parseExpression "hello" == Right (Id "hello", ""),
-    runParser parseExpression "hello   " == Right (Id "hello", "   "),
-    runParser parseExpression "   " == Left UnexpectedEndOfFile,
+  [ runParser expressionParser "hello" == Right (Id "hello", ""),
+    runParser expressionParser "hello   " == Right (Id "hello", "   "),
+    runParser expressionParser "   " == Left (LexicalError UnexpectedEndOfFile),
     -- Lambda tests
-    runParser parseExpression "\\a.b" == Right (Lambda "a" (Id "b"), ""),
-    runParser parseExpression "\\a. b" == Right (Lambda "a" (Id "b"), ""),
-    runParser parseExpression "\\a . b" == Right (Lambda "a" (Id "b"), ""),
-    runParser parseExpression "\\ a . b" == Right (Lambda "a" (Id "b"), ""),
-    runParser parseExpression "\\ a.b" == Right (Lambda "a" (Id "b"), ""),
-    runParser parseExpression "\\a .b" == Right (Lambda "a" (Id "b"), ""),
-    runParser parseExpression "\\a.b  " == Right (Lambda "a" (Id "b"), "  "),
-    runParser parseExpression "\\a.b  b" == Right (Lambda "a" (Application (Id "b") (Id "b")), ""),
+    runParser expressionParser "\\a.b" == Right (Lambda "a" (Id "b"), ""),
+    runParser expressionParser "\\a. b" == Right (Lambda "a" (Id "b"), ""),
+    runParser expressionParser "\\a . b" == Right (Lambda "a" (Id "b"), ""),
+    runParser expressionParser "\\ a . b" == Right (Lambda "a" (Id "b"), ""),
+    runParser expressionParser "\\ a.b" == Right (Lambda "a" (Id "b"), ""),
+    runParser expressionParser "\\a .b" == Right (Lambda "a" (Id "b"), ""),
+    runParser expressionParser "\\a.b  " == Right (Lambda "a" (Id "b"), "  "),
+    runParser expressionParser "\\a.b  b" == Right (Lambda "a" (Application (Id "b") (Id "b")), ""),
     -- Application tests
-    runParser parseExpression "a  b" == Right (Application (Id "a") (Id "b"), ""),
-    runParser parseExpression "(\\a.b)  b" == Right (Application (Lambda "a" (Id "b")) (Id "b"), ""),
-    runParser parseExpression "a b" == Right (Application (Id "a") (Id "b"), ""),
-    runParser parseExpression "a b c" == Right (Application (Application (Id "a") (Id "b")) (Id "c"), ""),
-    runParser parseExpression "a b c d" == Right (Application (Application (Application (Id "a") (Id "b")) (Id "c")) (Id "d"), ""),
-    runParser parseExpression "(\\a.a) b c" == Right (Application (Application (Lambda "a" (Id "a")) (Id "b")) (Id "c"), ""),
-    runParser parseExpression "(\\a.\\b.b) b c" == Right (Application (Application (Lambda "a" (Lambda "b" (Id "b"))) (Id "b")) (Id "c"), "")
+    runParser expressionParser "a  b" == Right (Application (Id "a") (Id "b"), ""),
+    runParser expressionParser "(\\a.b)  b" == Right (Application (Lambda "a" (Id "b")) (Id "b"), ""),
+    runParser expressionParser "a b" == Right (Application (Id "a") (Id "b"), ""),
+    runParser expressionParser "a b c" == Right (Application (Application (Id "a") (Id "b")) (Id "c"), ""),
+    runParser expressionParser "a b c d" == Right (Application (Application (Application (Id "a") (Id "b")) (Id "c")) (Id "d"), ""),
+    runParser expressionParser "(\\a.a) b c" == Right (Application (Application (Lambda "a" (Id "a")) (Id "b")) (Id "c"), ""),
+    runParser expressionParser "(\\a.\\b.b) b c" == Right (Application (Application (Lambda "a" (Lambda "b" (Id "b"))) (Id "b")) (Id "c"), "")
   ]

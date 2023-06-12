@@ -25,6 +25,8 @@ source-repository head
 
 library
   exposed-modules:
+      Errors
+      Interpreter
       Lexer
       Lib
       SemanticAnalyzer
