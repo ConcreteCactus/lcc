@@ -3,7 +3,9 @@
 
 module SyntacticAnalyzer
   ( SynExpression (..),
+    SynTypeExpression (..),
     parseExpression,
+    parseType,
   )
 where
 
@@ -16,6 +18,13 @@ data SynExpression
   | Lambda String SynExpression
   | Application SynExpression SynExpression
   deriving (Show, Eq)
+
+data SynTypeExpression
+  = TypeId String
+  | FunctionType SynTypeExpression SynTypeExpression
+  deriving (Show, Eq)
+
+data SynProgramPart = SynDefinition String SynExpression | SynDeclaration String SynTypeExpression deriving (Eq, Show)
 
 idParser :: Parser SynExpression
 idParser = Id <$> identifier
@@ -53,6 +62,44 @@ expressionParser =
 parseExpression :: String -> Either CompilerError SynExpression
 parseExpression s = fst <$> runParser expressionParser s
 
+tIdParser :: Parser SynTypeExpression
+tIdParser = TypeId <$> identifier
+
+functionParser :: Parser SynTypeExpression
+functionParser = FunctionType <$> typeParserWithoutFunction <*> (whiteSpaceO *> arrow *> whiteSpaceO *> typeParser)
+
+typeParserWithoutFunction :: Parser SynTypeExpression
+typeParserWithoutFunction =
+  tIdParser
+    <|> ( whiteSpaceO
+            *> ( openParen
+                   *> (whiteSpaceO *> typeParser <* whiteSpaceO)
+                   <* closeParen
+               )
+            <* whiteSpaceO
+        )
+
+typeParser :: Parser SynTypeExpression
+typeParser =
+  functionParser
+    <|> tIdParser
+    <|> ( whiteSpaceO
+            *> ( openParen
+                   *> (whiteSpaceO *> typeParser <* whiteSpaceO)
+                   <* closeParen
+               )
+            <* whiteSpaceO
+        )
+
+parseType :: String -> Either CompilerError SynTypeExpression
+parseType s = fst <$> runParser typeParser s
+
+parseDeclaration :: Parser SynProgramPart
+parseDeclaration = SynDeclaration <$> identifier <*> (whiteSpaceO *> colon *> whiteSpaceO *> typeParser)
+
+parseDefinition :: Parser SynProgramPart
+parseDefinition = SynDefinition <$> identifier <*> (whiteSpaceO *> colonEquals *> whiteSpaceO *> expressionParser)
+
 -- Unit tests
 
 tests :: [Bool]
@@ -77,5 +124,13 @@ tests =
     runParser expressionParser "a b c" == Right (Application (Application (Id "a") (Id "b")) (Id "c"), ""),
     runParser expressionParser "a b c d" == Right (Application (Application (Application (Id "a") (Id "b")) (Id "c")) (Id "d"), ""),
     runParser expressionParser "(\\a.a) b c" == Right (Application (Application (Lambda "a" (Id "a")) (Id "b")) (Id "c"), ""),
-    runParser expressionParser "(\\a.\\b.b) b c" == Right (Application (Application (Lambda "a" (Lambda "b" (Id "b"))) (Id "b")) (Id "c"), "")
+    runParser expressionParser "(\\a.\\b.b) b c" == Right (Application (Application (Lambda "a" (Lambda "b" (Id "b"))) (Id "b")) (Id "c"), ""),
+    -- Type parser tests
+    runParser typeParser "a" == Right (TypeId "a", ""),
+    runParser typeParser "ab" == Right (TypeId "ab", ""),
+    runParser typeParser "ab1  " == Right (TypeId "ab1", "  "),
+    runParser typeParser "a -> b" == Right (FunctionType (TypeId "a") (TypeId "b"), ""),
+    runParser typeParser "a->b" == Right (FunctionType (TypeId "a") (TypeId "b"), ""),
+    runParser typeParser "a -> b -> c" == Right (FunctionType (TypeId "a") (FunctionType (TypeId "b") (TypeId "c")), ""),
+    runParser typeParser "(a -> b) -> c" == Right (FunctionType (FunctionType (TypeId "a") (TypeId "b")) (TypeId "c"), "")
   ]

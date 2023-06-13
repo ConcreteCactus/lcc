@@ -11,6 +11,9 @@ module Lexer
     openParen,
     closeParen,
     identifier,
+    arrow,
+    colon,
+    colonEquals,
     sepBy1,
     (<|>),
   )
@@ -54,14 +57,18 @@ satisfyE e p = Parser parse
 charE :: CompilerError -> Char -> Parser Char
 charE e c = satisfyE e (== c)
 
--- stringE :: CompilerError -> String -> Parser String
--- stringE e = mapM (charE e)
+stringE :: CompilerError -> String -> Parser String
+stringE e = mapM (charE e)
 
 sepBy1 :: Parser () -> Parser a -> Parser [a]
 sepBy1 separator token = (:) <$> token <*> many (separator *> token)
 
+isSimpleSpace :: Char -> Bool
+isSimpleSpace '\n' = False
+isSimpleSpace s = isSpace s
+
 whiteSpace :: Parser ()
-whiteSpace = void $ some $ satisfyE CompilerError isSpace
+whiteSpace = void $ some (many (charE CompilerError '\n') *> some (satisfyE CompilerError isSimpleSpace))
 
 nothing :: Parser ()
 nothing = Parser (\s -> Right ((), s))
@@ -70,16 +77,39 @@ whiteSpaceO :: Parser ()
 whiteSpaceO = whiteSpace <|> nothing
 
 lambda :: Parser ()
-lambda = void (charE (LexicalError LambdaExpressionExpected) '\\')
+lambda = void $ charE (LexicalError LambdaExpressionExpected) '\\'
 
 dot :: Parser ()
-dot = void (charE (LexicalError InvalidLambdaExpression) '.')
+dot = void $ charE (LexicalError InvalidLambdaExpression) '.'
 
 openParen :: Parser ()
-openParen = void (charE CompilerError '(')
+openParen = void $ charE CompilerError '('
 
 closeParen :: Parser ()
-closeParen = void (charE CompilerError ')')
+closeParen = void $ charE CompilerError ')'
 
 identifier :: Parser String
-identifier = some (satisfyE CompilerError isAlpha)
+identifier = some $ satisfyE CompilerError isAlphaNum
+
+arrow :: Parser ()
+arrow = void $ stringE CompilerError "->"
+
+colon :: Parser ()
+colon = void $ charE CompilerError ':'
+
+colonEquals :: Parser ()
+colonEquals = void $ stringE CompilerError ":="
+
+-- Unit tests
+
+tests :: [Bool]
+tests =
+  [ runParser whiteSpace " " == Right ((), ""),
+    runParser whiteSpace "  " == Right ((), ""),
+    runParser whiteSpace "\t \ta" == Right ((), "a"),
+    runParser whiteSpace "  a" == Right ((), "a"),
+    runParser whiteSpace "  \t\n hello" == Right ((), "hello"),
+    runParser whiteSpace " \t \n" == Right ((), "\n"),
+    runParser whiteSpace " \t \nhello" == Right ((), "\nhello"),
+    runParser whiteSpace "\nhello" == Left CompilerError
+  ]
