@@ -15,6 +15,10 @@ module Lexer
     colon,
     colonEquals,
     sepBy1,
+    sepBy,
+    endOfLine,
+    endOfLineO,
+    eof,
     (<|>),
   )
 where
@@ -63,6 +67,9 @@ stringE e = mapM (charE e)
 sepBy1 :: Parser () -> Parser a -> Parser [a]
 sepBy1 separator token = (:) <$> token <*> many (separator *> token)
 
+sepBy :: Parser () -> Parser a -> Parser [a]
+sepBy separator token = sepBy1 separator token <|> (nothing *> pure [])
+
 isSimpleSpace :: Char -> Bool
 isSimpleSpace '\n' = False
 isSimpleSpace s = isSpace s
@@ -73,8 +80,17 @@ whiteSpace = void $ some (many (charE CompilerError '\n') *> some (satisfyE Comp
 nothing :: Parser ()
 nothing = Parser (\s -> Right ((), s))
 
+eof :: Parser ()
+eof = Parser (\s -> if s == "" then Right ((), "") else Left (LexicalError EndOfFileExpected))
+
 whiteSpaceO :: Parser ()
 whiteSpaceO = whiteSpace <|> nothing
+
+endOfLine :: Parser ()
+endOfLine = void (charE CompilerError '\n') <|> void (stringE CompilerError "\r\n")
+
+endOfLineO :: Parser ()
+endOfLineO = endOfLine <|> nothing
 
 lambda :: Parser ()
 lambda = void $ charE (LexicalError LambdaExpressionExpected) '\\'
