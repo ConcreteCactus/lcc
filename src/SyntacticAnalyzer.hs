@@ -4,17 +4,22 @@
 module SyntacticAnalyzer
   ( SynExpression (..),
     SynTypeExpression (..),
+    Program,
     parseExpression,
     parseType,
   )
 where
 
 import Control.Applicative
+import Control.Monad
 import Errors
 import Lexer
 
+data Literal = IntegerLiteral Integer deriving (Show, Eq)
+
 data SynExpression
   = Id String
+  | Lit Literal
   | Lambda String SynExpression
   | Application SynExpression SynExpression
   deriving (Show, Eq)
@@ -31,6 +36,12 @@ type Program = [SynProgramPart]
 idParser :: Parser SynExpression
 idParser = Id <$> identifier
 
+integerLiteralParser :: Parser Literal
+integerLiteralParser = IntegerLiteral <$> integer
+
+literalParser :: Parser SynExpression
+literalParser = Lit <$> integerLiteralParser
+
 lambdaParser :: Parser SynExpression
 lambdaParser =
   Lambda
@@ -45,13 +56,15 @@ applicationsParser = foldl1 Application <$> sepBy1 whiteSpace parseExpressionWit
 
 parseExpressionWithoutApplication :: Parser SynExpression
 parseExpressionWithoutApplication =
-  idParser
+  literalParser
+    <|> idParser
     <|> lambdaParser
     <|> (openParen *> expressionParser <* closeParen)
 
 expressionParser :: Parser SynExpression
 expressionParser =
   applicationsParser
+    <|> literalParser
     <|> idParser
     <|> lambdaParser
     <|> ( whiteSpaceO
@@ -102,11 +115,31 @@ declarationParser = SynDeclaration <$> identifier <*> (whiteSpaceO *> colon *> w
 definitionParser :: Parser SynProgramPart
 definitionParser = SynDefinition <$> identifier <*> (whiteSpaceO *> colonEquals *> whiteSpaceO *> expressionParser)
 
-programParser :: Parser Program
-programParser = sepBy (whiteSpaceO *> endOfLine) (definitionParser <|> declarationParser)
+blocksParser :: Parser [String]
+blocksParser = filter (not . null) <$> sepBy endOfLine block <* whiteSpaceO <* eof
 
-fullProgramParser :: Parser Program
-fullProgramParser = (programParser <* whiteSpaceO) <* eof
+partParser :: Parser SynProgramPart
+partParser = definitionParser <|> declarationParser
+
+parseProgram :: String -> Either [CompilerError] Program
+parseProgram s = do
+  blocks <- arrayifyError blocksE
+  let parsedBlocks = map (fmap fst . runParser partParser) blocks
+  foldr
+    ( \b acc -> case (b, acc) of
+        (Left e, Left eacc) -> Left $ e : eacc
+        (Left e, _) -> Left [e]
+        (Right a, Right aacc) -> Right $ a : aacc
+        (Right _, e) -> e
+    )
+    (Right [])
+    parsedBlocks
+  where
+    blocksE :: Either CompilerError [String]
+    blocksE = fst <$> runParser blocksParser s
+    arrayifyError :: Either e a -> Either [e] a
+    arrayifyError (Left e) = Left [e]
+    arrayifyError (Right a) = Right a
 
 -- Unit tests
 
@@ -116,6 +149,10 @@ tests =
   [ runParser expressionParser "hello" == Right (Id "hello", ""),
     runParser expressionParser "hello   " == Right (Id "hello", "   "),
     runParser expressionParser "   " == Left (LexicalError UnexpectedEndOfFile),
+    -- Literal tests
+    runParser expressionParser "154381" == Right (Lit (IntegerLiteral 154381), ""),
+    runParser expressionParser "15 4381" == Right (Application (Lit (IntegerLiteral 15)) (Lit (IntegerLiteral 4381)), ""),
+    runParser expressionParser "0xdeadbeef" == Right (Lit (IntegerLiteral 3735928559), ""),
     -- Lambda tests
     runParser expressionParser "\\a.b" == Right (Lambda "a" (Id "b"), ""),
     runParser expressionParser "\\a. b" == Right (Lambda "a" (Id "b"), ""),
@@ -146,8 +183,8 @@ tests =
     runParser declarationParser "helloWorld : string -> string" == Right (SynDeclaration "helloWorld" (FunctionType (TypeId "string") (TypeId "string")), ""),
     runParser definitionParser "world := \\a.\\b.a" == Right (SynDefinition "world" (Lambda "a" (Lambda "b" (Id "a"))), ""),
     -- Whole program parsing
-    runParser programParser program1 == Right (program1ShouldBe, ""),
-    runParser programParser program2 == Right (program2ShouldBe, "  \n")
+    parseProgram program1 == Right program1ShouldBe,
+    parseProgram program3 == Right program3ShouldBe
   ]
 
 program1 :: String
@@ -170,4 +207,23 @@ program2ShouldBe :: Program
 program2ShouldBe =
   [ SynDeclaration "hello" (FunctionType (TypeId "string") (FunctionType (FunctionType (TypeId "string") (TypeId "int")) (TypeId "char"))),
     SynDefinition "hello" (Lambda "a" (Lambda "b" (Lambda "c" (Id "b"))))
+  ]
+
+program3 :: String
+program3 =
+  "true : a -> a -> a\n"
+    ++ "true := \\a.\\b.a\n"
+    ++ "false : a -> a -> a\n"
+    ++ "false := \\a.\\b.b\n"
+    ++ "one : number\n"
+    ++ "one := 1"
+
+program3ShouldBe :: Program
+program3ShouldBe =
+  [ SynDeclaration "true" (FunctionType (TypeId "a") (FunctionType (TypeId "a") (TypeId "a"))),
+    SynDefinition "true" (Lambda "a" (Lambda "b" (Id "a"))),
+    SynDeclaration "false" (FunctionType (TypeId "a") (FunctionType (TypeId "a") (TypeId "a"))),
+    SynDefinition "false" (Lambda "a" (Lambda "b" (Id "b"))),
+    SynDeclaration "one" (TypeId "number"),
+    SynDefinition "one" (Lit (IntegerLiteral 1))
   ]
