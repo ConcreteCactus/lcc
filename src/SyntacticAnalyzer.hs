@@ -4,14 +4,18 @@
 module SyntacticAnalyzer
   ( SynExpression (..),
     SynTypeExpression (..),
+    SynProgramPart (..),
+    Literal,
     Program,
     parseExpression,
     parseType,
+    parseProgram,
+    parseProgramSingleError,
   )
 where
 
 import Control.Applicative
-import Control.Monad
+import qualified Data.List.NonEmpty as Ne
 import Errors
 import Lexer
 
@@ -78,7 +82,7 @@ parseExpression :: String -> Either CompilerError SynExpression
 parseExpression s = fst <$> runParser expressionParser s
 
 tIdParser :: Parser SynTypeExpression
-tIdParser = TypeId <$> identifier
+tIdParser = TypeId <$> anyCapIdentifier
 
 functionParser :: Parser SynTypeExpression
 functionParser = FunctionType <$> typeParserWithoutFunction <*> (whiteSpaceO *> arrow *> whiteSpaceO *> typeParser)
@@ -121,14 +125,14 @@ blocksParser = filter (not . null) <$> sepBy endOfLine block <* whiteSpaceO <* e
 partParser :: Parser SynProgramPart
 partParser = definitionParser <|> declarationParser
 
-parseProgram :: String -> Either [CompilerError] Program
+parseProgram :: String -> Either (Ne.NonEmpty CompilerError) Program
 parseProgram s = do
   blocks <- arrayifyError blocksE
-  let parsedBlocks = map (fmap fst . runParser partParser) blocks
+  let parsedBlocks = fmap (fmap fst . runParser partParser) blocks
   foldr
     ( \b acc -> case (b, acc) of
-        (Left e, Left eacc) -> Left $ e : eacc
-        (Left e, _) -> Left [e]
+        (Left e, Left eacc) -> Left $ e `Ne.cons` eacc
+        (Left e, _) -> Left $ Ne.singleton e
         (Right a, Right aacc) -> Right $ a : aacc
         (Right _, e) -> e
     )
@@ -137,9 +141,22 @@ parseProgram s = do
   where
     blocksE :: Either CompilerError [String]
     blocksE = fst <$> runParser blocksParser s
-    arrayifyError :: Either e a -> Either [e] a
-    arrayifyError (Left e) = Left [e]
+    arrayifyError :: Either e a -> Either (Ne.NonEmpty e) a
+    arrayifyError (Left e) = Left $ Ne.singleton e
     arrayifyError (Right a) = Right a
+
+parseProgramSingleError :: String -> Either CompilerError Program
+parseProgramSingleError s = case parseProgram s of
+  Left e -> Left $ Ne.head e
+  Right a -> Right a
+
+programParser :: Parser Program
+programParser =
+  Parser
+    ( \s -> case parseProgram s of
+        Left e -> Left $ Ne.head e
+        Right a -> Right (a, "")
+    )
 
 -- Unit tests
 
@@ -180,10 +197,12 @@ tests =
     runParser typeParser "(a -> b) -> c" == Right (FunctionType (FunctionType (TypeId "a") (TypeId "b")) (TypeId "c"), ""),
     -- Declaration definition
     runParser declarationParser "hello : string" == Right (SynDeclaration "hello" (TypeId "string"), ""),
+    runParser declarationParser "hello : String" == Right (SynDeclaration "hello" (TypeId "String"), ""),
     runParser declarationParser "helloWorld : string -> string" == Right (SynDeclaration "helloWorld" (FunctionType (TypeId "string") (TypeId "string")), ""),
     runParser definitionParser "world := \\a.\\b.a" == Right (SynDefinition "world" (Lambda "a" (Lambda "b" (Id "a"))), ""),
     -- Whole program parsing
     parseProgram program1 == Right program1ShouldBe,
+    parseProgram program2 == Right program2ShouldBe,
     parseProgram program3 == Right program3ShouldBe
   ]
 

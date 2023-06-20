@@ -3,7 +3,6 @@
 module Lexer
   ( CompilerError (..),
     Parser (..),
-    runParser,
     whiteSpace,
     whiteSpaceO,
     lambda,
@@ -21,6 +20,8 @@ module Lexer
     integer,
     block,
     eof,
+    capIdentifier,
+    anyCapIdentifier,
     (<|>),
   )
 where
@@ -109,7 +110,13 @@ closeParen :: Parser ()
 closeParen = void $ charE CompilerError ')'
 
 identifier :: Parser String
-identifier = some $ satisfyE CompilerError isAlphaNum
+identifier = (:) <$> satisfyE (LexicalError CaseError) isLower <*> many (satisfyE CompilerError isAlphaNum)
+
+capIdentifier :: Parser String
+capIdentifier = (:) <$> satisfyE (LexicalError CaseError) isUpper <*> many (satisfyE CompilerError isAlphaNum)
+
+anyCapIdentifier :: Parser String
+anyCapIdentifier = (:) <$> satisfyE (LexicalError OtherError) isAlpha <*> many (satisfyE CompilerError isAlphaNum)
 
 arrow :: Parser ()
 arrow = void $ stringE CompilerError "->"
@@ -233,5 +240,11 @@ tests =
     runParser block "a : b -> c \na := \\b.c" == Right ("a : b -> c", "\na := \\b.c"),
     runParser block "a : b ->\n c \r\na := \\b.c" == Right ("a : b -> c", "\na := \\b.c"),
     runParser block "a : b -> c \r\na := \\b.c" == Right ("a : b -> c", "\na := \\b.c"),
-    runParser block "a\n :\n b\n ->\n c \r\na := \\b.c" == Right ("a : b -> c", "\na := \\b.c")
+    runParser block "a\n :\n b\n ->\n c \r\na := \\b.c" == Right ("a : b -> c", "\na := \\b.c"),
+    runParser identifier "a" == Right ("a", ""),
+    runParser identifier "a1" == Right ("a1", ""),
+    runParser identifier "A1b" == Left (LexicalError CaseError),
+    runParser capIdentifier "A" == Right ("A", ""),
+    runParser capIdentifier "A1" == Right ("A1", ""),
+    runParser capIdentifier "a1" == Left (LexicalError CaseError)
   ]
