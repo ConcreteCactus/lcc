@@ -5,7 +5,7 @@ module SyntacticAnalyzer
   ( SynExpression (..),
     SynTypeExpression (..),
     SynProgramPart (..),
-    Literal,
+    Literal (..),
     Program,
     parseExpression,
     parseType,

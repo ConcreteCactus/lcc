@@ -1,0 +1,3 @@
+zero := \f.\b.b
+suc  := \n.\f.\b.f (n f b)
+main := suc (suc zero)

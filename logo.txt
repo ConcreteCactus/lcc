@@ -17,3 +17,15 @@ ___
   ▟▉▛ ▜▉▙      ▟▉▉▉▙          ▟▉▉▉▙
  ▟▉▛   ▜▉▙    ▟▉▛ ▜▉▙        ▟▉▛ ▜▉▙
 ▟▉▛     ▜▉▙  ▉▉▛   ▜▉▉  ▉▉  ▉▉▛   ▜▉▉ Lambada_Compiler v1.0
+
+
+
+eee=
+ eee=
+   ee=        eee=   eee=       eee=   eee=
+    ee=        eee= eee=         eee= eee=
+    eee=        eeeeee=           eeeeee=
+   ee=ee=        eeee=             eeee=
+  ee=  ee=      eeeeee=           eeeeee=
+ ee=    ee=    eee= eee=   ee=   eee= eee=
+ee=      ee=  eee=   eee=  ee=  eee=   eee= Lambda_Compiler v1.0

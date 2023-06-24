@@ -8,7 +8,15 @@ module SemanticAnalyzer
   ( SemanticError (..),
     Identifier (..),
     SemExpression (..),
+    SemProgram,
+    SemProgramPart (..),
+    Env (..),
+    State (..),
+    startingEnv,
     createSemanticExpression,
+    createSemanticExpressionS,
+    createSemanticProgram,
+    createSemanticProgramS,
   )
 where
 
@@ -132,7 +140,7 @@ createSemanticExpressionS (Id name) = do
   identM <- getVar name
   case identM of
     Just ident -> return $ Right $ SId ident
-    Nothing -> return $ Left (SemanticError UndefinedVariable)
+    Nothing -> return $ Left (SemanticError $ UndefinedVariable name)
 createSemanticExpressionS (Lambda param expr) = do
   pushScope
   paramIdent <- addVarInc param
@@ -185,7 +193,7 @@ tests =
     testT "(int -> int) -> int" == Right (SFunctionType (SFunctionType (STypeId TInteger) (STypeId TInteger)) (STypeId TInteger)),
     testP program1 == Right program1ShouldBe,
     testP program2 == Right program2ShouldBe,
-    testP program3 == Left (SemanticError UndefinedVariable)
+    testP program3 == Left (SemanticError $ UndefinedVariable "notE")
   ]
 
 program1 :: String

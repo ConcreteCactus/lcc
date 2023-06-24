@@ -2,6 +2,7 @@ module Errors
   ( CompilerError (..),
     LexicalError (..),
     SemanticError (..),
+    RuntimeError (..),
   )
 where
 
@@ -13,4 +14,7 @@ data CompilerError
 
 data LexicalError = UnexpectedEndOfFile | LambdaExpressionExpected | InvalidLambdaExpression | EndOfFileExpected | OtherError | CaseError deriving (Show, Eq) -- Todo: remove OtherError
 
-data SemanticError = ValueRedefinition | UndefinedVariable deriving (Show, Eq)
+data SemanticError = ValueRedefinition | UndefinedVariable String deriving (Show, Eq)
+
+data RuntimeError = InfiniteLoopError | TypeError | UndefinedVariableError
+  deriving (Eq, Show)

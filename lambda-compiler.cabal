@@ -28,9 +28,10 @@ library
       Errors
       Interpreter
       Lexer
-      Lib
+      Repl
       SemanticAnalyzer
       SyntacticAnalyzer
+      Util
   other-modules:
       Paths_lambda_compiler
   hs-source-dirs:
