@@ -55,7 +55,7 @@ get = State (\s -> (s, s))
 put :: s -> State s ()
 put ns = State $ const (ns, ())
 
-data Identifier = Identifier {iid :: Integer, iname :: String} deriving (Show, Eq)
+data Identifier = Identifier {iid :: Integer, iname :: String} deriving (Eq)
 
 data SemTypeIdentifier = TInteger deriving (Show, Eq)
 
@@ -66,7 +66,7 @@ data SemExpression
   | SLit Literal
   | SLambda Identifier SemExpression
   | SApplication SemExpression SemExpression
-  deriving (Eq, Show)
+  deriving (Eq)
 
 data SemType
   = STypeId SemTypeIdentifier
@@ -80,9 +80,24 @@ data InferredType
 
 data Env = Env {scopes :: Ne.NonEmpty [Identifier], variableCounter :: Integer}
 
-data SemProgramPart = SemDeclaration | SemDefinition Identifier SemExpression deriving (Eq, Show)
+data SemProgramPart = SemDeclaration | SemDefinition Identifier SemExpression deriving (Eq)
 
 type SemProgram = [SemProgramPart]
+
+instance Show SemProgramPart where
+  show SemDeclaration = "Declaration"
+  show (SemDefinition ident expr) = show ident ++ " := " ++ show expr
+
+instance Show SemExpression where
+  show (SId identifier) = show identifier
+  show (SLit literal) = show literal
+  show (SLambda param expr) = "\\" ++ show param ++ "." ++ show expr
+  show (SApplication expr1 expr2@(SApplication _ _)) =
+    show expr1 ++ " (" ++ show expr2 ++ ")"
+  show (SApplication expr1 expr2) = show expr1 ++ " " ++ show expr2
+
+instance Show Identifier where
+  show (Identifier _ name) = name
 
 startingEnv :: Env
 startingEnv = Env (Ne.singleton []) 0

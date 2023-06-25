@@ -1,3 +1,7 @@
 zero := \f.\b.b
 suc  := \n.\f.\b.f (n f b)
-main := suc (suc zero)
+
+true := \a.\b.a
+false := \a.\b.b
+
+and := \a.\b. a b false
