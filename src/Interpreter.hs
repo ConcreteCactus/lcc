@@ -1,10 +1,15 @@
 {-# LANGUAGE LambdaCase #-}
 {-# OPTIONS_GHC -Wincomplete-patterns #-}
 {-# OPTIONS_GHC -Wno-partial-fields #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
+{-# HLINT ignore "Use execState" #-}
 
 module Interpreter
-  ( EvaluatedExpression (..),
-    evaluateSafe,
+  ( evaluateSafe,
+    evaluateSafeDeep,
+    replaceReferences,
+    alpha,
   )
 where
 
@@ -14,10 +19,14 @@ import SemanticAnalyzer
 import SyntacticAnalyzer (Literal (..), parseProgramSingleError)
 import Util
 
-data EvaluatedExpression
-  = ELit Literal
-  | ELambda Identifier SemExpression
-  deriving (Eq, Show)
+data AlphaExpression
+  = ALit Literal
+  | AId Integer
+  | ALambda Integer AlphaExpression
+  | AApplication AlphaExpression AlphaExpression
+  deriving (Eq)
+
+type BoundVars = [Identifier]
 
 replaceExpression :: SemExpression -> Identifier -> SemExpression -> SemExpression
 replaceExpression (SId eid) curid repexpr =
@@ -68,29 +77,97 @@ lookupDefinitionName prog name = definition >>= getExpression
     getExpression (SemDefinition _ expr) = Just expr
     getExpression _ = Nothing
 
-evaluateSafe :: SemProgram -> Integer -> SemExpression -> Either RuntimeError EvaluatedExpression
+evaluateSafe :: SemProgram -> Integer -> SemExpression -> Either RuntimeError SemExpression
+evaluateSafe _ 0 _ = Left InfiniteLoopError
 evaluateSafe prog n (SId (Identifier _ name)) =
   maybeToEither
     (lookupDefinitionName prog name)
     UndefinedVariableError
     >>= evaluateSafe prog (n - 1)
-evaluateSafe _ _ (SLit literal) = Right $ ELit literal
-evaluateSafe _ _ (SLambda param expr) = Right $ ELambda param expr
+evaluateSafe _ _ (SLit literal) = Right $ SLit literal
+evaluateSafe _ _ (SLambda param expr) = Right $ SLambda param expr
 evaluateSafe prog n (SApplication expr1 expr2) =
   case evaluateSafe prog (n - 1) expr1 of
     Left e -> Left e
-    Right (ELit _) -> Left TypeError
-    Right (ELambda param expr) ->
+    Right (SLit _) -> Left $ TypeError "applying a value to a literal"
+    Right (SLambda param expr) ->
       evaluateSafe prog (n - 1) $
         beta (SApplication (SLambda param expr) expr2)
+    Right a -> Right a
+
+evaluateSafeDeep :: Integer -> SemExpression -> Either RuntimeError SemExpression
+evaluateSafeDeep 0 _ = Left InfiniteLoopError
+evaluateSafeDeep _ (SId ident) = Right $ SId ident
+evaluateSafeDeep _ (SLit lit) = Right $ SLit lit
+evaluateSafeDeep n (SLambda param expr) = SLambda param <$> evaluateSafeDeep (n - 1) expr
+evaluateSafeDeep n (SApplication expr1 expr2) =
+  let expr1e = evaluateSafeDeep (n - 1) expr1
+   in case expr1e of
+        Left e -> Left e
+        Right lamb@(SLambda _ _) ->
+          evaluateSafeDeep (n - 1) (beta $ SApplication lamb expr2)
+        Right a -> SApplication a <$> evaluateSafeDeep (n - 1) expr2
+
+replaceReferences ::
+  SemProgram ->
+  BoundVars ->
+  Integer ->
+  SemExpression ->
+  Either RuntimeError SemExpression
+replaceReferences _ _ 0 _ = Left InfiniteLoopError
+replaceReferences prog bvars n (SId ident@(Identifier _ name)) =
+  if ident `elem` bvars
+    then Right $ SId ident
+    else maybeToEither (lookupDefinitionName prog name) UndefinedVariableError >>= replaceReferences prog bvars (n - 1)
+replaceReferences _ _ _ (SLit lit) = Right $ SLit lit
+replaceReferences prog bvars n (SLambda param expr) =
+  SLambda param <$> replaceReferences prog (param : bvars) (n - 1) expr
+replaceReferences prog bvars n (SApplication expr1 expr2) =
+  SApplication
+    <$> replaceReferences prog bvars (n - 1) expr1
+    <*> replaceReferences prog bvars (n - 1) expr2
 
 maybeToEither :: Maybe a -> e -> Either e a
 maybeToEither Nothing e = Left e
 maybeToEither (Just a) _ = Right a
 
+normalizeToAlphaS :: SemExpression -> State ([(Identifier, Integer)], Integer) AlphaExpression
+normalizeToAlphaS (SId identifier) = do
+  (idents, count) <- get
+  case lookup identifier idents of
+    Nothing -> do
+      put ((identifier, count + 1) : idents, count + 1)
+      return $ AId $ count + 1
+    Just integer -> do
+      return $ AId integer
+normalizeToAlphaS (SLit lit) = return $ ALit lit
+normalizeToAlphaS (SLambda param expr) = do
+  (idents, count) <- get
+  put ((param, count + 1) : idents, count + 1)
+  next <- normalizeToAlphaS expr
+  return $ ALambda (count + 1) next
+normalizeToAlphaS (SApplication expr1 expr2) =
+  AApplication
+    <$> normalizeToAlphaS expr1
+    <*> normalizeToAlphaS expr2
+
+normalizeToAlpha :: SemExpression -> AlphaExpression
+normalizeToAlpha rexp = snd $ runState (normalizeToAlphaS rexp) ([], 0)
+
+alpha :: SemProgram -> SemExpression -> SemExpression -> Bool
+alpha prog expr1 expr2 = case (alpha1, alpha2) of
+  (Left _, _) -> False
+  (_, Left _) -> False
+  (Right a, Right b) -> a == b
+  where
+    alpha1 =
+      normalizeToAlpha <$> (replaceReferences prog [] 1000 expr1 >>= evaluateSafeDeep 1000)
+    alpha2 =
+      normalizeToAlpha <$> (replaceReferences prog [] 1000 expr2 >>= evaluateSafeDeep 1000)
+
 -- Unit tests
 
-test :: String -> Either (Either CompilerError RuntimeError) EvaluatedExpression
+test :: String -> Either (Either CompilerError RuntimeError) SemExpression
 test s = do
   syntactic <- sinkL $ parseProgramSingleError s
   semantic <- sinkL $ createSemanticProgram syntactic
@@ -102,8 +179,8 @@ test s = do
 
 tests :: [Bool]
 tests =
-  [ test program1 == Right (ELit (IntegerLiteral 1)),
-    test program2 == Right (ELit (IntegerLiteral 1))
+  [ test program1 == Right (SLit (IntegerLiteral 1)),
+    test program2 == Right (SLit (IntegerLiteral 1))
   ]
 
 program1 :: String

@@ -63,7 +63,7 @@ evalStep prog env expS = do
   syntactic <- sinkL $ parseExpression expS
   let (newEnv, semanticE) = runState (createSemanticExpressionS syntactic) env
   semantic <- sinkL semanticE
-  evaluated <- sinkR $ evaluateSafe prog 1000 semantic
+  evaluated <- sinkR $ replaceReferences prog [] 1000 semantic >>= evaluateSafeDeep 1000
   return (newEnv, evaluated)
 
 printStep :: Either (Either CompilerError RuntimeError) SemExpression -> IO ()

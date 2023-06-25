@@ -16,5 +16,5 @@ data LexicalError = UnexpectedEndOfFile | LambdaExpressionExpected | InvalidLamb
 
 data SemanticError = ValueRedefinition | UndefinedVariable String deriving (Show, Eq)
 
-data RuntimeError = InfiniteLoopError | TypeError | UndefinedVariableError
+data RuntimeError = InfiniteLoopError | TypeError String | UndefinedVariableError
   deriving (Eq, Show)

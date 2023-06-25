@@ -25,35 +25,7 @@ import Data.Foldable
 import qualified Data.List.NonEmpty as Ne
 import Errors
 import SyntacticAnalyzer
-
-newtype State s a = State {runState :: s -> (s, a)}
-
-instance Functor (State s) where
-  fmap f (State a) = State $ fmap f . a
-
-instance Applicative (State s) where
-  pure a = State (\s -> (s, a))
-  (State sab) <*> (State sa) =
-    State
-      ( \s1 ->
-          let (s2, ab) = sab s1
-           in let (s3, a) = sa s2 in (s3, ab a)
-      )
-
-instance Monad (State s) where
-  return = pure
-  (State sa) >>= f =
-    State
-      ( \s1 ->
-          let (s2, a) = sa s1
-           in let (State sb) = f a in sb s2
-      )
-
-get :: State s s
-get = State (\s -> (s, s))
-
-put :: s -> State s ()
-put ns = State $ const (ns, ())
+import Util
 
 data Identifier = Identifier {iid :: Integer, iname :: String} deriving (Eq)
 
@@ -92,6 +64,10 @@ instance Show SemExpression where
   show (SId identifier) = show identifier
   show (SLit literal) = show literal
   show (SLambda param expr) = "\\" ++ show param ++ "." ++ show expr
+  show (SApplication expr1@(SLambda param expr) expr2@(SApplication _ _)) =
+    "(" ++ show expr1 ++ ") (" ++ show expr2 ++ ")"
+  show (SApplication expr1@(SLambda param expr) expr2) =
+    "(" ++ show expr1 ++ ") " ++ show expr2
   show (SApplication expr1 expr2@(SApplication _ _)) =
     show expr1 ++ " (" ++ show expr2 ++ ")"
   show (SApplication expr1 expr2) = show expr1 ++ " " ++ show expr2
