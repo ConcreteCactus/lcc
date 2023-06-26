@@ -7,6 +7,8 @@ module Util
   )
 where
 
+import Control.Applicative
+
 sinkL :: Either e a -> Either (Either e f) a
 sinkL (Left e) = Left (Left e)
 sinkL (Right a) = Right a

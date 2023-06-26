@@ -1,6 +1,10 @@
 zero := \f.\b.b
 suc  := \n.\f.\b.f (n f b)
 
+add := \a.\b.\f.\z. a (b f z)
+
+one := \f.\b.f b
+
 true := \a.\b.a
 false := \a.\b.b
 

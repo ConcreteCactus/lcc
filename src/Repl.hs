@@ -1,7 +1,11 @@
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TupleSections #-}
 
 module Repl (repl) where
 
+import Control.Applicative
+import Data.List (find)
+import Data.Maybe
 import Errors
 import Interpreter
 import SemanticAnalyzer
@@ -64,7 +68,20 @@ evalStep prog env expS = do
   let (newEnv, semanticE) = runState (createSemanticExpressionS syntactic) env
   semantic <- sinkL semanticE
   evaluated <- sinkR $ replaceReferences prog [] 1000 semantic >>= evaluateSafeDeep 1000
-  return (newEnv, evaluated)
+  let replaced = fromMaybe evaluated $ findEqDefinition prog evaluated
+  return (newEnv, replaced)
+
+findEqDefinition :: SemProgram -> SemExpression -> Maybe SemExpression
+findEqDefinition prog expr =
+  find
+    ( \case
+        SemDeclaration -> False
+        SemDefinition _ e -> alpha prog e expr
+    )
+    prog
+    >>= \case
+      SemDeclaration -> Nothing
+      SemDefinition p _ -> Just $ SId p
 
 printStep :: Either (Either CompilerError RuntimeError) SemExpression -> IO ()
 printStep (Left e) = putStrLn (show e ++ "\n")
