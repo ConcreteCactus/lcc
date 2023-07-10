@@ -35,6 +35,8 @@ repl file = do
               printStep $ Left e
               replAgain prog env
             Right (newEnv, evaluated) -> do
+              let replaced = replacingStep prog evaluated
+              printStep $ Right replaced
               printStep $ Right evaluated
               replAgain prog newEnv
 
@@ -67,9 +69,12 @@ evalStep prog env expS = do
   syntactic <- sinkL $ parseExpression expS
   let (newEnv, semanticE) = runState (createSemanticExpressionS syntactic) env
   semantic <- sinkL semanticE
-  evaluated <- sinkR $ replaceReferences prog [] 1000 semantic >>= evaluateSafeDeep 1000
+  evaluated <- sinkR $ normalizePartial prog semantic
   let replaced = fromMaybe evaluated $ findEqDefinition prog evaluated
-  return (newEnv, replaced)
+  return (newEnv, evaluated)
+
+replacingStep :: SemProgram -> SemExpression -> SemExpression
+replacingStep prog evaluated = fromMaybe evaluated $ findEqDefinition prog evaluated
 
 findEqDefinition :: SemProgram -> SemExpression -> Maybe SemExpression
 findEqDefinition prog expr =

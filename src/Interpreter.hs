@@ -7,9 +7,11 @@
 
 module Interpreter
   ( evaluateSafe,
-    evaluateSafeDeep,
-    replaceReferences,
     alpha,
+    normalizeToAlpha,
+    normalizePartial,
+    replaceReferences,
+    evaluateSafeDeep,
   )
 where
 
@@ -27,6 +29,18 @@ data AlphaExpression
   deriving (Eq)
 
 type BoundVars = [Identifier]
+
+instance Show AlphaExpression where
+  show (ALit literal) = show literal
+  show (AId ident) = show ident
+  show (ALambda param expr) = "λ" ++ show param ++ "." ++ show expr
+  show (AApplication expr1@(ALambda _ _) expr2@(AApplication _ _)) =
+    "(" ++ show expr1 ++ ") (" ++ show expr2 ++ ")"
+  show (AApplication expr1@(ALambda _ _) expr2) =
+    "(" ++ show expr1 ++ ") " ++ show expr2
+  show (AApplication expr1 expr2@(AApplication _ _)) =
+    show expr1 ++ " (" ++ show expr2 ++ ")"
+  show (AApplication expr1 expr2) = show expr1 ++ " " ++ show expr2
 
 replaceExpression :: SemExpression -> Identifier -> SemExpression -> SemExpression
 replaceExpression (SId eid) curid repexpr =
@@ -154,16 +168,17 @@ normalizeToAlphaS (SApplication expr1 expr2) =
 normalizeToAlpha :: SemExpression -> AlphaExpression
 normalizeToAlpha rexp = snd $ runState (normalizeToAlphaS rexp) ([], 0)
 
+normalizePartial :: SemProgram -> SemExpression -> Either RuntimeError SemExpression
+normalizePartial prog expr = replaceReferences prog [] 1000 expr >>= evaluateSafeDeep 1000
+
 alpha :: SemProgram -> SemExpression -> SemExpression -> Bool
 alpha prog expr1 expr2 = case (alpha1, alpha2) of
   (Left _, _) -> False
   (_, Left _) -> False
   (Right a, Right b) -> a == b
   where
-    alpha1 =
-      normalizeToAlpha <$> (replaceReferences prog [] 1000 expr1 >>= evaluateSafeDeep 1000)
-    alpha2 =
-      normalizeToAlpha <$> (replaceReferences prog [] 1000 expr2 >>= evaluateSafeDeep 1000)
+    alpha1 = normalizeToAlpha <$> normalizePartial prog expr1
+    alpha2 = normalizeToAlpha <$> normalizePartial prog expr2
 
 -- Unit tests
 

@@ -63,17 +63,17 @@ instance Show SemProgramPart where
 instance Show SemExpression where
   show (SId identifier) = show identifier
   show (SLit literal) = show literal
-  show (SLambda param expr) = "\\" ++ show param ++ "." ++ show expr
-  show (SApplication expr1@(SLambda param expr) expr2@(SApplication _ _)) =
+  show (SLambda param expr) = "λ" ++ show param ++ "." ++ show expr
+  show (SApplication expr1@(SLambda _ _) expr2@(SApplication _ _)) =
     "(" ++ show expr1 ++ ") (" ++ show expr2 ++ ")"
-  show (SApplication expr1@(SLambda param expr) expr2) =
+  show (SApplication expr1@(SLambda _ _) expr2) =
     "(" ++ show expr1 ++ ") " ++ show expr2
   show (SApplication expr1 expr2@(SApplication _ _)) =
     show expr1 ++ " (" ++ show expr2 ++ ")"
   show (SApplication expr1 expr2) = show expr1 ++ " " ++ show expr2
 
 instance Show Identifier where
-  show (Identifier _ name) = name
+  show (Identifier code name) = name ++ "_" ++ show code
 
 startingEnv :: Env
 startingEnv = Env (Ne.singleton []) 0

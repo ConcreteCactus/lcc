@@ -1,11 +1,25 @@
 zero := \f.\b.b
 suc  := \n.\f.\b.f (n f b)
+add := \a.\b.\f.\z. a f (b f z)
 
-add := \a.\b.\f.\z. a (b f z)
+id := \x.x
 
-one := \f.\b.f b
+one := suc zero
+two := suc one
+three := suc two
+four := suc three
+five := suc four
+six := suc five
+seven := suc six
+eight := suc seven
+nine := suc eight
+ten := suc nine
+
+
+mul := \a.\b. a (add b) zero
 
 true := \a.\b.a
 false := \a.\b.b
 
 and := \a.\b. a b false
+isZero := \n. n (\x.false) true

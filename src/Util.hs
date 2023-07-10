@@ -4,10 +4,12 @@ module Util
     State (..),
     get,
     put,
+    Subscript (..),
   )
 where
 
 import Control.Applicative
+import Data.Char
 
 sinkL :: Either e a -> Either (Either e f) a
 sinkL (Left e) = Left (Left e)
@@ -45,3 +47,12 @@ get = State (\s -> (s, s))
 
 put :: s -> State s ()
 put ns = State $ const (ns, ())
+
+newtype Subscript = Subscript {unSubscript :: Integer}
+  deriving (Eq, Ord)
+
+instance Show Subscript where
+  show (Subscript i) = show $ foldr (\c s -> chars !! digitToInt c : s) "" $ show i
+    where
+      chars :: [Char]
+      chars = "₀₁₂₃₄₅₆₇₈₉"
