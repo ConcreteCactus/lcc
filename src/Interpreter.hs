@@ -17,6 +17,7 @@ where
 
 import Data.List (find)
 import Errors
+import Interpreter.Beta
 import SemanticAnalyzer
 import SyntacticAnalyzer (Literal (..), parseProgramSingleError)
 import Util
@@ -30,6 +31,14 @@ data AlphaExpression
 
 type BoundVars = [Identifier]
 
+data IEnv = IEnv Integer
+
+getIncIEnv :: State IEnv Integer
+getIncIEnv = do
+  (IEnv i) <- get
+  put $ IEnv (i + 1)
+  return i
+
 instance Show AlphaExpression where
   show (ALit literal) = show literal
   show (AId ident) = show ident
@@ -41,25 +50,6 @@ instance Show AlphaExpression where
   show (AApplication expr1 expr2@(AApplication _ _)) =
     show expr1 ++ " (" ++ show expr2 ++ ")"
   show (AApplication expr1 expr2) = show expr1 ++ " " ++ show expr2
-
-replaceExpression :: SemExpression -> Identifier -> SemExpression -> SemExpression
-replaceExpression (SId eid) curid repexpr =
-  if curid
-    == eid
-    then repexpr
-    else SId eid
-replaceExpression (SLambda param expr) curid repexpr =
-  SLambda param $
-    replaceExpression expr curid repexpr
-replaceExpression (SApplication expr1 expr2) curid repid =
-  SApplication
-    (replaceExpression expr1 curid repid)
-    (replaceExpression expr2 curid repid)
-replaceExpression (SLit l) _ _ = SLit l
-
-beta :: SemExpression -> SemExpression
-beta (SApplication (SLambda param expr1) expr2) = replaceExpression expr1 param expr2
-beta a = a
 
 lookupDefinition :: [SemProgramPart] -> Identifier -> Maybe SemExpression
 lookupDefinition prog ident = definition >>= getExpression
