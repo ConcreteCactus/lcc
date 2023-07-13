@@ -1,4 +1,4 @@
-module Interpreter.Alpha (alpha) where
+module Interpreter.Alpha (alpha, normalizePartial, alphaTests) where
 
 import Errors
 import Interpreter.Beta
@@ -28,18 +28,26 @@ instance Show AlphaExpression where
     show expr1 ++ " (" ++ show expr2 ++ ")"
   show (AApplication expr1 expr2) = show expr1 ++ " " ++ show expr2
 
-evaluateSafeDeep :: Integer -> SemExpression -> Either RuntimeError SemExpression
-evaluateSafeDeep 0 _ = Left InfiniteLoopError
-evaluateSafeDeep _ (SId ident) = Right $ SId ident
-evaluateSafeDeep _ (SLit lit) = Right $ SLit lit
-evaluateSafeDeep n (SLambda param expr) = SLambda param <$> evaluateSafeDeep (n - 1) expr
-evaluateSafeDeep n (SApplication expr1 expr2) =
-  let expr1e = evaluateSafeDeep (n - 1) expr1
-   in case expr1e of
-        Left e -> Left e
-        Right lamb@(SLambda _ _) ->
-          evaluateSafeDeep (n - 1) (beta $ SApplication lamb expr2)
-        Right a -> SApplication a <$> evaluateSafeDeep (n - 1) expr2
+evaluateSafeDeepS ::
+  Integer ->
+  SemExpression ->
+  State BEnv (Either RuntimeError SemExpression)
+evaluateSafeDeepS 0 _ = return $ Left InfiniteLoopError
+evaluateSafeDeepS _ (SId ident) = return $ Right $ SId ident
+evaluateSafeDeepS _ (SLit lit) = return $ Right $ SLit lit
+evaluateSafeDeepS n (SLambda param expr) = do
+  evaluated <- evaluateSafeDeepS (n - 1) expr
+  return $ SLambda param <$> evaluated
+evaluateSafeDeepS n (SApplication expr1 expr2) = do
+  expr1e <- evaluateSafeDeepS (n - 1) expr1
+  case expr1e of
+    Left e -> return $ Left e
+    Right lamb@(SLambda _ _) -> do
+      exprBeta <- beta (SApplication lamb expr2)
+      evaluateSafeDeepS (n - 1) exprBeta
+    Right a -> do
+      evaluated <- evaluateSafeDeepS (n - 1) expr2
+      return $ SApplication a <$> evaluated
 
 replaceReferences ::
   SemProgram ->
@@ -84,7 +92,9 @@ normalizeToAlpha :: SemExpression -> AlphaExpression
 normalizeToAlpha rexp = execState (normalizeToAlphaS rexp) ([], 0)
 
 normalizePartial :: SemProgram -> SemExpression -> Either RuntimeError SemExpression
-normalizePartial prog expr = replaceReferences prog [] 1000 expr >>= evaluateSafeDeep 1000
+normalizePartial (SemProgram env@(Env _ count) parts) expr = do
+  replaced <- replaceReferences (SemProgram env parts) [] 1000 expr
+  execState (evaluateSafeDeepS 1000 replaced) (BEnv count)
 
 alpha :: SemProgram -> SemExpression -> SemExpression -> Bool
 alpha prog expr1 expr2 = case (alpha1, alpha2) of
@@ -94,3 +104,21 @@ alpha prog expr1 expr2 = case (alpha1, alpha2) of
   where
     alpha1 = normalizeToAlpha <$> normalizePartial prog expr1
     alpha2 = normalizeToAlpha <$> normalizePartial prog expr2
+
+-- Unit tests
+
+test :: String -> String -> String -> Either CompilerError Bool
+test s e1 e2 = do
+  prog <- parseAndCreateProgram s
+  expr1 <- parseAndCreateExpressionWithProgram prog e1
+  expr2 <- parseAndCreateExpressionWithProgram prog e2
+  return $ alpha prog expr1 expr2
+
+alphaTests :: [Bool]
+alphaTests = [test program1 "one" "suc zero" == Right True]
+
+program1 :: String
+program1 =
+  "zero := \\f.\\z.z\n"
+    ++ "suc := \\n.\\f.\\z.f (n f z)\n"
+    ++ "one := \\f.\\z.f z\n"

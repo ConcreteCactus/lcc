@@ -7,6 +7,7 @@ module Util
     Subscript (..),
     maybeToEither,
     execState,
+    evalState,
   )
 where
 
@@ -65,3 +66,6 @@ maybeToEither (Just a) _ = Right a
 
 execState :: State s a -> s -> a
 execState (State sa) = snd . sa
+
+evalState :: State s a -> s -> s
+evalState (State sa) = fst . sa

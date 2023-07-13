@@ -1,9 +1,10 @@
 {-# OPTIONS_GHC -Wincomplete-patterns #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
-module Interpreter.Beta (beta) where
+module Interpreter.Beta (beta, BEnv (..)) where
 
 import SemanticAnalyzer
+import SyntacticAnalyzer
 import Util
 
 newtype BEnv = BEnv Integer
@@ -57,3 +58,18 @@ getMaxIndex (SId (Identifier i _)) = i
 getMaxIndex (SLit _) = 0
 getMaxIndex (SLambda (Identifier parami _) expr) = max parami $ getMaxIndex expr
 getMaxIndex (SApplication expr1 expr2) = max (getMaxIndex expr1) $ getMaxIndex expr2
+
+-- Unit tests
+
+betaTests :: [Bool]
+betaTests =
+  [ getMinIndex (SId (Identifier 0 "x")) == 0,
+    getMinIndex (SLit (IntegerLiteral 0)) == 0,
+    getMinIndex (SLambda (Identifier 0 "x") (SId (Identifier 1 "x"))) == 0,
+    getMinIndex (SApplication (SId (Identifier 0 "x")) (SId (Identifier 1 "x"))) == 0,
+    getMaxIndex (SId (Identifier 0 "x")) == 0,
+    getMaxIndex (SLit (IntegerLiteral 0)) == 0,
+    getMaxIndex (SLambda (Identifier 0 "x") (SId (Identifier 1 "x"))) == 1,
+    getMaxIndex (SApplication (SId (Identifier 0 "x")) (SId (Identifier 1 "x"))) == 1,
+    execState (beta (SApplication (SLambda (Identifier 0 "x") (SId (Identifier 0 "x"))) (SLit (IntegerLiteral 0)))) (BEnv 0) == SLit (IntegerLiteral 0)
+  ]

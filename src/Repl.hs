@@ -1,13 +1,11 @@
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE TupleSections #-}
 
 module Repl (repl) where
 
-import Control.Applicative
 import Data.List (find)
 import Data.Maybe
 import Errors
-import Interpreter
+import Interpreter.Alpha
 import SemanticAnalyzer
 import SyntacticAnalyzer
 import System.IO
@@ -20,7 +18,7 @@ repl file = do
   loadResult <- loadStep file
   case loadResult of
     Left err -> putStrLn $ "Couldn't load file: " ++ file ++ "\n" ++ show err ++ "\n"
-    Right (env, prog) -> do
+    Right prog@(SemProgram env _) -> do
       replAgain prog env
   where
     replAgain :: SemProgram -> Env -> IO ()
@@ -40,15 +38,14 @@ repl file = do
               printStep $ Right evaluated
               replAgain prog newEnv
 
-loadStep :: FilePath -> IO (Either CompilerError (Env, SemProgram))
+loadStep :: FilePath -> IO (Either CompilerError SemProgram)
 loadStep path = do
   progS <- readFile path
   let progE = parseProgramSingleError progS
   case progE of
     Left e -> return $ Left e
     Right prog -> do
-      let (env, loaded) = runState (createSemanticProgramS prog) startingEnv
-      return $ (env,) <$> loaded
+      return $ createSemanticProgram prog
 
 readStep :: IO String
 readStep = do
@@ -70,20 +67,19 @@ evalStep prog env expS = do
   let (newEnv, semanticE) = runState (createSemanticExpressionS syntactic) env
   semantic <- sinkL semanticE
   evaluated <- sinkR $ normalizePartial prog semantic
-  let replaced = fromMaybe evaluated $ findEqDefinition prog evaluated
   return (newEnv, evaluated)
 
 replacingStep :: SemProgram -> SemExpression -> SemExpression
 replacingStep prog evaluated = fromMaybe evaluated $ findEqDefinition prog evaluated
 
 findEqDefinition :: SemProgram -> SemExpression -> Maybe SemExpression
-findEqDefinition prog expr =
+findEqDefinition prog@(SemProgram _ parts) expr =
   find
     ( \case
         SemDeclaration -> False
         SemDefinition _ e -> alpha prog e expr
     )
-    prog
+    parts
     >>= \case
       SemDeclaration -> Nothing
       SemDefinition p _ -> Just $ SId p
