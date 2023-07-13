@@ -5,6 +5,8 @@ module Util
     get,
     put,
     Subscript (..),
+    maybeToEither,
+    execState,
   )
 where
 
@@ -56,3 +58,10 @@ instance Show Subscript where
     where
       chars :: [Char]
       chars = "₀₁₂₃₄₅₆₇₈₉"
+
+maybeToEither :: Maybe a -> e -> Either e a
+maybeToEither Nothing e = Left e
+maybeToEither (Just a) _ = Right a
+
+execState :: State s a -> s -> a
+execState (State sa) = snd . sa

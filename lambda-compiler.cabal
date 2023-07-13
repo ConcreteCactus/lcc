@@ -27,7 +27,9 @@ library
   exposed-modules:
       Errors
       Interpreter
+      Interpreter.Alpha
       Interpreter.Beta
+      Interpreter.IUtil
       Lexer
       Repl
       SemanticAnalyzer
