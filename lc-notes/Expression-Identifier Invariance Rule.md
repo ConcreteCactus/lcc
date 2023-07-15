@@ -1,1 +1,1 @@
-No parameters of any two $\lambda$-expressions can have the same identifier number.
+No parameters of any two $\lambda$-expressions can have the same identifier number (in the same context.)
