@@ -19,6 +19,7 @@ module SemanticAnalyzer
     createSemanticProgramS,
     parseAndCreateProgram,
     parseAndCreateExpressionWithProgram,
+    emptyProgram,
     sematicAnalyzerTests,
   )
 where
@@ -134,7 +135,7 @@ createSemanticExpressionS (Id name) = do
   identM <- getVar name
   case identM of
     Just ident -> return $ Right $ SId ident
-    Nothing -> return $ Left (SemanticError $ UndefinedVariable name)
+    Nothing -> return $ Left (SemanticError $ SUndefinedVariable name)
 createSemanticExpressionS (Lambda param expr) = do
   pushScope
   paramIdent <- addVarInc param
@@ -177,6 +178,9 @@ parseAndCreateExpressionWithProgram (SemProgram env _) s = do
   let created = execState (createSemanticExpressionS parsed) env
   created
 
+emptyProgram :: SemProgram
+emptyProgram = SemProgram startingEnv []
+
 -- Unit tests
 
 test :: String -> Either CompilerError SemExpression
@@ -192,13 +196,13 @@ sematicAnalyzerTests :: [Bool]
 sematicAnalyzerTests =
   [ test "\\a.a" == Right (SLambda (Identifier 1 "a") (SId $ Identifier 1 "a")),
     test "\\a.\\b.a b" == Right (SLambda (Identifier 1 "a") (SLambda (Identifier 2 "b") (SApplication (SId $ Identifier 1 "a") (SId $ Identifier 2 "b")))),
-    test "(\\a.a) x" == Left (SemanticError $ UndefinedVariable "x"),
+    test "(\\a.a) x" == Left (SemanticError $ SUndefinedVariable "x"),
     testT "int" == Right (STypeId TInteger),
     testT "int -> int" == Right (SFunctionType (STypeId TInteger) (STypeId TInteger)),
     testT "(int -> int) -> int" == Right (SFunctionType (SFunctionType (STypeId TInteger) (STypeId TInteger)) (STypeId TInteger)),
     testP program1 == Right program1ShouldBe,
     testP program2 == Right program2ShouldBe,
-    testP program3 == Left (SemanticError $ UndefinedVariable "notE"),
+    testP program3 == Left (SemanticError $ SUndefinedVariable "notE"),
     parseAndCreateProgram program1 == Right program1ShouldBe,
     parseAndCreateProgram program2 == Right program2ShouldBe,
     (parseAndCreateProgram program1 >>= (`parseAndCreateExpressionWithProgram` "true")) == Right (SId (Identifier 1 "true"))

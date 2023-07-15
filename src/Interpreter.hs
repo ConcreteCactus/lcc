@@ -4,7 +4,7 @@
 
 {-# HLINT ignore "Use execState" #-}
 
-module Interpreter (evaluateSafeS, interpreterTests) where
+module Interpreter (evaluateSafe, interpreterTests) where
 
 import Errors
 import Interpreter.Beta
@@ -13,49 +13,38 @@ import SemanticAnalyzer
 import SyntacticAnalyzer (Literal (..), parseProgramSingleError)
 import Util
 
-evaluateSafeS ::
-  SemProgram ->
-  Integer ->
-  SemExpression ->
-  State BEnv (Either RuntimeError SemExpression)
-evaluateSafeS _ 0 _ = return $ Left InfiniteLoopError
-evaluateSafeS prog n (SId (Identifier _ name)) = do
-  let defM = lookupDefinitionName prog name
-  case defM of
-    Nothing -> return $ Left UndefinedVariableError
-    Just def -> evaluateSafeS prog (n - 1) def
-evaluateSafeS _ _ (SLit literal) = return $ Right $ SLit literal
-evaluateSafeS _ _ (SLambda param expr) = return $ Right $ SLambda param expr
-evaluateSafeS prog n (SApplication expr1 expr2) = do
-  expr1E <- evaluateSafeS prog (n - 1) expr1
-  case expr1E of
-    Left e -> return $ Left e
-    Right (SLit _) -> return $ Left $ TypeError "applying a value to a literal"
-    Right (SLambda param expr) -> do
-      exprBeta <- beta (SApplication (SLambda param expr) expr2)
-      evaluateSafeS prog (n - 1) exprBeta
-    Right a -> return $ Right a
-
 evaluateSafe ::
   SemProgram ->
   Integer ->
   SemExpression ->
   Either RuntimeError SemExpression
-evaluateSafe (SemProgram env@(Env _ count) parts) n expr =
-  execState
-    (evaluateSafeS (SemProgram env parts) n expr)
-    (BEnv count)
+evaluateSafe _ 0 _ = Left InfiniteLoopError
+evaluateSafe prog@(SemProgram _ parts) n (SId ident@(Identifier _ identName)) =
+  maybeToEither
+    (lookupDefinition parts ident)
+    (RUndefinedVariable identName)
+    >>= evaluateSafe prog (n - 1)
+evaluateSafe _ _ (SLit literal) = Right $ SLit literal
+evaluateSafe _ _ (SLambda param expr) = Right $ SLambda param expr
+evaluateSafe prog n (SApplication expr1 expr2) = do
+  let expr1E = evaluateSafe prog (n - 1) expr1
+  case expr1E of
+    Left e -> Left e
+    Right (SLit _) -> Left $ TypeError "applying a value to a literal"
+    Right (SLambda param expr) -> do
+      evaluateSafe prog (n - 1) $ beta (SApplication (SLambda param expr) expr2)
+    Right a -> Right a
 
 -- Unit tests
 
 test :: String -> Either (Either CompilerError RuntimeError) SemExpression
 test s = do
   syntactic <- sinkL $ parseProgramSingleError s
-  semantic <- sinkL $ createSemanticProgram syntactic
+  semantic@(SemProgram _ parts) <- sinkL $ createSemanticProgram syntactic
   sinkR $
     maybeToEither
-      (lookupDefinitionName semantic "main")
-      UndefinedVariableError
+      (lookupDefinitionName parts "main")
+      (RUndefinedVariable "main")
       >>= evaluateSafe semantic 1000
 
 interpreterTests :: [Bool]

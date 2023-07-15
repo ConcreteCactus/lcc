@@ -9,8 +9,8 @@ where
 import Data.Foldable
 import SemanticAnalyzer
 
-lookupDefinition :: SemProgram -> Identifier -> Maybe SemExpression
-lookupDefinition (SemProgram _ parts) ident = definition >>= getExpression
+lookupDefinition :: [SemProgramPart] -> Identifier -> Maybe SemExpression
+lookupDefinition parts ident = definition >>= getExpression
   where
     definition :: Maybe SemProgramPart
     definition =
@@ -24,8 +24,8 @@ lookupDefinition (SemProgram _ parts) ident = definition >>= getExpression
     getExpression (SemDefinition _ expr) = Just expr
     getExpression _ = Nothing
 
-lookupDefinitionName :: SemProgram -> String -> Maybe SemExpression
-lookupDefinitionName (SemProgram _ parts) name = definition >>= getExpression
+lookupDefinitionName :: [SemProgramPart] -> String -> Maybe SemExpression
+lookupDefinitionName parts name = definition >>= getExpression
   where
     definition :: Maybe SemProgramPart
     definition =

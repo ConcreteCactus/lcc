@@ -32,11 +32,11 @@ repl file = do
             Left e -> do
               printStep $ Left e
               replAgain prog env
-            Right (newEnv, evaluated) -> do
+            Right evaluated -> do
               let replaced = replacingStep prog evaluated
               printStep $ Right replaced
               printStep $ Right evaluated
-              replAgain prog newEnv
+              replAgain prog env
 
 loadStep :: FilePath -> IO (Either CompilerError SemProgram)
 loadStep path = do
@@ -61,13 +61,12 @@ evalStep ::
   SemProgram ->
   Env ->
   String ->
-  Either (Either CompilerError RuntimeError) (Env, SemExpression)
+  Either (Either CompilerError RuntimeError) SemExpression
 evalStep prog env expS = do
   syntactic <- sinkL $ parseExpression expS
-  let (newEnv, semanticE) = runState (createSemanticExpressionS syntactic) env
+  let (_, semanticE) = runState (createSemanticExpressionS syntactic) env
   semantic <- sinkL semanticE
-  evaluated <- sinkR $ normalizePartial prog semantic
-  return (newEnv, evaluated)
+  sinkR $ normalizePartial prog semantic
 
 replacingStep :: SemProgram -> SemExpression -> SemExpression
 replacingStep prog evaluated = fromMaybe evaluated $ findEqDefinition prog evaluated

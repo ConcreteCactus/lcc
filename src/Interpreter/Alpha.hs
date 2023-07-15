@@ -28,45 +28,105 @@ instance Show AlphaExpression where
     show expr1 ++ " (" ++ show expr2 ++ ")"
   show (AApplication expr1 expr2) = show expr1 ++ " " ++ show expr2
 
-evaluateSafeDeepS ::
-  Integer ->
-  SemExpression ->
-  State BEnv (Either RuntimeError SemExpression)
-evaluateSafeDeepS 0 _ = return $ Left InfiniteLoopError
-evaluateSafeDeepS _ (SId ident) = return $ Right $ SId ident
-evaluateSafeDeepS _ (SLit lit) = return $ Right $ SLit lit
-evaluateSafeDeepS n (SLambda param expr) = do
-  evaluated <- evaluateSafeDeepS (n - 1) expr
-  return $ SLambda param <$> evaluated
-evaluateSafeDeepS n (SApplication expr1 expr2) = do
-  expr1e <- evaluateSafeDeepS (n - 1) expr1
-  case expr1e of
-    Left e -> return $ Left e
-    Right lamb@(SLambda _ _) -> do
-      exprBeta <- beta (SApplication lamb expr2)
-      evaluateSafeDeepS (n - 1) exprBeta
-    Right a -> do
-      evaluated <- evaluateSafeDeepS (n - 1) expr2
-      return $ SApplication a <$> evaluated
+newtype DEnv = DEnv Integer
 
-replaceReferences ::
-  SemProgram ->
-  BoundVars ->
+dupExpr :: [SemProgramPart] -> SemExpression -> State DEnv SemExpression
+dupExpr parts expression = do
+  (DEnv startingCount) <- get
+  put $ DEnv (startingCount + maxInd - minInd + 1)
+  return $ dupHelper startingCount expression
+  where
+    minInd, maxInd :: Integer
+    minInd = getMinIndex expression
+    maxInd = getMaxIndex expression
+    dupHelper :: Integer -> SemExpression -> SemExpression
+    dupHelper startingCount (SId ident@(Identifier i name)) =
+      let lookupM = lookupDefinition parts ident
+       in case lookupM of
+            Just _ -> SId (Identifier i name)
+            Nothing -> SId (Identifier (i - minInd + startingCount) name)
+    dupHelper _ (SLit lit) = SLit lit
+    dupHelper startingCount (SLambda (Identifier parami paramName) expr) =
+      SLambda (Identifier (parami - minInd + startingCount) paramName) (dupHelper startingCount expr)
+    dupHelper startingCount (SApplication expr1 expr2) =
+      SApplication (dupHelper startingCount expr1) (dupHelper startingCount expr2)
+
+getMinIndex :: SemExpression -> Integer
+getMinIndex (SId (Identifier i _)) = i
+getMinIndex (SLit _) = 0
+getMinIndex (SLambda (Identifier parami _) expr) = min parami $ getMinIndex expr
+getMinIndex (SApplication expr1 expr2) = min (getMinIndex expr1) $ getMinIndex expr2
+
+getMaxIndex :: SemExpression -> Integer
+getMaxIndex (SId (Identifier i _)) = i
+getMaxIndex (SLit _) = 0
+getMaxIndex (SLambda (Identifier parami _) expr) = max parami $ getMaxIndex expr
+getMaxIndex (SApplication expr1 expr2) = max (getMaxIndex expr1) $ getMaxIndex expr2
+
+evaluateSafeDeep ::
   Integer ->
   SemExpression ->
   Either RuntimeError SemExpression
-replaceReferences _ _ 0 _ = Left InfiniteLoopError
-replaceReferences prog bvars n (SId ident@(Identifier _ name)) =
+evaluateSafeDeep 0 _ = Left InfiniteLoopError
+evaluateSafeDeep _ (SId ident) = Right $ SId ident
+evaluateSafeDeep _ (SLit lit) = Right $ SLit lit
+evaluateSafeDeep n (SLambda param expr) = SLambda param <$> evaluateSafeDeep (n - 1) expr
+evaluateSafeDeep n (SApplication expr1 expr2) =
+  let expr1E = evaluateSafeDeep (n - 1) expr1
+   in case expr1E of
+        Left e -> Left e
+        Right lamb@(SLambda _ _) ->
+          evaluateSafeDeep (n - 1) $ beta (SApplication lamb expr2)
+        Right a -> SApplication a <$> evaluateSafeDeep (n - 1) expr2
+
+-- replaceReferences ::
+--   [SemProgramPart] ->
+--   BoundVars ->
+--   Integer ->
+--   SemExpression ->
+--   Either RuntimeError SemExpression
+-- replaceReferences _ _ 0 _ = Left InfiniteLoopError
+-- replaceReferences prog bvars n (SId ident@(Identifier _ identName)) =
+--   if ident `elem` bvars
+--     then Right $ SId ident
+--     else
+--       maybeToEither (lookupDefinition prog ident) (RUndefinedVariable identName)
+--         >>= replaceReferences prog bvars (n - 1)
+-- replaceReferences _ _ _ (SLit lit) = Right $ SLit lit
+-- replaceReferences prog bvars n (SLambda param expr) = do
+--   SLambda param <$> replaceReferences prog (param : bvars) (n - 1) expr
+-- replaceReferences prog bvars n (SApplication expr1 expr2) =
+--   SApplication
+--     <$> replaceReferences prog bvars (n - 1) expr1
+--     <*> replaceReferences prog bvars (n - 1) expr2
+
+replaceReferencesS ::
+  [SemProgramPart] ->
+  BoundVars ->
+  Integer ->
+  SemExpression ->
+  State DEnv (Either RuntimeError SemExpression)
+replaceReferencesS _ _ 0 _ = return $ Left InfiniteLoopError
+replaceReferencesS parts bvars n (SId ident@(Identifier _ identName)) =
   if ident `elem` bvars
-    then Right $ SId ident
-    else maybeToEither (lookupDefinitionName prog name) UndefinedVariableError >>= replaceReferences prog bvars (n - 1)
-replaceReferences _ _ _ (SLit lit) = Right $ SLit lit
-replaceReferences prog bvars n (SLambda param expr) =
-  SLambda param <$> replaceReferences prog (param : bvars) (n - 1) expr
-replaceReferences prog bvars n (SApplication expr1 expr2) =
-  SApplication
-    <$> replaceReferences prog bvars (n - 1) expr1
-    <*> replaceReferences prog bvars (n - 1) expr2
+    then return $ Right $ SId ident
+    else do
+      let definitionE = maybeToEither (lookupDefinition parts ident) (RUndefinedVariable identName)
+      case definitionE of
+        Left e -> return $ Left e
+        Right definition -> do
+          duped <- dupExpr parts definition
+          replaceReferencesS parts bvars (n - 1) duped
+replaceReferencesS _ _ _ (SLit lit) = return $ Right $ SLit lit
+replaceReferencesS parts bvars n (SLambda param expr) = do
+  replacedE <- replaceReferencesS parts (param : bvars) (n - 1) expr
+  case replacedE of
+    Left e -> return $ Left e
+    Right replaced -> return $ Right $ SLambda param replaced
+replaceReferencesS parts bvars n (SApplication expr1 expr2) = do
+  expr1E <- replaceReferencesS parts bvars (n - 1) expr1
+  expr2E <- replaceReferencesS parts bvars (n - 1) expr2
+  return (SApplication <$> expr1E <*> expr2E)
 
 normalizeToAlphaS :: SemExpression -> State ([(Identifier, Integer)], Integer) AlphaExpression
 normalizeToAlphaS (SId identifier) = do
@@ -92,9 +152,9 @@ normalizeToAlpha :: SemExpression -> AlphaExpression
 normalizeToAlpha rexp = execState (normalizeToAlphaS rexp) ([], 0)
 
 normalizePartial :: SemProgram -> SemExpression -> Either RuntimeError SemExpression
-normalizePartial (SemProgram env@(Env _ count) parts) expr = do
-  replaced <- replaceReferences (SemProgram env parts) [] 1000 expr
-  execState (evaluateSafeDeepS 1000 replaced) (BEnv count)
+normalizePartial (SemProgram (Env _ count) parts) expr = do
+  replaced <- execState (replaceReferencesS parts [] 1000 expr) (DEnv count)
+  evaluateSafeDeep 1000 replaced
 
 alpha :: SemProgram -> SemExpression -> SemExpression -> Bool
 alpha prog expr1 expr2 = case (alpha1, alpha2) of
@@ -114,8 +174,25 @@ test s e1 e2 = do
   expr2 <- parseAndCreateExpressionWithProgram prog e2
   return $ alpha prog expr1 expr2
 
+testDup :: String -> Integer -> Either CompilerError SemExpression
+testDup expr st = do
+  semExpr <- parseAndCreateExpressionWithProgram emptyProgram expr
+  return $ execState (dupExpr [] semExpr) (DEnv st)
+
 alphaTests :: [Bool]
-alphaTests = [test program1 "one" "suc zero" == Right True]
+alphaTests =
+  [ getMinIndex (SId (Identifier 0 "x")) == 0,
+    getMinIndex (SLit (IntegerLiteral 0)) == 0,
+    getMinIndex (SLambda (Identifier 0 "x") (SId (Identifier 1 "x"))) == 0,
+    getMinIndex (SApplication (SId (Identifier 0 "x")) (SId (Identifier 1 "x"))) == 0,
+    getMaxIndex (SId (Identifier 0 "x")) == 0,
+    getMaxIndex (SLit (IntegerLiteral 0)) == 0,
+    getMaxIndex (SLambda (Identifier 0 "x") (SId (Identifier 1 "x"))) == 1,
+    getMaxIndex (SApplication (SId (Identifier 0 "x")) (SId (Identifier 1 "x"))) == 1,
+    test program1 "one" "suc zero" == Right True,
+    testDup "\\a.\\b.a b" 0 == Right (SLambda (Identifier 0 "a") (SLambda (Identifier 1 "b") (SApplication (SId (Identifier 0 "a")) (SId (Identifier 1 "b"))))),
+    testDup "\\a.\\b.a b" 10 == Right (SLambda (Identifier 10 "a") (SLambda (Identifier 11 "b") (SApplication (SId (Identifier 10 "a")) (SId (Identifier 11 "b")))))
+  ]
 
 program1 :: String
 program1 =

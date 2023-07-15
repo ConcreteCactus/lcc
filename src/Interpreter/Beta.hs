@@ -1,13 +1,10 @@
 {-# OPTIONS_GHC -Wincomplete-patterns #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
-module Interpreter.Beta (beta, BEnv (..)) where
+module Interpreter.Beta (beta) where
 
 import SemanticAnalyzer
 import SyntacticAnalyzer
-import Util
-
-newtype BEnv = BEnv Integer
 
 replaceExpression :: SemExpression -> Identifier -> SemExpression -> SemExpression
 replaceExpression (SId eid) curid repexpr =
@@ -24,52 +21,13 @@ replaceExpression (SApplication expr1 expr2) curid repid =
     (replaceExpression expr2 curid repid)
 replaceExpression (SLit l) _ _ = SLit l
 
-beta :: SemExpression -> State BEnv SemExpression
-beta (SApplication (SLambda param expr1) expr2) = do
-  dupedExpr <- dupExpr expr2
-  return $ replaceExpression expr1 param dupedExpr
-beta a = return a
-
-dupExpr :: SemExpression -> State BEnv SemExpression
-dupExpr expression = do
-  (BEnv startingCount) <- get
-  put $ BEnv (startingCount + maxInd - minInd + 1)
-  return $ betaHelper startingCount expression
-  where
-    minInd, maxInd :: Integer
-    minInd = getMinIndex expression
-    maxInd = getMaxIndex expression
-    betaHelper :: Integer -> SemExpression -> SemExpression
-    betaHelper startingCount (SId (Identifier i name)) = SId (Identifier (i - minInd + startingCount) name)
-    betaHelper _ (SLit lit) = SLit lit
-    betaHelper startingCount (SLambda (Identifier parami paramName) expr) =
-      SLambda (Identifier (parami - minInd + startingCount) paramName) (betaHelper startingCount expr)
-    betaHelper startingCount (SApplication expr1 expr2) =
-      SApplication (betaHelper startingCount expr1) (betaHelper startingCount expr2)
-
-getMinIndex :: SemExpression -> Integer
-getMinIndex (SId (Identifier i _)) = i
-getMinIndex (SLit _) = 0
-getMinIndex (SLambda (Identifier parami _) expr) = min parami $ getMinIndex expr
-getMinIndex (SApplication expr1 expr2) = min (getMinIndex expr1) $ getMinIndex expr2
-
-getMaxIndex :: SemExpression -> Integer
-getMaxIndex (SId (Identifier i _)) = i
-getMaxIndex (SLit _) = 0
-getMaxIndex (SLambda (Identifier parami _) expr) = max parami $ getMaxIndex expr
-getMaxIndex (SApplication expr1 expr2) = max (getMaxIndex expr1) $ getMaxIndex expr2
+beta :: SemExpression -> SemExpression
+beta (SApplication (SLambda param expr1) expr2) = replaceExpression expr1 param expr2
+beta a = a
 
 -- Unit tests
 
 betaTests :: [Bool]
 betaTests =
-  [ getMinIndex (SId (Identifier 0 "x")) == 0,
-    getMinIndex (SLit (IntegerLiteral 0)) == 0,
-    getMinIndex (SLambda (Identifier 0 "x") (SId (Identifier 1 "x"))) == 0,
-    getMinIndex (SApplication (SId (Identifier 0 "x")) (SId (Identifier 1 "x"))) == 0,
-    getMaxIndex (SId (Identifier 0 "x")) == 0,
-    getMaxIndex (SLit (IntegerLiteral 0)) == 0,
-    getMaxIndex (SLambda (Identifier 0 "x") (SId (Identifier 1 "x"))) == 1,
-    getMaxIndex (SApplication (SId (Identifier 0 "x")) (SId (Identifier 1 "x"))) == 1,
-    execState (beta (SApplication (SLambda (Identifier 0 "x") (SId (Identifier 0 "x"))) (SLit (IntegerLiteral 0)))) (BEnv 0) == SLit (IntegerLiteral 0)
+  [ beta (SApplication (SLambda (Identifier 0 "x") (SId (Identifier 0 "x"))) (SLit (IntegerLiteral 0))) == SLit (IntegerLiteral 0)
   ]
