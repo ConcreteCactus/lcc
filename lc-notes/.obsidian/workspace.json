@@ -13,7 +13,7 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Expression-Identifier Invariance Rule.md",
+                "file": "Alpha equivalence is hard.md",
                 "mode": "source",
                 "source": false
               }
@@ -93,7 +93,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "Expression-Identifier Invariance Rule.md",
+                "file": "Alpha equivalence is hard.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -110,7 +110,7 @@
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "Expression-Identifier Invariance Rule.md",
+                "file": "Alpha equivalence is hard.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               }
@@ -133,7 +133,7 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "Expression-Identifier Invariance Rule.md"
+                "file": "Alpha equivalence is hard.md"
               }
             }
           }
@@ -156,7 +156,7 @@
   },
   "active": "9701974cbeaf6243",
   "lastOpenFiles": [
-    "Alpha equivalence is hard.md",
-    "Expression-Identifier Invariance Rule.md"
+    "Expression-Identifier Invariance Rule.md",
+    "Alpha equivalence is hard.md"
   ]
 }

@@ -1,0 +1,32 @@
+zero := \f.\b.b
+suc  := \n.\f.\b.f (n f b)
+add := \a.\b.\f.\z. a f (b f z)
+
+pred := \n.\f.\z.n (\g.\h.h (g f)) (\u.z) (\u.u)
+
+one := suc zero
+two := suc one
+three := suc two
+four := suc three
+five := suc four
+six := suc five
+seven := suc six
+eight := suc seven
+nine := suc eight
+ten := suc nine
+
+true := \a.\b.a
+false := \a.\b.b
+
+emptyVec := \f.\e.e
+cons := \item.\vec.\f.\e.f item vec
+
+onetwothree := cons one (cons two (cons three emptyVec))
+
+head := \err.\vec. vec (\item.\tail.item) err
+
+tail := \err.\vec. vec (\item.\tail.tail) err
+
+isZero := \n. n (\x. false) true
+
+index := \err.\vec.\n. (isZero n) (head err vec) (index err (tail err vec) (pred n))
