@@ -1,5 +1,6 @@
 module Interpreter.Alpha (alpha, normalizePartial, alphaTests) where
 
+import Data.Maybe
 import Errors
 import Interpreter.Beta
 import Interpreter.IUtil
@@ -63,42 +64,30 @@ getMaxIndex (SLit _) = 0
 getMaxIndex (SLambda (Identifier parami _) expr) = max parami $ getMaxIndex expr
 getMaxIndex (SApplication expr1 expr2) = max (getMaxIndex expr1) $ getMaxIndex expr2
 
-evaluateSafeDeep ::
+evaluateSafeDeepS ::
+  [SemProgramPart] ->
   Integer ->
   SemExpression ->
-  Either RuntimeError SemExpression
-evaluateSafeDeep 0 _ = Left InfiniteLoopError
-evaluateSafeDeep _ (SId ident) = Right $ SId ident
-evaluateSafeDeep _ (SLit lit) = Right $ SLit lit
-evaluateSafeDeep n (SLambda param expr) = SLambda param <$> evaluateSafeDeep (n - 1) expr
-evaluateSafeDeep n (SApplication expr1 expr2) =
-  let expr1E = evaluateSafeDeep (n - 1) expr1
-   in case expr1E of
-        Left e -> Left e
-        Right lamb@(SLambda _ _) ->
-          evaluateSafeDeep (n - 1) $ beta (SApplication lamb expr2)
-        Right a -> SApplication a <$> evaluateSafeDeep (n - 1) expr2
-
--- replaceReferences ::
---   [SemProgramPart] ->
---   BoundVars ->
---   Integer ->
---   SemExpression ->
---   Either RuntimeError SemExpression
--- replaceReferences _ _ 0 _ = Left InfiniteLoopError
--- replaceReferences prog bvars n (SId ident@(Identifier _ identName)) =
---   if ident `elem` bvars
---     then Right $ SId ident
---     else
---       maybeToEither (lookupDefinition prog ident) (RUndefinedVariable identName)
---         >>= replaceReferences prog bvars (n - 1)
--- replaceReferences _ _ _ (SLit lit) = Right $ SLit lit
--- replaceReferences prog bvars n (SLambda param expr) = do
---   SLambda param <$> replaceReferences prog (param : bvars) (n - 1) expr
--- replaceReferences prog bvars n (SApplication expr1 expr2) =
---   SApplication
---     <$> replaceReferences prog bvars (n - 1) expr1
---     <*> replaceReferences prog bvars (n - 1) expr2
+  State DEnv (Either RuntimeError SemExpression)
+evaluateSafeDeepS _ 0 _ = return $ Left InfiniteLoopError
+evaluateSafeDeepS _ _ (SId ident) = return $ Right $ SId ident
+evaluateSafeDeepS _ _ (SLit lit) = return $ Right $ SLit lit
+evaluateSafeDeepS parts n (SLambda param expr) = (SLambda param <$>) <$> evaluateSafeDeepS parts (n - 1) expr
+evaluateSafeDeepS parts n (SApplication expr1 expr2) = do
+  expr1E <- evaluateSafeDeepS parts (n - 1) expr1
+  case expr1E of
+    Left e -> return $ Left e
+    Right lamb@(SLambda _ _) ->
+      evaluateSafeDeepS parts (n - 1) $ beta (SApplication lamb expr2)
+    Right (SId ident)
+      | isJust (lookupDefinition parts ident) ->
+          let lookupM = lookupDefinition parts ident
+           in case lookupM of
+                Nothing -> error "Guard failed"
+                Just definition -> do
+                  duped <- dupExpr parts definition
+                  evaluateSafeDeepS parts (n - 1) $ SApplication duped expr2
+    Right a -> (SApplication a <$>) <$> evaluateSafeDeepS parts (n - 1) expr2
 
 replaceReferencesS ::
   [SemProgramPart] ->
@@ -152,9 +141,8 @@ normalizeToAlpha :: SemExpression -> AlphaExpression
 normalizeToAlpha rexp = execState (normalizeToAlphaS rexp) ([], 0)
 
 normalizePartial :: SemProgram -> SemExpression -> Either RuntimeError SemExpression
-normalizePartial (SemProgram (Env _ count) parts) expr = do
-  replaced <- execState (replaceReferencesS parts [] 1000 expr) (DEnv count)
-  evaluateSafeDeep 1000 replaced
+normalizePartial (SemProgram (Env _ count) parts) expr =
+  execState (evaluateSafeDeepS parts 1000 expr) (DEnv count)
 
 alpha :: SemProgram -> SemExpression -> SemExpression -> Bool
 alpha prog expr1 expr2 = case (alpha1, alpha2) of
