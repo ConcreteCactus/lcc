@@ -20,18 +20,16 @@ module SemanticAnalyzer
     parseAndCreateProgram,
     parseAndCreateExpressionWithProgram,
     emptyProgram,
-    sematicAnalyzerTests,
+    semanticAnalyzerTests,
   )
 where
 
-import Control.Applicative
 import Data.Foldable
-import qualified Data.List.NonEmpty as Ne
 import Errors
 import SyntacticAnalyzer
 import Util
 
-data Identifier = Identifier {iid :: Integer, iname :: String} deriving (Eq)
+data Identifier = Identifier Int String deriving (Eq)
 
 data SemTypeIdentifier = TInteger deriving (Show, Eq)
 
@@ -39,8 +37,9 @@ data InferredIdentifier = TIInteger deriving (Show, Eq)
 
 data SemExpression
   = SId Identifier
+  | SRef String
   | SLit Literal
-  | SLambda Identifier SemExpression
+  | SLambda String SemExpression
   | SApplication SemExpression SemExpression
   deriving (Eq)
 
@@ -54,20 +53,21 @@ data InferredType
   | ISFunctionType InferredType InferredType
   deriving (Eq, Show)
 
-data Env = Env {scopes :: Ne.NonEmpty [Identifier], variableCounter :: Integer} deriving (Eq, Show)
+data Env = Env {globals :: [String], scope :: [String]} deriving (Eq, Show)
 
-data SemProgramPart = SemDeclaration | SemDefinition Identifier SemExpression deriving (Eq)
+data SemProgramPart = SemDeclaration | SemDefinition String SemExpression deriving (Eq)
 
-data SemProgram = SemProgram Env [SemProgramPart] deriving (Eq, Show)
+data SemProgram = SemProgram [String] [SemProgramPart] deriving (Eq, Show)
 
 instance Show SemProgramPart where
   show SemDeclaration = "Declaration"
-  show (SemDefinition ident expr) = show ident ++ " := " ++ show expr
+  show (SemDefinition name expr) = name ++ " := " ++ show expr
 
 instance Show SemExpression where
   show (SId identifier) = show identifier
+  show (SRef name) = name
   show (SLit literal) = show literal
-  show (SLambda param expr) = "λ" ++ show param ++ "." ++ show expr
+  show (SLambda paramName expr) = "λ" ++ paramName ++ "." ++ show expr
   show (SApplication expr1@(SLambda _ _) expr2@(SApplication _ _)) =
     "(" ++ show expr1 ++ ") (" ++ show expr2 ++ ")"
   show (SApplication expr1@(SLambda _ _) expr2) =
@@ -80,46 +80,38 @@ instance Show Identifier where
   show (Identifier code name) = name ++ "_" ++ show code
 
 startingEnv :: Env
-startingEnv = Env (Ne.singleton []) 0
+startingEnv = Env [] []
 
-findInMulti :: (Foldable t, Foldable u) => (a -> Bool) -> t (u a) -> Maybe a
-findInMulti f = foldr (\a b -> find f a <|> b) Nothing
+addGlobal :: String -> State Env ()
+addGlobal newGlobal = do
+  env <- get
+  put $ env {globals = newGlobal : globals env}
 
-getVar :: String -> State Env (Maybe Identifier)
-getVar name = findInMulti ((== name) . iname) . scopes <$> get
+addVar :: String -> State Env ()
+addVar newVar = do
+  env <- get
+  put $ env {scope = newVar : scope env}
 
-getCount :: State Env Integer
-getCount = variableCounter <$> get
+popVar :: State Env ()
+popVar = do
+  env <- get
+  put $ env {scope = tail $ scope env}
 
-addVar :: Identifier -> State Env ()
-addVar ident = do
-  Env scops count <- get
-  let h = Ne.head scops
-  let t = Ne.tail scops
-  put $ Env ((ident : h) Ne.:| t) count
+findVar :: String -> State Env (Maybe Identifier)
+findVar idName = do
+  env <- get
+  let scopeVars = scope env
+  let (foundNameM, count) = foldr (\name (found, n) -> if name == idName then (Just name, 1) else (found, n + 1)) (Nothing, 0) scopeVars
+  case foundNameM of
+    Nothing -> return Nothing
+    Just foundName -> return $ Just $ Identifier count foundName
 
-addVarInc :: String -> State Env Identifier
-addVarInc name = do
-  count <- getCount
-  let ident = Identifier (count + 1) name
-  addVar ident
-  incCount
-  return ident
-
-pushScope :: State Env ()
-pushScope = do
-  Env scops count <- get
-  put $ Env ([] `Ne.cons` scops) count
-
-popScope :: State Env ()
-popScope = do
-  Env scops count <- get
-  put $ Env (Ne.fromList $ Ne.tail scops) count
-
-incCount :: State Env ()
-incCount = do
-  Env vars count <- get
-  put $ Env vars $ count + 1
+findGlobal :: String -> State Env (Maybe String)
+findGlobal idName = do
+  env <- get
+  let globalVars = globals env
+  let foundNameM = find (== idName) globalVars
+  return foundNameM
 
 createSemanticType :: SynTypeExpression -> Either CompilerError SemType
 createSemanticType (TypeId "int") = Right $ STypeId TInteger
@@ -132,16 +124,19 @@ createSemanticType _ = Left CompilerError
 createSemanticExpressionS ::
   SynExpression -> State Env (Either CompilerError SemExpression)
 createSemanticExpressionS (Id name) = do
-  identM <- getVar name
+  identM <- findVar name
   case identM of
     Just ident -> return $ Right $ SId ident
-    Nothing -> return $ Left (SemanticError $ SUndefinedVariable name)
+    Nothing -> do
+      globalM <- findGlobal name
+      case globalM of
+        Just global -> return $ Right $ SRef global
+        Nothing -> return $ Left $ SemanticError $ SUndefinedVariable name
 createSemanticExpressionS (Lambda param expr) = do
-  pushScope
-  paramIdent <- addVarInc param
+  addVar param
   sformula <- createSemanticExpressionS expr
-  popScope
-  return $ SLambda paramIdent <$> sformula
+  popVar
+  return $ SLambda param <$> sformula
 createSemanticExpressionS (Application func arg) = do
   sfunc <- createSemanticExpressionS func
   sarg <- createSemanticExpressionS arg
@@ -155,31 +150,30 @@ createSemanticProgramS :: Program -> State Env (Either CompilerError [SemProgram
 createSemanticProgramS [] = return $ Right []
 createSemanticProgramS (SynDeclaration _ _ : rest) = createSemanticProgramS rest
 createSemanticProgramS (SynDefinition name synExpr : rest) = do
-  nameIdentM <- getVar name
+  nameIdentM <- findGlobal name
   case nameIdentM of
     Just _ -> return $ Left (SemanticError ValueRedefinition)
     Nothing -> do
-      nameIdent <- addVarInc name
+      addGlobal name
       expr <- createSemanticExpressionS synExpr
       semRest <- createSemanticProgramS rest
-      return $ (\e r -> SemDefinition nameIdent e : r) <$> expr <*> semRest
+      return $ (\e r -> SemDefinition name e : r) <$> expr <*> semRest
 
 createSemanticProgram :: Program -> Either CompilerError SemProgram
-createSemanticProgram prog = SemProgram env <$> semProgParts
+createSemanticProgram prog = SemProgram globs <$> semProgParts
   where
-    (env, semProgParts) = runState (createSemanticProgramS prog) startingEnv
+    (Env globs _, semProgParts) = runState (createSemanticProgramS prog) startingEnv
 
 parseAndCreateProgram :: String -> Either CompilerError SemProgram
 parseAndCreateProgram s = parseProgramSingleError s >>= createSemanticProgram
 
 parseAndCreateExpressionWithProgram :: SemProgram -> String -> Either CompilerError SemExpression
-parseAndCreateExpressionWithProgram (SemProgram env _) s = do
+parseAndCreateExpressionWithProgram (SemProgram globs _) s = do
   parsed <- parseExpression s
-  let created = execState (createSemanticExpressionS parsed) env
-  created
+  execState (createSemanticExpressionS parsed) (Env globs [])
 
 emptyProgram :: SemProgram
-emptyProgram = SemProgram startingEnv []
+emptyProgram = SemProgram [] []
 
 -- Unit tests
 
@@ -192,10 +186,10 @@ testT s = parseType s >>= createSemanticType
 testP :: String -> Either CompilerError SemProgram
 testP s = parseProgramSingleError s >>= createSemanticProgram
 
-sematicAnalyzerTests :: [Bool]
-sematicAnalyzerTests =
-  [ test "\\a.a" == Right (SLambda (Identifier 1 "a") (SId $ Identifier 1 "a")),
-    test "\\a.\\b.a b" == Right (SLambda (Identifier 1 "a") (SLambda (Identifier 2 "b") (SApplication (SId $ Identifier 1 "a") (SId $ Identifier 2 "b")))),
+semanticAnalyzerTests :: [Bool]
+semanticAnalyzerTests =
+  [ test "\\a.a" == Right (SLambda "a" (SId $ Identifier 1 "a")),
+    test "\\a.\\b.a b" == Right (SLambda "a" (SLambda "b" (SApplication (SId $ Identifier 2 "a") (SId $ Identifier 1 "b")))),
     test "(\\a.a) x" == Left (SemanticError $ SUndefinedVariable "x"),
     testT "int" == Right (STypeId TInteger),
     testT "int -> int" == Right (SFunctionType (STypeId TInteger) (STypeId TInteger)),
@@ -205,7 +199,7 @@ sematicAnalyzerTests =
     testP program3 == Left (SemanticError $ SUndefinedVariable "notE"),
     parseAndCreateProgram program1 == Right program1ShouldBe,
     parseAndCreateProgram program2 == Right program2ShouldBe,
-    (parseAndCreateProgram program1 >>= (`parseAndCreateExpressionWithProgram` "true")) == Right (SId (Identifier 1 "true"))
+    (parseAndCreateProgram program1 >>= (`parseAndCreateExpressionWithProgram` "true")) == Right (SRef "true")
   ]
 
 program1 :: String
@@ -216,9 +210,9 @@ program1 =
 program1ShouldBe :: SemProgram
 program1ShouldBe =
   SemProgram
-    (Env (Ne.fromList [[Identifier 4 "false", Identifier 1 "true"]]) 6)
-    [ SemDefinition (Identifier 1 "true") (SLambda (Identifier 2 "a") (SLambda (Identifier 3 "b") (SId $ Identifier 2 "a"))),
-      SemDefinition (Identifier 4 "false") (SLambda (Identifier 5 "a") (SLambda (Identifier 6 "b") (SId $ Identifier 6 "b")))
+    ["false", "true"]
+    [ SemDefinition "true" (SLambda "a" (SLambda "b" (SId $ Identifier 2 "a"))),
+      SemDefinition "false" (SLambda "a" (SLambda "b" (SId $ Identifier 1 "b")))
     ]
 
 program2 :: String
@@ -233,13 +227,13 @@ program2 =
 program2ShouldBe :: SemProgram
 program2ShouldBe =
   SemProgram
-    (Env (Ne.fromList [[Identifier 15 "xor", Identifier 13 "not", Identifier 10 "or", Identifier 7 "and", Identifier 4 "false", Identifier 1 "true"]]) 17)
-    [ SemDefinition (Identifier 1 "true") (SLambda (Identifier 2 "a") (SLambda (Identifier 3 "b") (SId $ Identifier 2 "a"))),
-      SemDefinition (Identifier 4 "false") (SLambda (Identifier 5 "a") (SLambda (Identifier 6 "b") (SId $ Identifier 6 "b"))),
-      SemDefinition (Identifier 7 "and") (SLambda (Identifier 8 "a") (SLambda (Identifier 9 "b") (SApplication (SApplication (SId $ Identifier 8 "a") (SId $ Identifier 9 "b")) (SId $ Identifier 4 "false")))),
-      SemDefinition (Identifier 10 "or") (SLambda (Identifier 11 "a") (SLambda (Identifier 12 "b") (SApplication (SApplication (SId $ Identifier 11 "a") (SId $ Identifier 1 "true")) (SId $ Identifier 12 "b")))),
-      SemDefinition (Identifier 13 "not") (SLambda (Identifier 14 "a") (SApplication (SApplication (SId $ Identifier 14 "a") (SId $ Identifier 4 "false")) (SId $ Identifier 1 "true"))),
-      SemDefinition (Identifier 15 "xor") (SLambda (Identifier 16 "a") (SLambda (Identifier 17 "b") (SApplication (SApplication (SId $ Identifier 16 "a") (SApplication (SId $ Identifier 13 "not") (SId $ Identifier 17 "b"))) (SId $ Identifier 17 "b"))))
+    ["xor", "not", "or", "and", "false", "true"]
+    [ SemDefinition "true" (SLambda "a" (SLambda "b" (SId $ Identifier 2 "a"))),
+      SemDefinition "false" (SLambda "a" (SLambda "b" (SId $ Identifier 1 "b"))),
+      SemDefinition "and" (SLambda "a" (SLambda "b" (SApplication (SApplication (SId $ Identifier 2 "a") (SId $ Identifier 1 "b")) (SRef "false")))),
+      SemDefinition "or" (SLambda "a" (SLambda "b" (SApplication (SApplication (SId $ Identifier 2 "a") (SRef "true")) (SId $ Identifier 1 "b")))),
+      SemDefinition "not" (SLambda "a" (SApplication (SApplication (SId $ Identifier 1 "a") (SRef "false")) (SRef "true"))),
+      SemDefinition "xor" (SLambda "a" (SLambda "b" (SApplication (SApplication (SId $ Identifier 2 "a") (SApplication (SRef "not") (SId $ Identifier 1 "b"))) (SId $ Identifier 1 "b"))))
     ]
 
 program3 :: String
