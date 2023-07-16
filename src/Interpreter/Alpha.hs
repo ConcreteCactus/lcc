@@ -64,21 +64,21 @@ getMaxIndex (SLit _) = 0
 getMaxIndex (SLambda (Identifier parami _) expr) = max parami $ getMaxIndex expr
 getMaxIndex (SApplication expr1 expr2) = max (getMaxIndex expr1) $ getMaxIndex expr2
 
-evaluateSafeDeepS ::
+evaluateShallowS ::
   [SemProgramPart] ->
   Integer ->
   SemExpression ->
   State DEnv (Either RuntimeError SemExpression)
-evaluateSafeDeepS _ 0 _ = return $ Left InfiniteLoopError
-evaluateSafeDeepS _ _ (SId ident) = return $ Right $ SId ident
-evaluateSafeDeepS _ _ (SLit lit) = return $ Right $ SLit lit
-evaluateSafeDeepS parts n (SLambda param expr) = (SLambda param <$>) <$> evaluateSafeDeepS parts (n - 1) expr
-evaluateSafeDeepS parts n (SApplication expr1 expr2) = do
-  expr1E <- evaluateSafeDeepS parts (n - 1) expr1
+evaluateShallowS _ 0 _ = return $ Left InfiniteLoopError
+evaluateShallowS _ _ (SId ident) = return $ Right $ SId ident
+evaluateShallowS _ _ (SLit lit) = return $ Right $ SLit lit
+evaluateShallowS _ _ (SLambda param expr) = return $ Right $ SLambda param expr
+evaluateShallowS parts n (SApplication expr1 expr2) = do
+  expr1E <- evaluateShallowS parts (n - 1) expr1
   case expr1E of
     Left e -> return $ Left e
     Right lamb@(SLambda _ _) ->
-      evaluateSafeDeepS parts (n - 1) $ beta (SApplication lamb expr2)
+      evaluateShallowS parts (n - 1) $ beta (SApplication lamb expr2)
     Right (SId ident)
       | isJust (lookupDefinition parts ident) ->
           let lookupM = lookupDefinition parts ident
@@ -86,36 +86,30 @@ evaluateSafeDeepS parts n (SApplication expr1 expr2) = do
                 Nothing -> error "Guard failed"
                 Just definition -> do
                   duped <- dupExpr parts definition
-                  evaluateSafeDeepS parts (n - 1) $ SApplication duped expr2
-    Right a -> (SApplication a <$>) <$> evaluateSafeDeepS parts (n - 1) expr2
+                  evaluateShallowS parts (n - 1) $ SApplication duped expr2
+    Right a -> return $ Right $ SApplication a expr2
 
-replaceReferencesS ::
+evaluateDeepS ::
   [SemProgramPart] ->
-  BoundVars ->
   Integer ->
   SemExpression ->
   State DEnv (Either RuntimeError SemExpression)
-replaceReferencesS _ _ 0 _ = return $ Left InfiniteLoopError
-replaceReferencesS parts bvars n (SId ident@(Identifier _ identName)) =
-  if ident `elem` bvars
-    then return $ Right $ SId ident
-    else do
-      let definitionE = maybeToEither (lookupDefinition parts ident) (RUndefinedVariable identName)
-      case definitionE of
-        Left e -> return $ Left e
-        Right definition -> do
-          duped <- dupExpr parts definition
-          replaceReferencesS parts bvars (n - 1) duped
-replaceReferencesS _ _ _ (SLit lit) = return $ Right $ SLit lit
-replaceReferencesS parts bvars n (SLambda param expr) = do
-  replacedE <- replaceReferencesS parts (param : bvars) (n - 1) expr
-  case replacedE of
+evaluateDeepS _ 0 _ = return $ Left InfiniteLoopError
+evaluateDeepS _ _ (SId ident) = return $ Right $ SId ident
+evaluateDeepS _ _ (SLit lit) = return $ Right $ SLit lit
+evaluateDeepS parts n (SLambda param expr1) = do
+  expr2E <- evaluateShallowS parts (n - 1) expr1
+  case expr2E of
     Left e -> return $ Left e
-    Right replaced -> return $ Right $ SLambda param replaced
-replaceReferencesS parts bvars n (SApplication expr1 expr2) = do
-  expr1E <- replaceReferencesS parts bvars (n - 1) expr1
-  expr2E <- replaceReferencesS parts bvars (n - 1) expr2
-  return (SApplication <$> expr1E <*> expr2E)
+    Right expr2 -> (SLambda param <$>) <$> evaluateDeepS parts (n - 1) expr2
+evaluateDeepS parts n (SApplication expr1 expr2) = do
+  applShallowE <- evaluateShallowS parts (n - 1) (SApplication expr1 expr2)
+  case applShallowE of
+    Left e -> return $ Left e
+    Right (SApplication expr3 expr4) ->
+      (SApplication expr3 <$>)
+        <$> evaluateDeepS parts (n - 1) expr4
+    Right a -> evaluateDeepS parts (n - 1) a
 
 normalizeToAlphaS :: SemExpression -> State ([(Identifier, Integer)], Integer) AlphaExpression
 normalizeToAlphaS (SId identifier) = do
@@ -142,7 +136,7 @@ normalizeToAlpha rexp = execState (normalizeToAlphaS rexp) ([], 0)
 
 normalizePartial :: SemProgram -> SemExpression -> Either RuntimeError SemExpression
 normalizePartial (SemProgram (Env _ count) parts) expr =
-  execState (evaluateSafeDeepS parts 1000 expr) (DEnv count)
+  execState (evaluateDeepS parts 1000 expr) (DEnv count)
 
 alpha :: SemProgram -> SemExpression -> SemExpression -> Bool
 alpha prog expr1 expr2 = case (alpha1, alpha2) of
@@ -179,7 +173,10 @@ alphaTests =
     getMaxIndex (SApplication (SId (Identifier 0 "x")) (SId (Identifier 1 "x"))) == 1,
     test program1 "one" "suc zero" == Right True,
     testDup "\\a.\\b.a b" 0 == Right (SLambda (Identifier 0 "a") (SLambda (Identifier 1 "b") (SApplication (SId (Identifier 0 "a")) (SId (Identifier 1 "b"))))),
-    testDup "\\a.\\b.a b" 10 == Right (SLambda (Identifier 10 "a") (SLambda (Identifier 11 "b") (SApplication (SId (Identifier 10 "a")) (SId (Identifier 11 "b")))))
+    testDup "\\a.\\b.a b" 10 == Right (SLambda (Identifier 10 "a") (SLambda (Identifier 11 "b") (SApplication (SId (Identifier 10 "a")) (SId (Identifier 11 "b"))))),
+    test program2 "one suc zero" "one" == Right True,
+    test program2 "add five five" "ten" == Right True,
+    test program2 "index true onetwothree one" "one" == Right True
   ]
 
 program1 :: String
@@ -187,3 +184,29 @@ program1 =
   "zero := \\f.\\z.z\n"
     ++ "suc := \\n.\\f.\\z.f (n f z)\n"
     ++ "one := \\f.\\z.f z\n"
+
+program2 :: String
+program2 =
+  "zero := \\f.\\b.b\n"
+    ++ "suc  := \\n.\\f.\\b.f (n f b)\n"
+    ++ "add := \\a.\\b.\\f.\\z. a f (b f z)\n"
+    ++ "pred := \\n.\\f.\\z.n (\\g.\\h.h (g f)) (\\u.z) (\\u.u)\n"
+    ++ "one := suc zero\n"
+    ++ "two := suc one\n"
+    ++ "three := suc two\n"
+    ++ "four := suc three\n"
+    ++ "five := suc four\n"
+    ++ "six := suc five\n"
+    ++ "seven := suc six\n"
+    ++ "eight := suc seven\n"
+    ++ "nine := suc eight\n"
+    ++ "ten := suc nine\n"
+    ++ "true := \\a.\\b.a\n"
+    ++ "false := \\a.\\b.b\n"
+    ++ "emptyVec := \\f.\\e.e\n"
+    ++ "cons := \\item.\\vec.\\f.\\e.f item vec\n"
+    ++ "onetwothree := cons one (cons two (cons three emptyVec))\n"
+    ++ "head := \\err.\\vec. vec (\\item.\\tail.item) err\n"
+    ++ "tail := \\err.\\vec. vec (\\item.\\tail.tail) err\n"
+    ++ "isZero := \\n. n (\\x. false) true\n"
+    ++ "index := \\err.\\vec.\\n. (isZero n) (head err vec) (index err (tail err vec) (pred n))\n"
