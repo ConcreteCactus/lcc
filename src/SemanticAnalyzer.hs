@@ -6,7 +6,6 @@
 
 module SemanticAnalyzer
   ( SemanticError (..),
-    Identifier (..),
     SemExpression (..),
     SemProgram (..),
     SemProgramPart (..),
@@ -29,14 +28,12 @@ import Errors
 import SyntacticAnalyzer
 import Util
 
-data Identifier = Identifier Int String deriving (Eq)
-
 data SemTypeIdentifier = TInteger deriving (Show, Eq)
 
 data InferredIdentifier = TIInteger deriving (Show, Eq)
 
 data SemExpression
-  = SId Identifier
+  = SId Int
   | SRef String
   | SLit Literal
   | SLambda String SemExpression
@@ -64,20 +61,33 @@ instance Show SemProgramPart where
   show (SemDefinition name expr) = name ++ " := " ++ show expr
 
 instance Show SemExpression where
-  show (SId identifier) = show identifier
-  show (SRef name) = name
-  show (SLit literal) = show literal
-  show (SLambda paramName expr) = "λ" ++ paramName ++ "." ++ show expr
-  show (SApplication expr1@(SLambda _ _) expr2@(SApplication _ _)) =
-    "(" ++ show expr1 ++ ") (" ++ show expr2 ++ ")"
-  show (SApplication expr1@(SLambda _ _) expr2) =
-    "(" ++ show expr1 ++ ") " ++ show expr2
-  show (SApplication expr1 expr2@(SApplication _ _)) =
-    show expr1 ++ " (" ++ show expr2 ++ ")"
-  show (SApplication expr1 expr2) = show expr1 ++ " " ++ show expr2
+  show = showHelper []
 
-instance Show Identifier where
-  show (Identifier code name) = name ++ "_" ++ show code
+(!!!) :: [a] -> Int -> Maybe a
+(!!!) [] _ = Nothing
+(!!!) (x : _) 0 = Just x
+(!!!) (_ : xs) n = xs !!! (n - 1)
+
+showHelper :: [String] -> SemExpression -> String
+showHelper names (SId identifier) =
+  case names !!! identifier of
+    Nothing -> "?_" ++ show identifier
+    Just name -> name ++ "_" ++ show identifier
+showHelper _ (SRef name) = name
+showHelper _ (SLit literal) = show literal
+showHelper names (SLambda paramName expr) =
+  "λ"
+    ++ paramName
+    ++ "."
+    ++ showHelper (paramName : names) expr
+showHelper names (SApplication expr1@(SLambda _ _) expr2@(SApplication _ _)) =
+  "(" ++ showHelper names expr1 ++ ") (" ++ showHelper names expr2 ++ ")"
+showHelper names (SApplication expr1@(SLambda _ _) expr2) =
+  "(" ++ showHelper names expr1 ++ ") " ++ showHelper names expr2
+showHelper names (SApplication expr1 expr2@(SApplication _ _)) =
+  showHelper names expr1 ++ " (" ++ showHelper names expr2 ++ ")"
+showHelper names (SApplication expr1 expr2) =
+  showHelper names expr1 ++ " " ++ showHelper names expr2
 
 startingEnv :: Env
 startingEnv = Env [] []
@@ -97,14 +107,14 @@ popVar = do
   env <- get
   put $ env {scope = tail $ scope env}
 
-findVar :: String -> State Env (Maybe Identifier)
+findVar :: String -> State Env (Maybe Int)
 findVar idName = do
   env <- get
   let scopeVars = scope env
   let (foundNameM, count) = foldr (\name (found, n) -> if name == idName then (Just name, 1) else (found, n + 1)) (Nothing, 0) scopeVars
   case foundNameM of
     Nothing -> return Nothing
-    Just foundName -> return $ Just $ Identifier count foundName
+    Just _ -> return $ Just count
 
 findGlobal :: String -> State Env (Maybe String)
 findGlobal idName = do
@@ -188,8 +198,8 @@ testP s = parseProgramSingleError s >>= createSemanticProgram
 
 semanticAnalyzerTests :: [Bool]
 semanticAnalyzerTests =
-  [ test "\\a.a" == Right (SLambda "a" (SId $ Identifier 1 "a")),
-    test "\\a.\\b.a b" == Right (SLambda "a" (SLambda "b" (SApplication (SId $ Identifier 2 "a") (SId $ Identifier 1 "b")))),
+  [ test "\\a.a" == Right (SLambda "a" (SId 1)),
+    test "\\a.\\b.a b" == Right (SLambda "a" (SLambda "b" (SApplication (SId 2) (SId 1)))),
     test "(\\a.a) x" == Left (SemanticError $ SUndefinedVariable "x"),
     testT "int" == Right (STypeId TInteger),
     testT "int -> int" == Right (SFunctionType (STypeId TInteger) (STypeId TInteger)),
@@ -211,8 +221,8 @@ program1ShouldBe :: SemProgram
 program1ShouldBe =
   SemProgram
     ["false", "true"]
-    [ SemDefinition "true" (SLambda "a" (SLambda "b" (SId $ Identifier 2 "a"))),
-      SemDefinition "false" (SLambda "a" (SLambda "b" (SId $ Identifier 1 "b")))
+    [ SemDefinition "true" (SLambda "a" (SLambda "b" (SId 2))),
+      SemDefinition "false" (SLambda "a" (SLambda "b" (SId 1)))
     ]
 
 program2 :: String
@@ -228,12 +238,12 @@ program2ShouldBe :: SemProgram
 program2ShouldBe =
   SemProgram
     ["xor", "not", "or", "and", "false", "true"]
-    [ SemDefinition "true" (SLambda "a" (SLambda "b" (SId $ Identifier 2 "a"))),
-      SemDefinition "false" (SLambda "a" (SLambda "b" (SId $ Identifier 1 "b"))),
-      SemDefinition "and" (SLambda "a" (SLambda "b" (SApplication (SApplication (SId $ Identifier 2 "a") (SId $ Identifier 1 "b")) (SRef "false")))),
-      SemDefinition "or" (SLambda "a" (SLambda "b" (SApplication (SApplication (SId $ Identifier 2 "a") (SRef "true")) (SId $ Identifier 1 "b")))),
-      SemDefinition "not" (SLambda "a" (SApplication (SApplication (SId $ Identifier 1 "a") (SRef "false")) (SRef "true"))),
-      SemDefinition "xor" (SLambda "a" (SLambda "b" (SApplication (SApplication (SId $ Identifier 2 "a") (SApplication (SRef "not") (SId $ Identifier 1 "b"))) (SId $ Identifier 1 "b"))))
+    [ SemDefinition "true" (SLambda "a" (SLambda "b" (SId 2))),
+      SemDefinition "false" (SLambda "a" (SLambda "b" (SId 1))),
+      SemDefinition "and" (SLambda "a" (SLambda "b" (SApplication (SApplication (SId 2) (SId 1)) (SRef "false")))),
+      SemDefinition "or" (SLambda "a" (SLambda "b" (SApplication (SApplication (SId 2) (SRef "true")) (SId 1)))),
+      SemDefinition "not" (SLambda "a" (SApplication (SApplication (SId 1) (SRef "false")) (SRef "true"))),
+      SemDefinition "xor" (SLambda "a" (SLambda "b" (SApplication (SApplication (SId 2) (SApplication (SRef "not") (SId 1))) (SId 1))))
     ]
 
 program3 :: String

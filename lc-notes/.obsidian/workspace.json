@@ -20,6 +20,18 @@
             }
           },
           {
+            "id": "016dad5dc71725d5",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Expression-Identifier Invariance Rule.md",
+                "mode": "source",
+                "source": false
+              }
+            }
+          },
+          {
             "id": "d28c28618c66df68",
             "type": "leaf",
             "state": {
@@ -27,7 +39,8 @@
               "state": {}
             }
           }
-        ]
+        ],
+        "currentTab": 1
       }
     ],
     "direction": "vertical"
@@ -93,7 +106,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "Alpha equivalence is hard.md",
+                "file": "Expression-Identifier Invariance Rule.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -110,7 +123,7 @@
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "Alpha equivalence is hard.md",
+                "file": "Expression-Identifier Invariance Rule.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               }
@@ -133,7 +146,7 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "Alpha equivalence is hard.md"
+                "file": "Expression-Identifier Invariance Rule.md"
               }
             }
           }
@@ -154,9 +167,10 @@
       "command-palette:Open command palette": false
     }
   },
-  "active": "9701974cbeaf6243",
+  "active": "016dad5dc71725d5",
   "lastOpenFiles": [
-    "Expression-Identifier Invariance Rule.md",
-    "Alpha equivalence is hard.md"
+    "De Brujin indices.md",
+    "Alpha equivalence is hard.md",
+    "Expression-Identifier Invariance Rule.md"
   ]
 }

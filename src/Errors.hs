@@ -3,6 +3,9 @@ module Errors
     LexicalError (..),
     SemanticError (..),
     RuntimeError (..),
+    RunErrorable,
+    CompileErrorable,
+    RunAndCompileErrorable,
   )
 where
 
@@ -16,5 +19,11 @@ data LexicalError = UnexpectedEndOfFile | LambdaExpressionExpected | InvalidLamb
 
 data SemanticError = ValueRedefinition | SUndefinedVariable String deriving (Show, Eq)
 
-data RuntimeError = InfiniteLoopError | TypeError String | RUndefinedVariable String
+data RuntimeError = ComputationLimitReached | TypeError String | RUndefinedReference String
   deriving (Eq, Show)
+
+type RunErrorable a = Either RuntimeError a
+
+type CompileErrorable a = Either CompilerError a
+
+type RunAndCompileErrorable a = Either (Either CompilerError RuntimeError) a
