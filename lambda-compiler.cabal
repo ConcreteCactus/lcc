@@ -28,6 +28,7 @@ library
       Errors
       Interpreter
       Lexer
+      Repl
       SemanticAnalyzer
       SyntacticAnalyzer
       Util

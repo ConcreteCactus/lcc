@@ -65,7 +65,7 @@ instance Show SemExpression where
 
 (!!!) :: [a] -> Int -> Maybe a
 (!!!) [] _ = Nothing
-(!!!) (x : _) 0 = Just x
+(!!!) (x : _) 1 = Just x
 (!!!) (_ : xs) n = xs !!! (n - 1)
 
 showHelper :: [String] -> SemExpression -> String

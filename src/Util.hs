@@ -8,6 +8,7 @@ module Util
     maybeToEither,
     execState,
     evalState,
+    trim,
   )
 where
 
@@ -69,3 +70,6 @@ execState (State sa) = snd . sa
 
 evalState :: State s a -> s -> s
 evalState (State sa) = fst . sa
+
+trim :: String -> String
+trim str = reverse $ dropWhile isSpace $ reverse $ dropWhile isSpace str
