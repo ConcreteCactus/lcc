@@ -9,6 +9,7 @@ module Util
     execState,
     evalState,
     trim,
+    (!!!),
   )
 where
 
@@ -73,3 +74,13 @@ evalState (State sa) = fst . sa
 
 trim :: String -> String
 trim str = reverse $ dropWhile isSpace $ reverse $ dropWhile isSpace str
+
+(!!!) :: [a] -> Int -> Maybe a
+(!!!) [] _ = Nothing
+(!!!) (x : _) 1 = Just x
+(!!!) (_ : xs) n = xs !!! (n - 1)
+
+forgivingZipWith :: (a -> a -> a) -> [a] -> [a] -> [a]
+forgivingZipWith _ [] r = r
+forgivingZipWith _ r [] = r
+forgivingZipWith f (x : xs) (y : ys) = f x y : forgivingZipWith f xs ys

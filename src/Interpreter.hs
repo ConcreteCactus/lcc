@@ -42,23 +42,11 @@ evaluate parts (SApplication expr1 expr2) = do
   case expr1Eval of
     Left e -> return $ Left e
     Right fn@(SLambda _ _) -> evaluate parts (beta fn expr2)
-    Right (SRef refName) -> case lookupRef parts refName of
+    Right (SRef refName) -> case lookupRefExp parts refName of
       Nothing -> return $ Left $ RUndefinedReference refName
       Just expr -> evaluate parts (SApplication expr expr2)
-    Right a -> return $ Left $ TypeError (show a ++ " is not a function")
+    Right a -> return $ Left $ RTypeError (show a ++ " is not a function")
 evaluate _ a = return $ pure a
-
-lookupRef :: [SemProgramPart] -> String -> Maybe SemExpression
-lookupRef parts refName =
-  find
-    ( \case
-        SemDefinition name expr -> name == refName
-        SemDeclaration -> False
-    )
-    parts
-    >>= \case
-      SemDefinition _ expr -> Just expr
-      SemDeclaration -> Nothing
 
 runLimitedComputation :: Limit -> Limited (RunErrorable a) -> RunAndCompileErrorable a
 runLimitedComputation lim comp = case runLimited lim comp of
