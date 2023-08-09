@@ -63,7 +63,7 @@ startingEnv = Env [] [] []
 addGlobal :: String -> State Env ()
 addGlobal newGlobal = do
   env <- get
-  put $ env {globals = newGlobal : globals env}
+  put $ env {globals = globals env ++ [newGlobal]}
 
 addVar :: String -> State Env ()
 addVar newVar = do
@@ -152,10 +152,10 @@ createSemanticPartsS = foldEitherM (flip helper) []
         Right semExpr -> do
           let typM = inferType parts semExpr
           case typM of
-            Nothing -> return $ Left $ SemanticError STypeError
-            Just typ -> do
-              addDecl name typ
-              return $ Right $ SemDefinition name semExpr typ : parts
+            Left e -> return $ Left $ SemanticError $ STypeError e
+            Right typ -> do
+              addGlobal name
+              return $ Right $ parts ++ [SemDefinition name semExpr typ]
 
 createSemanticProgram :: Program -> Either CompilerError SemProgram
 createSemanticProgram prog = SemProgram globs <$> semProgParts
@@ -197,6 +197,21 @@ getNewId = do
   put $ InferEnv (ident + 1) rec
   return ident
 
+shiftNewIds :: SemType -> State InferEnv SemType
+shiftNewIds typ = do
+  InferEnv ident rec <- get
+  let (newTyp, maxIdent) = shiftIds ident typ
+  put $ InferEnv maxIdent rec
+  return newTyp
+  where
+    shiftIds :: Int -> SemType -> (SemType, Int)
+    shiftIds ident (SAtomicType a) = (SAtomicType a, ident)
+    shiftIds ident (SFunctionType t1 t2) =
+      let (newT1, maxIdent1) = shiftIds ident t1
+          (newT2, maxIdent2) = shiftIds ident t2
+       in (SFunctionType newT1 newT2, max maxIdent1 maxIdent2)
+    shiftIds ident (SGenericType gid) = (SGenericType (gid + ident - 1), gid + ident)
+
 -- Also returns the last element of the list
 createGenericList :: Int -> State InferEnv ([SemType], SemType)
 createGenericList 0 = error "createGenericList called with 0"
@@ -205,37 +220,39 @@ createGenericList n = do
   lastId <- getNewId
   return (start ++ [SGenericType lastId], SGenericType lastId)
 
-inferTypeS :: [SemProgramPart] -> SemExpression -> State InferEnv (Maybe (SemType, [SemType]))
-inferTypeS _ (SLit (IntegerLiteral _)) = return $ Just (SAtomicType AInt, [])
+inferTypeS :: [SemProgramPart] -> SemExpression -> State InferEnv (Either STypeError (SemType, [SemType]))
+inferTypeS _ (SLit (IntegerLiteral _)) = return $ Right (SAtomicType AInt, [])
 inferTypeS _ (SId ident) = do
   (generics, lastGeneric) <- createGenericList ident
-  return $ Just (lastGeneric, generics)
+  return $ Right (lastGeneric, generics)
 inferTypeS parts (SRef refName) = do
   case lookupRefType parts refName of
-    Nothing -> return Nothing
-    Just typ -> return $ Just (typ, [])
+    Nothing -> return $ Left STReferenceNotFound
+    Just typ -> do
+      shifted <- shiftNewIds typ
+      return $ Right (shifted, [])
 inferTypeS parts (SLambda _ expr) = do
   inferred <- inferTypeS parts expr
   case inferred of
-    Nothing -> return Nothing
-    Just (exprType, exprGenerics) -> do
+    Left e -> return $ Left e
+    Right (exprType, exprGenerics) -> do
       case exprGenerics of
         [] -> do
           paramId <- getNewId
-          return $ Just (SFunctionType (SGenericType paramId) exprType, [])
+          return $ Right (SFunctionType (SGenericType paramId) exprType, [])
         (paramType : otherGenerics) -> do
-          return $ Just (SFunctionType paramType exprType, otherGenerics)
+          return $ Right (SFunctionType paramType exprType, otherGenerics)
 inferTypeS parts (SApplication expr1 expr2) = do
   inferred1 <- inferTypeS parts expr1
   inferred2 <- inferTypeS parts expr2
   case (inferred1, inferred2) of
-    (Nothing, _) -> return Nothing
-    (_, Nothing) -> return Nothing
-    (Just (expr1Type, expr1Generics), Just (expr2Type, expr2Generics)) -> do
-      newGenericsM <- sequence <$> zipWithM reconcileTypesIS expr1Generics expr2Generics
+    (Left e, _) -> return $ Left e
+    (_, Left e) -> return $ Left e
+    (Right (expr1Type, expr1Generics), Right (expr2Type, expr2Generics)) -> do
+      newGenericsM <- sequence <$> forgivingZipWithME reconcileTypesIS expr1Generics expr2Generics
       case newGenericsM of
-        Nothing -> return Nothing
-        Just newGenerics -> do
+        Left e -> return $ Left e
+        Right newGenerics -> do
           updatedGenerics <- mapM updateWithSubstitutionsI newGenerics
           updatedExpr1Type <- updateWithSubstitutionsI expr1Type
           case updatedExpr1Type of
@@ -244,22 +261,25 @@ inferTypeS parts (SApplication expr1 expr2) = do
               updatedParam <- updateWithSubstitutionsI paramType
               reconciledParamM <- reconcileTypesIS updatedParam updatedExpr2Type
               case reconciledParamM of
-                Nothing -> return Nothing
-                Just _ -> do
+                Left e -> return $ Left e
+                Right _ -> do
                   updatedReturn <- updateWithSubstitutionsI returnType
-                  return $ Just (updatedReturn, updatedGenerics)
+                  return $ Right (updatedReturn, updatedGenerics)
             SGenericType genericId -> do
               updatedExpr2Type <- updateWithSubstitutionsI expr2Type
               newReturnId <- getNewId
-              -- This generic id is not used anywhere else, so it's safe to add it and not update
-              addingWorked <- addNewSubstitutionI genericId (SFunctionType updatedExpr2Type (SGenericType newReturnId))
+              addingWorked <-
+                addNewSubstitutionI
+                  genericId
+                  (SFunctionType updatedExpr2Type (SGenericType newReturnId))
               case addingWorked of
-                Nothing -> return Nothing
-                Just _ ->
-                  return $ Just (SGenericType newReturnId, updatedGenerics)
-            _ -> return Nothing
+                Left e -> return $ Left e
+                Right _ -> do
+                  updatedGenerics' <- mapM updateWithSubstitutionsI updatedGenerics
+                  return $ Right (SGenericType newReturnId, updatedGenerics')
+            typ -> return $ Left $ STApplyingToANonFunction $ show typ
 
-inferType :: [SemProgramPart] -> SemExpression -> Maybe SemType
+inferType :: [SemProgramPart] -> SemExpression -> Either STypeError SemType
 inferType parts expr = fst <$> execState (inferTypeS parts expr) (InferEnv 1 (ReconcileEnv []))
 
 -- Laws
@@ -267,21 +287,21 @@ inferType parts expr = fst <$> execState (inferTypeS parts expr) (InferEnv 1 (Re
 --   2. forall (a, b), (a', b') in RE : b != b' => a != a'
 newtype ReconcileEnv = ReconcileEnv [(Int, SemType)]
 
-addNewSubstitution :: Int -> SemType -> State ReconcileEnv (Maybe ())
+addNewSubstitution :: Int -> SemType -> State ReconcileEnv (Either STypeError ())
 addNewSubstitution genericId typ = do
   ReconcileEnv env <- get
-  let substitued = checkAndSubstitute env typ
-  if checkSelfRefs genericId substitued
-    then return Nothing
+  let substituted = checkAndSubstitute env typ
+  if checkSelfRefs genericId substituted
+    then return $ Left $ STSelfReferenceFound genericId $ show substituted
     else do
-      let newEnv = substituteOldSubs genericId substitued env
-      put $ ReconcileEnv ((genericId, substitued) : newEnv)
-      return $ Just ()
+      let newEnv = substituteOldSubs genericId substituted env
+      put $ ReconcileEnv ((genericId, substituted) : newEnv)
+      return $ Right ()
   where
     -- 1. Check for and substitute references in the new substitution
     checkAndSubstitute :: [(Int, SemType)] -> SemType -> SemType
     checkAndSubstitute subs (SGenericType genericId') = case lookup genericId' subs of
-      Nothing -> SGenericType genericId
+      Nothing -> SGenericType genericId'
       Just typ' -> typ'
     checkAndSubstitute _ (SAtomicType atomicType) = SAtomicType atomicType
     checkAndSubstitute subs (SFunctionType paramType returnType) =
@@ -305,7 +325,7 @@ addNewSubstitution genericId typ = do
     substituteOldSubs genericId' typ' =
       map (second (substitueSimple genericId' typ'))
 
-addNewSubstitutionI :: Int -> SemType -> State InferEnv (Maybe ())
+addNewSubstitutionI :: Int -> SemType -> State InferEnv (Either STypeError ())
 addNewSubstitutionI genericId typ = do
   InferEnv count renv <- get
   let (newREnv, result) = runState (addNewSubstitution genericId typ) renv
@@ -332,21 +352,21 @@ updateWithSubstitutionsI typ = do
   put $ InferEnv count newREnv
   return newTyp
 
-reconcileTypesS :: SemType -> SemType -> State ReconcileEnv (Maybe SemType)
+reconcileTypesS :: SemType -> SemType -> State ReconcileEnv (Either STypeError SemType)
 reconcileTypesS (SGenericType genericId) typ = do
   added <- addNewSubstitution genericId typ
   case added of
-    Nothing -> return Nothing
-    Just _ -> return $ Just typ
+    Left e -> return $ Left e
+    Right _ -> return $ Right typ
 reconcileTypesS typ (SGenericType genericId) = do
   added <- addNewSubstitution genericId typ
   case added of
-    Nothing -> return Nothing
-    Just _ -> return $ Just typ
+    Left e -> return $ Left e
+    Right _ -> return $ Right typ
 reconcileTypesS (SAtomicType atomicType) (SAtomicType atomicType') =
   if atomicType == atomicType'
-    then return $ Just (SAtomicType atomicType)
-    else return Nothing
+    then return $ Right (SAtomicType atomicType)
+    else return $ Left $ STAtomicTypeMismatch (show atomicType) (show atomicType')
 reconcileTypesS
   (SFunctionType paramType returnType)
   (SFunctionType paramType' returnType') = do
@@ -355,21 +375,21 @@ reconcileTypesS
     updatedReturn' <- updateWithSubstitutions returnType'
     reconciledReturn <- reconcileTypesS updatedReturn updatedReturn'
     case (reconciledParam, reconciledReturn) of
-      (Nothing, _) -> return Nothing
-      (_, Nothing) -> return Nothing
-      (Just reconciledParam', Just reconciledReturn') ->
-        return $ Just (SFunctionType reconciledParam' reconciledReturn')
-reconcileTypesS _ _ = return Nothing
+      (Left e, _) -> return $ Left e
+      (_, Left e) -> return $ Left e
+      (Right reconciledParam', Right reconciledReturn') ->
+        return $ Right (SFunctionType reconciledParam' reconciledReturn')
+reconcileTypesS typ typ' = return $ Left $ STTypeMismatch (show typ) (show typ')
 
-reconcileTypesIS :: SemType -> SemType -> State InferEnv (Maybe SemType)
+reconcileTypesIS :: SemType -> SemType -> State InferEnv (Either STypeError SemType)
 reconcileTypesIS t1 t2 = do
   InferEnv count renv <- get
   let (newREnv, reconciledM) = runState (reconcileTypesS t1 t2) renv
   case reconciledM of
-    Nothing -> return Nothing
-    Just reconciled -> do
+    Left e -> return $ Left e
+    Right reconciled -> do
       put $ InferEnv count newREnv
-      return $ Just reconciled
+      return $ Right reconciled
 
 -- Unit tests
 
@@ -406,9 +426,9 @@ program1 =
 program1ShouldBe :: SemProgram
 program1ShouldBe =
   SemProgram
-    ["false", "true"]
-    [ SemDefinition "true" (SLambda "a" (SLambda "b" (SId 2))) (SFunctionType (SGenericType 1) (SFunctionType (SGenericType 2) (SGenericType 1))),
-      SemDefinition "false" (SLambda "a" (SLambda "b" (SId 1))) (SFunctionType (SGenericType 1) (SFunctionType (SGenericType 2) (SGenericType 2)))
+    ["true", "false"]
+    [ SemDefinition "true" (SLambda "a" (SLambda "b" (SId 2))) (SFunctionType (SGenericType 2) (SFunctionType (SGenericType 1) (SGenericType 2))),
+      SemDefinition "false" (SLambda "a" (SLambda "b" (SId 1))) (SFunctionType (SGenericType 2) (SFunctionType (SGenericType 1) (SGenericType 1)))
     ]
 
 program2 :: String
@@ -423,9 +443,9 @@ program2 =
 program2ShouldBe :: SemProgram
 program2ShouldBe =
   SemProgram
-    ["xor", "not", "or", "and", "false", "true"]
-    [ SemDefinition "true" (SLambda "a" (SLambda "b" (SId 2))) (SFunctionType (SGenericType 1) (SFunctionType (SGenericType 2) (SGenericType 1))),
-      SemDefinition "false" (SLambda "a" (SLambda "b" (SId 1))) (SFunctionType (SGenericType 1) (SFunctionType (SGenericType 2) (SGenericType 2))),
+    ["true", "false", "and", "or", "not", "xor"]
+    [ SemDefinition "true" (SLambda "a" (SLambda "b" (SId 2))) (SFunctionType (SGenericType 2) (SFunctionType (SGenericType 1) (SGenericType 2))),
+      SemDefinition "false" (SLambda "a" (SLambda "b" (SId 1))) (SFunctionType (SGenericType 2) (SFunctionType (SGenericType 1) (SGenericType 1))),
       SemDefinition "and" (SLambda "a" (SLambda "b" (SApplication (SApplication (SId 2) (SId 1)) (SRef "false")))) (SAtomicType AInt),
       SemDefinition "or" (SLambda "a" (SLambda "b" (SApplication (SApplication (SId 2) (SRef "true")) (SId 1)))) (SAtomicType AInt),
       SemDefinition "not" (SLambda "a" (SApplication (SApplication (SId 1) (SRef "false")) (SRef "true"))) (SAtomicType AInt),
@@ -440,3 +460,7 @@ program3 =
     ++ "or := \\a.\\b. a true b\n"
     ++ "not := \\a. a false true\n"
     ++ "xor := \\a.\\b. a (notE b) b"
+
+program4 :: String
+program4 =
+  "te := \\a. \\b. a b\n"

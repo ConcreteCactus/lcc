@@ -10,10 +10,12 @@ module Util
     evalState,
     trim,
     (!!!),
+    forgivingZipWith,
+    forgivingZipWithM,
+    forgivingZipWithME,
   )
 where
 
-import Control.Applicative
 import Data.Char
 
 sinkL :: Either e a -> Either (Either e f) a
@@ -84,3 +86,13 @@ forgivingZipWith :: (a -> a -> a) -> [a] -> [a] -> [a]
 forgivingZipWith _ [] r = r
 forgivingZipWith _ r [] = r
 forgivingZipWith f (x : xs) (y : ys) = f x y : forgivingZipWith f xs ys
+
+forgivingZipWithM :: (Applicative m) => (a -> a -> m a) -> [a] -> [a] -> m [a]
+forgivingZipWithM _ [] r = pure r
+forgivingZipWithM _ r [] = pure r
+forgivingZipWithM f (x : xs) (y : ys) = (:) <$> f x y <*> forgivingZipWithM f xs ys
+
+forgivingZipWithME :: (Applicative m) => (a -> a -> m (Either e a)) -> [a] -> [a] -> m [Either e a]
+forgivingZipWithME _ [] r = pure (Right <$> r)
+forgivingZipWithME _ r [] = pure (Right <$> r)
+forgivingZipWithME f (x : xs) (y : ys) = (:) <$> f x y <*> forgivingZipWithME f xs ys
