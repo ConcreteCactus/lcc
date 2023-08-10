@@ -11,7 +11,6 @@ module SemanticAnalyzer
     SemProgramPart (..),
     Env (..),
     State (..),
-    startingEnv,
     createSemanticExpression,
     createSemanticExpressionS,
     createSemanticProgram,
@@ -31,82 +30,12 @@ import SemanticAnalyzer.SemType
 import SyntacticAnalyzer
 import Util
 
-data Env = Env {globals :: [String], scope :: [String], decls :: [(String, SemType)]} deriving (Eq, Show)
-
 data SemProgramPart = SemDefinition String SemExpression SemType deriving (Eq)
 
 data SemProgram = SemProgram [String] [SemProgramPart] deriving (Eq, Show)
 
 instance Show SemProgramPart where
   show (SemDefinition name expr typ) = name ++ " := " ++ show expr ++ " : " ++ show typ
-
-startingEnv :: Env
-startingEnv = Env [] [] []
-
-addGlobal :: String -> State Env ()
-addGlobal newGlobal = do
-  env <- get
-  put $ env {globals = globals env ++ [newGlobal]}
-
-addVar :: String -> State Env ()
-addVar newVar = do
-  env <- get
-  put $ env {scope = newVar : scope env}
-
-popVar :: State Env ()
-popVar = do
-  env <- get
-  put $ env {scope = tail $ scope env}
-
-findVar :: String -> State Env (Maybe Int)
-findVar idName = do
-  env <- get
-  let scopeVars = scope env
-  let (foundNameM, count) = foldr (\name (found, n) -> if name == idName then (Just name, 1) else (found, n + 1)) (Nothing, 0) scopeVars
-  case foundNameM of
-    Nothing -> return Nothing
-    Just _ -> return $ Just count
-
-findGlobal :: String -> State Env (Maybe String)
-findGlobal idName = do
-  env <- get
-  let globalVars = globals env
-  let foundNameM = find (== idName) globalVars
-  return foundNameM
-
-findDecl :: String -> State Env (Maybe SemType)
-findDecl idName =
-  lookup idName . decls <$> get
-
-addDecl :: String -> SemType -> State Env ()
-addDecl name semType = do
-  env <- get
-  put $ env {decls = (name, semType) : decls env}
-
-createSemanticExpressionS ::
-  SynExpression -> State Env (Either CompilerError SemExpression)
-createSemanticExpressionS (Id name) = do
-  identM <- findVar name
-  case identM of
-    Just ident -> return $ Right $ SId ident
-    Nothing -> do
-      globalM <- findGlobal name
-      case globalM of
-        Just global -> return $ Right $ SRef global
-        Nothing -> return $ Left $ SemanticError $ SUndefinedVariable name
-createSemanticExpressionS (Lambda param expr) = do
-  addVar param
-  sformula <- createSemanticExpressionS expr
-  popVar
-  return $ SLambda param <$> sformula
-createSemanticExpressionS (Application func arg) = do
-  sfunc <- createSemanticExpressionS func
-  sarg <- createSemanticExpressionS arg
-  return $ SApplication <$> sfunc <*> sarg
-createSemanticExpressionS (Lit l) = return $ Right $ SLit l
-
-createSemanticExpression :: SynExpression -> Either CompilerError SemExpression
-createSemanticExpression expr = snd $ runState (createSemanticExpressionS expr) startingEnv
 
 createSemanticPartsS :: Program -> State Env (Either CompilerError [SemProgramPart])
 createSemanticPartsS = foldEitherM (flip helper) []
@@ -119,7 +48,13 @@ createSemanticPartsS = foldEitherM (flip helper) []
         Left err -> return $ Left err
         Right newAcc -> foldEitherM f newAcc xs
     helper :: [SemProgramPart] -> SynProgramPart -> State Env (Either CompilerError [SemProgramPart])
-    helper parts (SynDeclaration _ _) = return $ Right parts
+    helper parts (SynDeclaration name typ) = do
+      let semTypeE = createSemanticType typ
+      case semTypeE of
+        Left e -> return $ Left e
+        Right semType -> do
+          addDecl name semType
+          return $ Right parts
     helper parts (SynDefinition name expr) = do
       semExprE <- createSemanticExpressionS expr
       case semExprE of
@@ -251,7 +186,8 @@ semanticAnalyzerTests =
     parseAndCreateProgram program1 == Right program1ShouldBe,
     parseAndCreateProgram program2 == Right program2ShouldBe,
     (parseAndCreateProgram program1 >>= (`parseAndCreateExpressionWithProgram` "true")) == Right (SRef "true"),
-    parseAndCreateProgram program4 == Right program4ShouldBe
+    parseAndCreateProgram program4 == Right program4ShouldBe,
+    parseAndCreateProgram program5 == Right program5ShouldBe
   ]
 
 program1 :: String
@@ -306,3 +242,22 @@ program4ShouldBe =
   SemProgram
     ["te"]
     [SemDefinition "te" (SLambda "a" (SLambda "b" (SApplication (SId 2) (SId 1)))) (SFunctionType (SFunctionType (SGenericType 3) (SGenericType 4)) (SFunctionType (SGenericType 3) (SGenericType 4)))]
+
+program5 :: String
+program5 =
+  "zero := \\f. \\z. z\n"
+    ++ "succ := \\n. \\f. \\z. f (n f z)\n"
+    ++ "one := succ zero\n"
+    ++ "two := succ one\n"
+    ++ "three := succ two\n"
+
+program5ShouldBe :: SemProgram
+program5ShouldBe =
+  SemProgram
+    ["zero", "succ", "one", "two", "three"]
+    [ SemDefinition "zero" (SLambda "f" (SLambda "z" (SId 1))) (SFunctionType (SGenericType 2) (SFunctionType (SGenericType 1) (SGenericType 1))),
+      SemDefinition "succ" (SLambda "n" (SLambda "f" (SLambda "z" (SApplication (SId 2) (SApplication (SApplication (SId 3) (SId 2)) (SId 1)))))) (SFunctionType (SFunctionType (SFunctionType (SGenericType 10) (SGenericType 11)) (SFunctionType (SGenericType 9) (SGenericType 10))) (SFunctionType (SFunctionType (SGenericType 10) (SGenericType 11)) (SFunctionType (SGenericType 9) (SGenericType 11)))),
+      SemDefinition "one" (SApplication (SRef "succ") (SRef "zero")) (SFunctionType (SFunctionType (SGenericType 12) (SGenericType 11)) (SFunctionType (SGenericType 12) (SGenericType 11))),
+      SemDefinition "two" (SApplication (SRef "succ") (SRef "one")) (SFunctionType (SFunctionType (SGenericType 22) (SGenericType 22)) (SFunctionType (SGenericType 22) (SGenericType 22))),
+      SemDefinition "three" (SApplication (SRef "succ") (SRef "two")) (SFunctionType (SFunctionType (SGenericType 33) (SGenericType 33)) (SFunctionType (SGenericType 33) (SGenericType 33)))
+    ]

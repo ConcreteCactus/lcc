@@ -15,7 +15,6 @@ eight := suc seven
 nine := suc eight
 ten := suc nine
 
-
 mul := \a.\b. a (add b) zero
 
 true := \a.\b.a

@@ -25,13 +25,13 @@ data SemType
   = SAtomicType AtomicType
   | SGenericType Int
   | SFunctionType SemType SemType
-  deriving (Eq)
+  deriving (Eq, Show)
 
-instance Show SemType where
-  show (SAtomicType a) = show a
-  show (SGenericType n) = "T" ++ show n
-  show (SFunctionType t1@(SFunctionType _ _) t2) = "(" ++ show t1 ++ ") -> " ++ show t2
-  show (SFunctionType t1 t2) = show t1 ++ " -> " ++ show t2
+-- instance Show SemType where
+--   show (SAtomicType a) = show a
+--   show (SGenericType n) = "T" ++ show n
+--   show (SFunctionType t1@(SFunctionType _ _) t2) = "(" ++ show t1 ++ ") -> " ++ show t2
+--   show (SFunctionType t1 t2) = show t1 ++ " -> " ++ show t2
 
 data InferEnv = InferEnv Int ReconcileEnv
 
@@ -129,6 +129,8 @@ updateWithSubstitutionsI typ = do
   return newTyp
 
 reconcileTypesS :: SemType -> SemType -> State ReconcileEnv (Either STypeError SemType)
+reconcileTypesS (SGenericType genericId) (SGenericType genericId')
+  | genericId == genericId' = return $ Right (SGenericType genericId)
 reconcileTypesS (SGenericType genericId) typ = do
   added <- addNewSubstitution genericId typ
   case added of
