@@ -192,8 +192,8 @@ normalizeGenericIndicesS (SGenericType ind) = do
   dict <- get
   case lookup ind dict of
     Nothing -> do
-      put $ (ind, length dict) : dict
-      return $ SGenericType (length dict)
+      put $ (ind, length dict + 1) : dict
+      return $ SGenericType (length dict + 1)
     Just ind' -> return $ SGenericType ind'
 normalizeGenericIndicesS (SAtomicType atomicType) = return $ SAtomicType atomicType
 normalizeGenericIndicesS (SFunctionType paramType returnType) = do

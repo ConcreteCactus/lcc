@@ -199,8 +199,8 @@ program1ShouldBe :: SemProgram
 program1ShouldBe =
   SemProgram
     ["true", "false"]
-    [ SemDefinition "true" (SLambda "a" (SLambda "b" (SId 2))) (SFunctionType (SGenericType 2) (SFunctionType (SGenericType 1) (SGenericType 2))),
-      SemDefinition "false" (SLambda "a" (SLambda "b" (SId 1))) (SFunctionType (SGenericType 2) (SFunctionType (SGenericType 1) (SGenericType 1)))
+    [ SemDefinition "true" (SLambda "a" (SLambda "b" (SId 2))) (SFunctionType (SGenericType 1) (SFunctionType (SGenericType 2) (SGenericType 1))),
+      SemDefinition "false" (SLambda "a" (SLambda "b" (SId 1))) (SFunctionType (SGenericType 1) (SFunctionType (SGenericType 2) (SGenericType 2)))
     ]
 
 program2 :: String
@@ -216,12 +216,12 @@ program2ShouldBe :: SemProgram
 program2ShouldBe =
   SemProgram
     ["true", "false", "and", "or", "not", "xor"]
-    [ SemDefinition "true" (SLambda "a" (SLambda "b" (SId 2))) (SFunctionType (SGenericType 2) (SFunctionType (SGenericType 1) (SGenericType 2))),
-      SemDefinition "false" (SLambda "a" (SLambda "b" (SId 1))) (SFunctionType (SGenericType 2) (SFunctionType (SGenericType 1) (SGenericType 1))),
-      SemDefinition "and" (SLambda "a" (SLambda "b" (SApplication (SApplication (SId 2) (SId 1)) (SRef "false")))) (SFunctionType (SFunctionType (SGenericType 3) (SFunctionType (SFunctionType (SGenericType 6) (SFunctionType (SGenericType 5) (SGenericType 5))) (SGenericType 7))) (SFunctionType (SGenericType 3) (SGenericType 7))),
-      SemDefinition "or" (SLambda "a" (SLambda "b" (SApplication (SApplication (SId 2) (SRef "true")) (SId 1)))) (SFunctionType (SFunctionType (SFunctionType (SGenericType 4) (SFunctionType (SGenericType 3) (SGenericType 4))) (SFunctionType (SGenericType 6) (SGenericType 7))) (SFunctionType (SGenericType 6) (SGenericType 7))),
-      SemDefinition "not" (SLambda "a" (SApplication (SApplication (SId 1) (SRef "false")) (SRef "true"))) (SFunctionType (SFunctionType (SFunctionType (SGenericType 3) (SFunctionType (SGenericType 2) (SGenericType 2))) (SFunctionType (SFunctionType (SGenericType 6) (SFunctionType (SGenericType 5) (SGenericType 6))) (SGenericType 7))) (SGenericType 7)),
-      SemDefinition "xor" (SLambda "a" (SLambda "b" (SApplication (SApplication (SId 2) (SApplication (SRef "not") (SId 1))) (SId 1)))) (SFunctionType (SFunctionType (SGenericType 9) (SFunctionType (SFunctionType (SFunctionType (SGenericType 5) (SFunctionType (SGenericType 4) (SGenericType 4))) (SFunctionType (SFunctionType (SGenericType 8) (SFunctionType (SGenericType 7) (SGenericType 8))) (SGenericType 9))) (SGenericType 13))) (SFunctionType (SFunctionType (SFunctionType (SGenericType 5) (SFunctionType (SGenericType 4) (SGenericType 4))) (SFunctionType (SFunctionType (SGenericType 8) (SFunctionType (SGenericType 7) (SGenericType 8))) (SGenericType 9))) (SGenericType 13)))
+    [ SemDefinition "true" (SLambda "a" (SLambda "b" (SId 2))) (SFunctionType (SGenericType 1) (SFunctionType (SGenericType 2) (SGenericType 1))),
+      SemDefinition "false" (SLambda "a" (SLambda "b" (SId 1))) (SFunctionType (SGenericType 1) (SFunctionType (SGenericType 2) (SGenericType 2))),
+      SemDefinition "and" (SLambda "a" (SLambda "b" (SApplication (SApplication (SId 2) (SId 1)) (SRef "false")))) (SFunctionType (SFunctionType (SGenericType 1) (SFunctionType (SFunctionType (SGenericType 2) (SFunctionType (SGenericType 3) (SGenericType 3))) (SGenericType 4))) (SFunctionType (SGenericType 1) (SGenericType 4))),
+      SemDefinition "or" (SLambda "a" (SLambda "b" (SApplication (SApplication (SId 2) (SRef "true")) (SId 1)))) (SFunctionType (SFunctionType (SFunctionType (SGenericType 1) (SFunctionType (SGenericType 2) (SGenericType 1))) (SFunctionType (SGenericType 3) (SGenericType 4))) (SFunctionType (SGenericType 3) (SGenericType 4))),
+      SemDefinition "not" (SLambda "a" (SApplication (SApplication (SId 1) (SRef "false")) (SRef "true"))) (SFunctionType (SFunctionType (SFunctionType (SGenericType 1) (SFunctionType (SGenericType 2) (SGenericType 2))) (SFunctionType (SFunctionType (SGenericType 3) (SFunctionType (SGenericType 4) (SGenericType 3))) (SGenericType 5))) (SGenericType 5)),
+      SemDefinition "xor" (SLambda "a" (SLambda "b" (SApplication (SApplication (SId 2) (SApplication (SRef "not") (SId 1))) (SId 1)))) (SFunctionType (SFunctionType (SGenericType 1) (SFunctionType (SFunctionType (SFunctionType (SGenericType 2) (SFunctionType (SGenericType 3) (SGenericType 3))) (SFunctionType (SFunctionType (SGenericType 4) (SFunctionType (SGenericType 5) (SGenericType 4))) (SGenericType 1))) (SGenericType 6))) (SFunctionType (SFunctionType (SFunctionType (SGenericType 2) (SFunctionType (SGenericType 3) (SGenericType 3))) (SFunctionType (SFunctionType (SGenericType 4) (SFunctionType (SGenericType 5) (SGenericType 4))) (SGenericType 1))) (SGenericType 6)))
     ]
 
 program3 :: String
@@ -241,7 +241,7 @@ program4ShouldBe :: SemProgram
 program4ShouldBe =
   SemProgram
     ["te"]
-    [SemDefinition "te" (SLambda "a" (SLambda "b" (SApplication (SId 2) (SId 1)))) (SFunctionType (SFunctionType (SGenericType 3) (SGenericType 4)) (SFunctionType (SGenericType 3) (SGenericType 4)))]
+    [SemDefinition "te" (SLambda "a" (SLambda "b" (SApplication (SId 2) (SId 1)))) (SFunctionType (SFunctionType (SGenericType 1) (SGenericType 2)) (SFunctionType (SGenericType 1) (SGenericType 2)))]
 
 program5 :: String
 program5 =
@@ -255,9 +255,9 @@ program5ShouldBe :: SemProgram
 program5ShouldBe =
   SemProgram
     ["zero", "succ", "one", "two", "three"]
-    [ SemDefinition "zero" (SLambda "f" (SLambda "z" (SId 1))) (SFunctionType (SGenericType 2) (SFunctionType (SGenericType 1) (SGenericType 1))),
-      SemDefinition "succ" (SLambda "n" (SLambda "f" (SLambda "z" (SApplication (SId 2) (SApplication (SApplication (SId 3) (SId 2)) (SId 1)))))) (SFunctionType (SFunctionType (SFunctionType (SGenericType 10) (SGenericType 11)) (SFunctionType (SGenericType 9) (SGenericType 10))) (SFunctionType (SFunctionType (SGenericType 10) (SGenericType 11)) (SFunctionType (SGenericType 9) (SGenericType 11)))),
-      SemDefinition "one" (SApplication (SRef "succ") (SRef "zero")) (SFunctionType (SFunctionType (SGenericType 12) (SGenericType 11)) (SFunctionType (SGenericType 12) (SGenericType 11))),
-      SemDefinition "two" (SApplication (SRef "succ") (SRef "one")) (SFunctionType (SFunctionType (SGenericType 22) (SGenericType 22)) (SFunctionType (SGenericType 22) (SGenericType 22))),
-      SemDefinition "three" (SApplication (SRef "succ") (SRef "two")) (SFunctionType (SFunctionType (SGenericType 33) (SGenericType 33)) (SFunctionType (SGenericType 33) (SGenericType 33)))
+    [ SemDefinition "zero" (SLambda "f" (SLambda "z" (SId 1))) (SFunctionType (SGenericType 1) (SFunctionType (SGenericType 2) (SGenericType 2))),
+      SemDefinition "succ" (SLambda "n" (SLambda "f" (SLambda "z" (SApplication (SId 2) (SApplication (SApplication (SId 3) (SId 2)) (SId 1)))))) (SFunctionType (SFunctionType (SFunctionType (SGenericType 1) (SGenericType 2)) (SFunctionType (SGenericType 3) (SGenericType 1))) (SFunctionType (SFunctionType (SGenericType 1) (SGenericType 2)) (SFunctionType (SGenericType 3) (SGenericType 2)))),
+      SemDefinition "one" (SApplication (SRef "succ") (SRef "zero")) (SFunctionType (SFunctionType (SGenericType 1) (SGenericType 2)) (SFunctionType (SGenericType 1) (SGenericType 2))),
+      SemDefinition "two" (SApplication (SRef "succ") (SRef "one")) (SFunctionType (SFunctionType (SGenericType 1) (SGenericType 1)) (SFunctionType (SGenericType 1) (SGenericType 1))),
+      SemDefinition "three" (SApplication (SRef "succ") (SRef "two")) (SFunctionType (SFunctionType (SGenericType 1) (SGenericType 1)) (SFunctionType (SGenericType 1) (SGenericType 1)))
     ]
