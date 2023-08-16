@@ -7,6 +7,7 @@ module SemanticAnalyzer.SemType
     shiftNewIds,
     addNewSubstitutionI,
     updateWithSubstitutionsI,
+    normalizeGenericIndices,
     reconcileTypesIS,
     createGenericList,
     getNewId,
@@ -25,13 +26,13 @@ data SemType
   = SAtomicType AtomicType
   | SGenericType Int
   | SFunctionType SemType SemType
-  deriving (Eq, Show)
+  deriving (Eq)
 
--- instance Show SemType where
---   show (SAtomicType a) = show a
---   show (SGenericType n) = "T" ++ show n
---   show (SFunctionType t1@(SFunctionType _ _) t2) = "(" ++ show t1 ++ ") -> " ++ show t2
---   show (SFunctionType t1 t2) = show t1 ++ " -> " ++ show t2
+instance Show SemType where
+  show (SAtomicType a) = show a
+  show (SGenericType n) = "T" ++ show n
+  show (SFunctionType t1@(SFunctionType _ _) t2) = "(" ++ show t1 ++ ") -> " ++ show t2
+  show (SFunctionType t1 t2) = show t1 ++ " -> " ++ show t2
 
 data InferEnv = InferEnv Int ReconcileEnv
 
@@ -182,3 +183,20 @@ getNewId = do
   InferEnv ident rec <- get
   put $ InferEnv (ident + 1) rec
   return ident
+
+normalizeGenericIndices :: SemType -> SemType
+normalizeGenericIndices typ = execState (normalizeGenericIndicesS typ) []
+
+normalizeGenericIndicesS :: SemType -> State [(Int, Int)] SemType
+normalizeGenericIndicesS (SGenericType ind) = do
+  dict <- get
+  case lookup ind dict of
+    Nothing -> do
+      put $ (ind, length dict) : dict
+      return $ SGenericType (length dict)
+    Just ind' -> return $ SGenericType ind'
+normalizeGenericIndicesS (SAtomicType atomicType) = return $ SAtomicType atomicType
+normalizeGenericIndicesS (SFunctionType paramType returnType) = do
+  normalizedParam <- normalizeGenericIndicesS paramType
+  normalizedReturn <- normalizeGenericIndicesS returnType
+  return $ SFunctionType normalizedParam normalizedReturn

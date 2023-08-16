@@ -159,7 +159,7 @@ inferTypeS parts (SApplication expr1 expr2) = do
             typ -> return $ Left $ STApplyingToANonFunction $ show typ
 
 inferType :: [SemProgramPart] -> SemExpression -> Either STypeError SemType
-inferType parts expr = fst <$> execState (inferTypeS parts expr) (InferEnv 1 (ReconcileEnv []))
+inferType parts expr = normalizeGenericIndices . fst <$> execState (inferTypeS parts expr) (InferEnv 1 (ReconcileEnv []))
 
 -- Unit tests
 
