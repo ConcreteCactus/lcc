@@ -73,7 +73,7 @@ createSemanticExpressionS (Application func arg) = do
 createSemanticExpressionS (Lit l) = return $ Right $ SLit l
 
 createSemanticExpression :: SynExpression -> Either CompilerError SemExpression
-createSemanticExpression expr = snd $ runState (createSemanticExpressionS expr) startingEnv
+createSemanticExpression expr = execState (createSemanticExpressionS expr) startingEnv
 
 startingEnv :: Env
 startingEnv = Env [] [] []
