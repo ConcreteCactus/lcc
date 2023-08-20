@@ -9,6 +9,7 @@ module SemanticAnalyzer.SemType
     updateWithSubstitutionsI,
     normalizeGenericIndices,
     reconcileTypesIS,
+    checkType,
     createGenericList,
     getNewId,
   )
@@ -53,16 +54,21 @@ shiftNewIds :: SemType -> State InferEnv SemType
 shiftNewIds typ = do
   InferEnv ident rec <- get
   let (newTyp, maxIdent) = shiftIds ident typ
-  put $ InferEnv maxIdent rec
+  put $ InferEnv (maxIdent + 1) rec
   return newTyp
-  where
-    shiftIds :: Int -> SemType -> (SemType, Int)
-    shiftIds ident (SAtomicType a) = (SAtomicType a, ident)
-    shiftIds ident (SFunctionType t1 t2) =
-      let (newT1, maxIdent1) = shiftIds ident t1
-          (newT2, maxIdent2) = shiftIds ident t2
-       in (SFunctionType newT1 newT2, max maxIdent1 maxIdent2)
-    shiftIds ident (SGenericType gid) = (SGenericType (gid + ident - 1), gid + ident)
+
+getHighestId :: SemType -> Int
+getHighestId (SAtomicType _) = 0
+getHighestId (SFunctionType t1 t2) = max (getHighestId t1) (getHighestId t2)
+getHighestId (SGenericType n) = n
+
+shiftIds :: Int -> SemType -> (SemType, Int)
+shiftIds ident (SAtomicType a) = (SAtomicType a, ident)
+shiftIds ident (SFunctionType t1 t2) =
+  let (newT1, maxIdent1) = shiftIds ident t1
+      (newT2, maxIdent2) = shiftIds ident t2
+   in (SFunctionType newT1 newT2, max maxIdent1 maxIdent2)
+shiftIds ident (SGenericType gid) = (SGenericType (gid + ident), gid + ident)
 
 addNewSubstitution :: Int -> SemType -> State ReconcileEnv (Either STypeError ())
 addNewSubstitution genericId typ = do
@@ -160,6 +166,34 @@ reconcileTypesS
         return $ Right (SFunctionType reconciledParam' reconciledReturn')
 reconcileTypesS typ typ' = return $ Left $ STTypeMismatch (show typ) (show typ')
 
+checkTypeS :: Int -> SemType -> SemType -> State ReconcileEnv (Either STypeError ())
+checkTypeS _ (SGenericType genericId) (SGenericType genericId')
+  | genericId == genericId' = return $ Right ()
+checkTypeS hi typ (SGenericType genericId)
+  | genericId > hi = return $ Left $ STTypeMismatch (show (SGenericType genericId)) $ show typ
+checkTypeS _ typ (SGenericType genericId) = do
+  added <- addNewSubstitution genericId typ
+  case added of
+    Left _ -> return $ Left $ STTypeMismatch (show (SGenericType genericId)) $ show typ
+    Right _ -> return $ Right ()
+checkTypeS _ (SGenericType genericId) typ =
+  return $
+    Left $
+      STTypeMismatch (show typ) (show $ SGenericType genericId)
+checkTypeS _ (SAtomicType atomicType) (SAtomicType atomicType') =
+  if atomicType == atomicType'
+    then return $ Right ()
+    else return $ Left $ STAtomicTypeMismatch (show atomicType) (show atomicType')
+checkTypeS hi (SFunctionType paramType returnType) (SFunctionType paramType' returnType') = do
+  checkedParam <- checkTypeS hi paramType paramType'
+  updatedReturn' <- updateWithSubstitutions returnType'
+  checkedReturn <- checkTypeS hi returnType updatedReturn'
+  case (checkedParam, checkedReturn) of
+    (Left e, _) -> return $ Left e
+    (_, Left e) -> return $ Left e
+    (Right _, Right _) -> return $ Right ()
+checkTypeS _ typ typ' = return $ Left $ STTypeMismatch (show typ) (show typ')
+
 reconcileTypesIS :: SemType -> SemType -> State InferEnv (Either STypeError SemType)
 reconcileTypesIS t1 t2 = do
   InferEnv count renv <- get
@@ -169,6 +203,12 @@ reconcileTypesIS t1 t2 = do
     Right reconciled -> do
       put $ InferEnv count newREnv
       return $ Right reconciled
+
+checkType :: SemType -> SemType -> Either STypeError ()
+checkType t1 t2 = execState (checkTypeS highestIdT2 st1 t2) (ReconcileEnv [])
+  where
+    (st1, _) = shiftIds highestIdT2 t1
+    highestIdT2 = getHighestId t2
 
 -- Also returns the last element of the list
 createGenericList :: Int -> State InferEnv ([SemType], SemType)
@@ -200,3 +240,21 @@ normalizeGenericIndicesS (SFunctionType paramType returnType) = do
   normalizedParam <- normalizeGenericIndicesS paramType
   normalizedReturn <- normalizeGenericIndicesS returnType
   return $ SFunctionType normalizedParam normalizedReturn
+
+-- Unit tests
+
+semanticAnalyzerSemTypeTests :: [Bool]
+semanticAnalyzerSemTypeTests =
+  [ checkType (a AInt) (a AInt) == Right (),
+    checkType (a AInt) (t 1) == Right (),
+    checkType (t 1) (a AInt) == Left (STTypeMismatch "AInt" "T1"),
+    checkType (t 1 --> t 2) (t 1 --> t 2) == Right (),
+    checkType (t 1 --> t 2) (t 1 --> t 3) == Right (),
+    checkType (t 1 --> t 2) (t 1 --> t 1) == Left (STTypeMismatch "T2" "T3"),
+    checkType (t 1 --> a AInt) (t 1 --> t 1) == Left (STTypeMismatch "T2" "AInt"),
+    checkType (t 1 --> t 2) (t 3 --> t 2) == Right ()
+  ]
+  where
+    (-->) = SFunctionType
+    t = SGenericType
+    a = SAtomicType
