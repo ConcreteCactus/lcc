@@ -49,12 +49,9 @@ createSemanticPartsS = foldEitherM (flip helper) []
         Right newAcc -> foldEitherM f newAcc xs
     helper :: [SemProgramPart] -> SynProgramPart -> State Env (Either CompilerError [SemProgramPart])
     helper parts (SynDeclaration name typ) = do
-      let semTypeE = createSemanticType typ
-      case semTypeE of
-        Left e -> return $ Left e
-        Right semType -> do
-          addDecl name semType
-          return $ Right parts
+      let semType = createSemanticType typ
+      addDecl name semType
+      return $ Right parts
     helper parts (SynDefinition name expr) = do
       semExprE <- createSemanticExpressionS expr
       case semExprE of
@@ -68,9 +65,22 @@ createSemanticPartsS = foldEitherM (flip helper) []
               return $ Right $ parts ++ [SemDefinition name semExpr typ]
 
 createSemanticProgram :: Program -> Either CompilerError SemProgram
-createSemanticProgram prog = SemProgram globs <$> semProgParts
+createSemanticProgram prog = SemProgram globs <$> (semProgParts >>= sinkError . checkSemProgParts declarations)
   where
-    (Env globs _ _, semProgParts) = runState (createSemanticPartsS prog) startingEnv
+    (Env globs _ declarations, semProgParts) = runState (createSemanticPartsS prog) startingEnv
+    sinkError :: Either STypeError a -> Either CompilerError a
+    sinkError (Left e) = Left $ SemanticError $ STypeError e
+    sinkError (Right a) = Right a
+
+checkSemProgParts :: [(String, SemType)] -> [SemProgramPart] -> Either STypeError [SemProgramPart]
+checkSemProgParts declarations =
+  mapM
+    ( \(SemDefinition name expr typ) -> case lookup name declarations of
+        Nothing -> Right $ SemDefinition name expr typ
+        Just declTyp -> case checkType declTyp typ of
+          Left e -> Left e
+          Right _ -> Right $ SemDefinition name expr declTyp
+    )
 
 parseAndCreateProgram :: String -> Either CompilerError SemProgram
 parseAndCreateProgram s = parseProgramSingleError s >>= createSemanticProgram
@@ -167,7 +177,7 @@ test :: String -> Either CompilerError SemExpression
 test s = parseExpression s >>= createSemanticExpression
 
 testT :: String -> Either CompilerError SemType
-testT s = parseType s >>= createSemanticType
+testT s = createSemanticType <$> parseType s
 
 testP :: String -> Either CompilerError SemProgram
 testP s = parseProgramSingleError s >>= createSemanticProgram
@@ -187,7 +197,8 @@ semanticAnalyzerTests =
     parseAndCreateProgram program2 == Right program2ShouldBe,
     (parseAndCreateProgram program1 >>= (`parseAndCreateExpressionWithProgram` "true")) == Right (SRef "true"),
     parseAndCreateProgram program4 == Right program4ShouldBe,
-    parseAndCreateProgram program5 == Right program5ShouldBe
+    parseAndCreateProgram program5 == Right program5ShouldBe,
+    parseAndCreateProgram program6 == Right program6ShouldBe
   ]
 
 program1 :: String
@@ -261,3 +272,18 @@ program5ShouldBe =
       SemDefinition "two" (SApplication (SRef "succ") (SRef "one")) (SFunctionType (SFunctionType (SGenericType 1) (SGenericType 1)) (SFunctionType (SGenericType 1) (SGenericType 1))),
       SemDefinition "three" (SApplication (SRef "succ") (SRef "two")) (SFunctionType (SFunctionType (SGenericType 1) (SGenericType 1)) (SFunctionType (SGenericType 1) (SGenericType 1)))
     ]
+
+program6ShouldBe :: SemProgram
+program6ShouldBe =
+  SemProgram
+    ["true", "false"]
+    [ SemDefinition "true" (SLambda "a" (SLambda "b" (SId 2))) (SFunctionType (SGenericType 1) (SFunctionType (SGenericType 1) (SGenericType 1))),
+      SemDefinition "false" (SLambda "a" (SLambda "b" (SId 1))) (SFunctionType (SGenericType 1) (SFunctionType (SGenericType 1) (SGenericType 1)))
+    ]
+
+program6 :: String
+program6 =
+  "true : a -> a -> a\n"
+    ++ "true := \\a.\\b.a\n"
+    ++ "false : a -> a -> a\n"
+    ++ "false := \\a.\\b.b\n"

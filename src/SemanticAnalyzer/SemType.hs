@@ -42,13 +42,23 @@ data InferEnv = InferEnv Int ReconcileEnv
 --   2. forall (a, b), (a', b') in RE : b != b' => a != a'
 newtype ReconcileEnv = ReconcileEnv [(Int, SemType)]
 
-createSemanticType :: SynTypeExpression -> Either CompilerError SemType
-createSemanticType (TypeId "int") = Right $ SAtomicType AInt
-createSemanticType (FunctionType t1 t2) =
-  SFunctionType
-    <$> createSemanticType t1
-    <*> createSemanticType t2
-createSemanticType _ = Left CompilerError
+data SemanticTypeEnv = SemanticTypeEnv Int [(String, Int)]
+
+createSemanticType :: SynTypeExpression -> SemType
+createSemanticType synType = execState (createSemanticTypeS synType) (SemanticTypeEnv 1 [])
+
+createSemanticTypeS :: SynTypeExpression -> State SemanticTypeEnv SemType
+createSemanticTypeS (TypeId id') = do
+  SemanticTypeEnv ident decls <- get
+  case lookup id' decls of
+    Just ident' -> return $ SGenericType ident'
+    Nothing -> do
+      put $ SemanticTypeEnv (ident + 1) ((id', ident) : decls)
+      return $ SGenericType ident
+createSemanticTypeS (FunctionType t1 t2) = do
+  t1' <- createSemanticTypeS t1
+  t2' <- createSemanticTypeS t2
+  return $ SFunctionType t1' t2'
 
 shiftNewIds :: SemType -> State InferEnv SemType
 shiftNewIds typ = do

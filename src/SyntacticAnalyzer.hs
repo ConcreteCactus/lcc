@@ -11,6 +11,7 @@ module SyntacticAnalyzer
     parseType,
     parseProgram,
     parseProgramSingleError,
+    syntacticAnalyzerTests,
   )
 where
 
@@ -160,8 +161,8 @@ programParser =
 
 -- Unit tests
 
-tests :: [Bool]
-tests =
+syntacticAnalyzerTests :: [Bool]
+syntacticAnalyzerTests =
   -- Id tests
   [ runParser expressionParser "hello" == Right (Id "hello", ""),
     runParser expressionParser "hello   " == Right (Id "hello", "   "),
