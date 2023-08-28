@@ -1,3 +1,5 @@
+{-# LANGUAGE TupleSections #-}
+
 module SemanticAnalyzer.SemType
   ( SemType (..),
     AtomicType (..),
@@ -5,13 +7,18 @@ module SemanticAnalyzer.SemType
     ReconcileEnv (..),
     createSemanticType,
     shiftNewIds,
+    shiftAwayFrom,
     addNewSubstitutionI,
     updateWithSubstitutionsI,
     normalizeGenericIndices,
+    reconcileTypesS,
     reconcileTypesIS,
     checkType,
     createGenericList,
     getNewId,
+    getTypeInferredToRefSI,
+    getAllTypesInferredToRefsSI,
+    semanticAnalyzerSemTypeTests,
   )
 where
 
@@ -35,7 +42,7 @@ instance Show SemType where
   show (SFunctionType t1@(SFunctionType _ _) t2) = "(" ++ show t1 ++ ") -> " ++ show t2
   show (SFunctionType t1 t2) = show t1 ++ " -> " ++ show t2
 
-data InferEnv = InferEnv Int ReconcileEnv
+data InferEnv = InferEnv Int ReconcileEnv [(String, Int)]
 
 -- Laws
 --   1. forall (a, _) in RE : forall (_, b) in RE : forall genericId in b : a != genericId
@@ -60,11 +67,15 @@ createSemanticTypeS (FunctionType t1 t2) = do
   t2' <- createSemanticTypeS t2
   return $ SFunctionType t1' t2'
 
+shiftAwayFrom :: SemType -> SemType -> SemType
+shiftAwayFrom original shiftCandidate =
+  fst $ shiftIds (getHighestId original + 1) shiftCandidate
+
 shiftNewIds :: SemType -> State InferEnv SemType
 shiftNewIds typ = do
-  InferEnv ident rec <- get
+  InferEnv ident rec refs <- get
   let (newTyp, maxIdent) = shiftIds ident typ
-  put $ InferEnv (maxIdent + 1) rec
+  put $ InferEnv (maxIdent + 1) rec refs
   return newTyp
 
 getHighestId :: SemType -> Int
@@ -106,23 +117,23 @@ addNewSubstitution genericId typ = do
     checkSelfRefs genericId' (SFunctionType paramType returnType) =
       checkSelfRefs genericId' paramType || checkSelfRefs genericId' returnType
     -- 3. Check for and substitute references in the old substitutions
-    substitueSimple :: Int -> SemType -> SemType -> SemType
-    substitueSimple genericId' typ' (SGenericType genericId'') =
+    substituteSimple :: Int -> SemType -> SemType -> SemType
+    substituteSimple genericId' typ' (SGenericType genericId'') =
       if genericId' == genericId''
         then typ'
         else SGenericType genericId''
-    substitueSimple _ _ (SAtomicType atomicType) = SAtomicType atomicType
-    substitueSimple genericId' typ' (SFunctionType paramType returnType) =
-      SFunctionType (substitueSimple genericId' typ' paramType) (substitueSimple genericId' typ' returnType)
+    substituteSimple _ _ (SAtomicType atomicType) = SAtomicType atomicType
+    substituteSimple genericId' typ' (SFunctionType paramType returnType) =
+      SFunctionType (substituteSimple genericId' typ' paramType) (substituteSimple genericId' typ' returnType)
     substituteOldSubs :: Int -> SemType -> [(Int, SemType)] -> [(Int, SemType)]
     substituteOldSubs genericId' typ' =
-      map (second (substitueSimple genericId' typ'))
+      map (second (substituteSimple genericId' typ'))
 
 addNewSubstitutionI :: Int -> SemType -> State InferEnv (Either STypeError ())
 addNewSubstitutionI genericId typ = do
-  InferEnv count renv <- get
+  InferEnv count renv refs <- get
   let (newREnv, result) = runState (addNewSubstitution genericId typ) renv
-  put $ InferEnv count newREnv
+  put $ InferEnv count newREnv refs
   return result
 
 updateWithSubstitutions :: SemType -> State ReconcileEnv SemType
@@ -140,9 +151,9 @@ updateWithSubstitutions typ = do
 
 updateWithSubstitutionsI :: SemType -> State InferEnv SemType
 updateWithSubstitutionsI typ = do
-  InferEnv count renv <- get
+  InferEnv count renv refs <- get
   let (newREnv, newTyp) = runState (updateWithSubstitutions typ) renv
-  put $ InferEnv count newREnv
+  put $ InferEnv count newREnv refs
   return newTyp
 
 reconcileTypesS :: SemType -> SemType -> State ReconcileEnv (Either STypeError SemType)
@@ -206,12 +217,12 @@ checkTypeS _ typ typ' = return $ Left $ STTypeMismatch (show typ) (show typ')
 
 reconcileTypesIS :: SemType -> SemType -> State InferEnv (Either STypeError SemType)
 reconcileTypesIS t1 t2 = do
-  InferEnv count renv <- get
+  InferEnv count renv refs <- get
   let (newREnv, reconciledM) = runState (reconcileTypesS t1 t2) renv
   case reconciledM of
     Left e -> return $ Left e
     Right reconciled -> do
-      put $ InferEnv count newREnv
+      put $ InferEnv count newREnv refs
       return $ Right reconciled
 
 checkType :: SemType -> SemType -> Either STypeError ()
@@ -230,9 +241,29 @@ createGenericList n = do
 
 getNewId :: State InferEnv Int
 getNewId = do
-  InferEnv ident rec <- get
-  put $ InferEnv (ident + 1) rec
+  InferEnv ident rec refs <- get
+  put $ InferEnv (ident + 1) rec refs
   return ident
+
+getOrCreateIdOfRefSI :: String -> State InferEnv Int
+getOrCreateIdOfRefSI refName = do
+  InferEnv ident rec refs <- get
+  case lookup refName refs of
+    Nothing -> do
+      refId <- getNewId
+      put $ InferEnv ident rec ((refName, refId) : refs)
+      return refId
+    Just refId -> return refId
+
+getTypeInferredToRefSI :: String -> State InferEnv SemType
+getTypeInferredToRefSI refName = do
+  refId <- getOrCreateIdOfRefSI refName
+  updateWithSubstitutionsI (SGenericType refId)
+
+getAllTypesInferredToRefsSI :: State InferEnv [(String, SemType)]
+getAllTypesInferredToRefsSI = do
+  InferEnv _ _ refs <- get
+  mapM (\(refName, _) -> (refName,) <$> getTypeInferredToRefSI refName) refs
 
 normalizeGenericIndices :: SemType -> SemType
 normalizeGenericIndices typ = execState (normalizeGenericIndicesS typ) []

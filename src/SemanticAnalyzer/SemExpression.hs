@@ -24,7 +24,7 @@ data SemExpression
   | SApplication SemExpression SemExpression
   deriving (Eq)
 
-data Env = Env {globals :: [String], scope :: [String], decls :: [(String, SemType)]} deriving (Eq, Show)
+data Env = Env {globals :: [String], scope :: [String], decls :: [(String, SemType)], globalInfers :: [(String, SemType)]} deriving (Eq, Show)
 
 instance Show SemExpression where
   show = showHelper []
@@ -51,32 +51,34 @@ showHelper names (SApplication expr1 expr2) =
   showHelper names expr1 ++ " " ++ showHelper names expr2
 
 createSemanticExpressionS ::
-  SynExpression -> State Env (Either CompilerError SemExpression)
+  SynExpression -> State Env SemExpression
 createSemanticExpressionS (Id name) = do
   identM <- findVar name
   case identM of
-    Just ident -> return $ Right $ SId ident
+    Just ident -> return $ SId ident
     Nothing -> do
       globalM <- findGlobal name
       case globalM of
-        Just global -> return $ Right $ SRef global
-        Nothing -> return $ Left $ SemanticError $ SUndefinedVariable name
+        Just global -> return $ SRef global
+        Nothing -> do
+          addGlobal name
+          return $ SRef name
 createSemanticExpressionS (Lambda param expr) = do
   addVar param
   sformula <- createSemanticExpressionS expr
   popVar
-  return $ SLambda param <$> sformula
+  return $ SLambda param sformula
 createSemanticExpressionS (Application func arg) = do
   sfunc <- createSemanticExpressionS func
   sarg <- createSemanticExpressionS arg
-  return $ SApplication <$> sfunc <*> sarg
-createSemanticExpressionS (Lit l) = return $ Right $ SLit l
+  return $ SApplication sfunc sarg
+createSemanticExpressionS (Lit l) = return $ SLit l
 
-createSemanticExpression :: SynExpression -> Either CompilerError SemExpression
+createSemanticExpression :: SynExpression -> SemExpression
 createSemanticExpression expr = execState (createSemanticExpressionS expr) startingEnv
 
 startingEnv :: Env
-startingEnv = Env [] [] []
+startingEnv = Env [] [] [] []
 
 addGlobal :: String -> State Env ()
 addGlobal newGlobal = do

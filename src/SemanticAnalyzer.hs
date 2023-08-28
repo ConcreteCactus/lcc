@@ -1,8 +1,8 @@
-{-# OPTIONS_GHC -Wincomplete-patterns #-}
-{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-
 {-# HLINT ignore "Use tuple-section" #-}
 {-# HLINT ignore "Use execState" #-}
+{-# LANGUAGE TupleSections #-}
+{-# OPTIONS_GHC -Wincomplete-patterns #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 module SemanticAnalyzer
   ( SemanticError (..),
@@ -23,6 +23,7 @@ module SemanticAnalyzer
   )
 where
 
+import Data.Bifunctor
 import Data.Foldable
 import Errors
 import SemanticAnalyzer.SemExpression
@@ -53,21 +54,19 @@ createSemanticPartsS = foldEitherM (flip helper) []
       addDecl name semType
       return $ Right parts
     helper parts (SynDefinition name expr) = do
-      semExprE <- createSemanticExpressionS expr
-      case semExprE of
-        Left err -> return $ Left err
-        Right semExpr -> do
-          let typM = inferType parts semExpr
-          case typM of
-            Left e -> return $ Left $ SemanticError $ STypeError e
-            Right typ -> do
-              addGlobal name
-              return $ Right $ parts ++ [SemDefinition name semExpr typ]
+      semExpr <- createSemanticExpressionS expr
+      let typM = inferType parts semExpr
+      case typM of
+        Left e -> return $ Left $ SemanticError $ STypeError e
+        Right (typ, newGlobalInfers) -> do
+          mergeWithCurrentGlobalInfers newGlobalInfers
+          addGlobal name
+          return $ Right $ parts ++ [SemDefinition name semExpr typ]
 
 createSemanticProgram :: Program -> Either CompilerError SemProgram
 createSemanticProgram prog = SemProgram globs <$> (semProgParts >>= sinkError . checkSemProgParts declarations)
   where
-    (Env globs _ declarations, semProgParts) = runState (createSemanticPartsS prog) startingEnv
+    (Env globs _ declarations _, semProgParts) = runState (createSemanticPartsS prog) startingEnv
     sinkError :: Either STypeError a -> Either CompilerError a
     sinkError (Left e) = Left $ SemanticError $ STypeError e
     sinkError (Right a) = Right a
@@ -88,7 +87,7 @@ parseAndCreateProgram s = parseProgramSingleError s >>= createSemanticProgram
 parseAndCreateExpressionWithProgram :: SemProgram -> String -> Either CompilerError SemExpression
 parseAndCreateExpressionWithProgram (SemProgram globs _) s = do
   parsed <- parseExpression s
-  execState (createSemanticExpressionS parsed) (Env globs [] [])
+  return $ execState (createSemanticExpressionS parsed) (Env globs [] [] [])
 
 lookupRefExp :: [SemProgramPart] -> String -> Maybe SemExpression
 lookupRefExp parts refName =
@@ -106,6 +105,26 @@ lookupRefType parts refName =
     parts
     >>= \(SemDefinition _ _ typ) -> Just typ
 
+mergeGlobalInfers :: [(String, SemType)] -> [(String, SemType)] -> Either STypeError [(String, SemType)]
+mergeGlobalInfers [] oldInfers = Right oldInfers
+mergeGlobalInfers ((name, typ) : newInfers) oldInfers =
+  case lookup name oldInfers of
+    Nothing -> ((name, typ) :) <$> mergeGlobalInfers newInfers oldInfers
+    Just oldTyp -> do
+      let shiftedTyp = shiftAwayFrom oldTyp typ
+      mergedTyp <- execState (reconcileTypesS shiftedTyp oldTyp) (ReconcileEnv [])
+      ((name, mergedTyp) :) <$> mergeGlobalInfers newInfers oldInfers
+
+mergeWithCurrentGlobalInfers :: [(String, SemType)] -> State Env (Either STypeError [(String, SemType)])
+mergeWithCurrentGlobalInfers newInfers = do
+  currEnv@(Env _ _ _ globalInferences) <- get
+  let mergedE = mergeGlobalInfers newInfers globalInferences
+  case mergedE of
+    Left e -> return $ Left e
+    Right merged -> do
+      put $ currEnv {globalInfers = merged}
+      return $ Right merged
+
 emptyProgram :: SemProgram
 emptyProgram = SemProgram [] []
 
@@ -116,7 +135,9 @@ inferTypeS _ (SId ident) = do
   return $ Right (lastGeneric, generics)
 inferTypeS parts (SRef refName) = do
   case lookupRefType parts refName of
-    Nothing -> return $ Left STReferenceNotFound
+    Nothing -> do
+      typ <- getTypeInferredToRefSI refName
+      return $ Right (typ, [])
     Just typ -> do
       shifted <- shiftNewIds typ
       return $ Right (shifted, [])
@@ -168,13 +189,18 @@ inferTypeS parts (SApplication expr1 expr2) = do
                   return $ Right (SGenericType newReturnId, updatedGenerics')
             typ -> return $ Left $ STApplyingToANonFunction $ show typ
 
-inferType :: [SemProgramPart] -> SemExpression -> Either STypeError SemType
-inferType parts expr = normalizeGenericIndices . fst <$> execState (inferTypeS parts expr) (InferEnv 1 (ReconcileEnv []))
+inferType :: [SemProgramPart] -> SemExpression -> Either STypeError (SemType, [(String, SemType)])
+inferType parts expr = (,normRefs) <$> normTypeE
+  where
+    (ienv, typE) = runState (inferTypeS parts expr) (InferEnv 1 (ReconcileEnv []) [])
+    normTypeE = normalizeGenericIndices . fst <$> typE
+    refs = execState getAllTypesInferredToRefsSI ienv
+    normRefs = second normalizeGenericIndices <$> refs
 
 -- Unit tests
 
 test :: String -> Either CompilerError SemExpression
-test s = parseExpression s >>= createSemanticExpression
+test s = createSemanticExpression <$> parseExpression s
 
 testT :: String -> Either CompilerError SemType
 testT s = createSemanticType <$> parseType s
