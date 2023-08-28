@@ -7,8 +7,8 @@
 module SemanticAnalyzer
   ( SemanticError (..),
     SemExpression (..),
-    SemProgram (..),
-    SemProgramPart (..),
+    Program (..),
+    Definition (..),
     Env (..),
     State (..),
     createSemanticExpression,
@@ -26,19 +26,28 @@ where
 import Data.Bifunctor
 import Data.Foldable
 import Errors
-import SemanticAnalyzer.SemExpression
-import SemanticAnalyzer.SemType
-import SyntacticAnalyzer
+import SemanticAnalyzer.Expression
+import SemanticAnalyzer.Type
+import qualified SyntacticAnalyzer as Y
 import Util
 
-data SemProgramPart = SemDefinition String SemExpression SemType deriving (Eq)
+data Definition = Definition
+  { defName :: String,
+    defExpr :: SemExpression,
+    defType :: SemType
+  }
+  deriving (Eq)
 
-data SemProgram = SemProgram [String] [SemProgramPart] deriving (Eq, Show)
+data Program = Program
+  { progGlobals :: [String],
+    progDefs :: [Definition]
+  }
+  deriving (Eq, Show)
 
-instance Show SemProgramPart where
-  show (SemDefinition name expr typ) = name ++ " := " ++ show expr ++ " : " ++ show typ
+instance Show Definition where
+  show (Definition name expr typ) = name ++ " := " ++ show expr ++ " : " ++ show typ
 
-createSemanticPartsS :: Program -> State Env (Either CompilerError [SemProgramPart])
+createSemanticPartsS :: Y.Program -> State Env (Either CompilerError [Definition])
 createSemanticPartsS = foldEitherM (flip helper) []
   where
     foldEitherM :: (Monad m) => (a -> b -> m (Either e b)) -> b -> [a] -> m (Either e b)
@@ -48,7 +57,7 @@ createSemanticPartsS = foldEitherM (flip helper) []
       case res of
         Left err -> return $ Left err
         Right newAcc -> foldEitherM f newAcc xs
-    helper :: [SemProgramPart] -> SynProgramPart -> State Env (Either CompilerError [SemProgramPart])
+    helper :: [Definition] -> SynProgramPart -> State Env (Either CompilerError [Definition])
     helper parts (SynDeclaration name typ) = do
       let semType = createSemanticType typ
       addDecl name semType
@@ -59,51 +68,54 @@ createSemanticPartsS = foldEitherM (flip helper) []
       case typM of
         Left e -> return $ Left $ SemanticError $ STypeError e
         Right (typ, newGlobalInfers) -> do
-          mergeWithCurrentGlobalInfers newGlobalInfers
-          addGlobal name
-          return $ Right $ parts ++ [SemDefinition name semExpr typ]
+          errE <- mergeWithCurrentGlobalInfers newGlobalInfers
+          case errE of
+            Left e -> return $ Left $ SemanticError $ STypeError e
+            Right _ -> do
+              addGlobal name
+              return $ Right $ parts ++ [Definition name semExpr typ]
 
-createSemanticProgram :: Program -> Either CompilerError SemProgram
-createSemanticProgram prog = SemProgram globs <$> (semProgParts >>= sinkError . checkSemProgParts declarations)
+createSemanticProgram :: Y.Program -> Either CompilerError Program
+createSemanticProgram prog = Program globs <$> (semProgParts >>= sinkError . checkSemProgParts declarations)
   where
     (Env globs _ declarations _, semProgParts) = runState (createSemanticPartsS prog) startingEnv
     sinkError :: Either STypeError a -> Either CompilerError a
     sinkError (Left e) = Left $ SemanticError $ STypeError e
     sinkError (Right a) = Right a
 
-checkSemProgParts :: [(String, SemType)] -> [SemProgramPart] -> Either STypeError [SemProgramPart]
+checkSemProgParts :: [(String, SemType)] -> [Definition] -> Either STypeError [Definition]
 checkSemProgParts declarations =
   mapM
-    ( \(SemDefinition name expr typ) -> case lookup name declarations of
-        Nothing -> Right $ SemDefinition name expr typ
+    ( \(Definition name expr typ) -> case lookup name declarations of
+        Nothing -> Right $ Definition name expr typ
         Just declTyp -> case checkType declTyp typ of
           Left e -> Left e
-          Right _ -> Right $ SemDefinition name expr declTyp
+          Right _ -> Right $ Definition name expr declTyp
     )
 
-parseAndCreateProgram :: String -> Either CompilerError SemProgram
+parseAndCreateProgram :: String -> Either CompilerError Program
 parseAndCreateProgram s = parseProgramSingleError s >>= createSemanticProgram
 
-parseAndCreateExpressionWithProgram :: SemProgram -> String -> Either CompilerError SemExpression
-parseAndCreateExpressionWithProgram (SemProgram globs _) s = do
+parseAndCreateExpressionWithProgram :: Program -> String -> Either CompilerError SemExpression
+parseAndCreateExpressionWithProgram (Program globs _) s = do
   parsed <- parseExpression s
   return $ execState (createSemanticExpressionS parsed) (Env globs [] [] [])
 
-lookupRefExp :: [SemProgramPart] -> String -> Maybe SemExpression
+lookupRefExp :: [Definition] -> String -> Maybe SemExpression
 lookupRefExp parts refName =
   find
-    ( \(SemDefinition name _ _) -> name == refName
+    ( \(Definition name _ _) -> name == refName
     )
     parts
-    >>= \(SemDefinition _ expr _) -> Just expr
+    >>= \(Definition _ expr _) -> Just expr
 
-lookupRefType :: [SemProgramPart] -> String -> Maybe SemType
+lookupRefType :: [Definition] -> String -> Maybe SemType
 lookupRefType parts refName =
   find
-    ( \(SemDefinition name _ _) -> name == refName
+    ( \(Definition name _ _) -> name == refName
     )
     parts
-    >>= \(SemDefinition _ _ typ) -> Just typ
+    >>= \(Definition _ _ typ) -> Just typ
 
 mergeGlobalInfers :: [(String, SemType)] -> [(String, SemType)] -> Either STypeError [(String, SemType)]
 mergeGlobalInfers [] oldInfers = Right oldInfers
@@ -115,7 +127,7 @@ mergeGlobalInfers ((name, typ) : newInfers) oldInfers =
       mergedTyp <- execState (reconcileTypesS shiftedTyp oldTyp) (ReconcileEnv [])
       ((name, mergedTyp) :) <$> mergeGlobalInfers newInfers oldInfers
 
-mergeWithCurrentGlobalInfers :: [(String, SemType)] -> State Env (Either STypeError [(String, SemType)])
+mergeWithCurrentGlobalInfers :: [(String, SemType)] -> State Env (Either STypeError ())
 mergeWithCurrentGlobalInfers newInfers = do
   currEnv@(Env _ _ _ globalInferences) <- get
   let mergedE = mergeGlobalInfers newInfers globalInferences
@@ -123,12 +135,12 @@ mergeWithCurrentGlobalInfers newInfers = do
     Left e -> return $ Left e
     Right merged -> do
       put $ currEnv {globalInfers = merged}
-      return $ Right merged
+      return $ Right ()
 
-emptyProgram :: SemProgram
-emptyProgram = SemProgram [] []
+emptyProgram :: Program
+emptyProgram = Program [] []
 
-inferTypeS :: [SemProgramPart] -> SemExpression -> State InferEnv (Either STypeError (SemType, [SemType]))
+inferTypeS :: [Definition] -> SemExpression -> State InferEnv (Either STypeError (SemType, [SemType]))
 inferTypeS _ (SLit (IntegerLiteral _)) = return $ Right (SAtomicType AInt, [])
 inferTypeS _ (SId ident) = do
   (generics, lastGeneric) <- createGenericList ident
@@ -189,7 +201,7 @@ inferTypeS parts (SApplication expr1 expr2) = do
                   return $ Right (SGenericType newReturnId, updatedGenerics')
             typ -> return $ Left $ STApplyingToANonFunction $ show typ
 
-inferType :: [SemProgramPart] -> SemExpression -> Either STypeError (SemType, [(String, SemType)])
+inferType :: [Definition] -> SemExpression -> Either STypeError (SemType, [(String, SemType)])
 inferType parts expr = (,normRefs) <$> normTypeE
   where
     (ienv, typE) = runState (inferTypeS parts expr) (InferEnv 1 (ReconcileEnv []) [])
@@ -205,7 +217,7 @@ test s = createSemanticExpression <$> parseExpression s
 testT :: String -> Either CompilerError SemType
 testT s = createSemanticType <$> parseType s
 
-testP :: String -> Either CompilerError SemProgram
+testP :: String -> Either CompilerError Program
 testP s = parseProgramSingleError s >>= createSemanticProgram
 
 semanticAnalyzerTests :: [Bool]
@@ -232,12 +244,12 @@ program1 =
   "true := \\a.\\b.a\n"
     ++ "false := \\a.\\b.b"
 
-program1ShouldBe :: SemProgram
+program1ShouldBe :: Program
 program1ShouldBe =
-  SemProgram
+  Program
     ["true", "false"]
-    [ SemDefinition "true" (SLambda "a" (SLambda "b" (SId 2))) (SFunctionType (SGenericType 1) (SFunctionType (SGenericType 2) (SGenericType 1))),
-      SemDefinition "false" (SLambda "a" (SLambda "b" (SId 1))) (SFunctionType (SGenericType 1) (SFunctionType (SGenericType 2) (SGenericType 2)))
+    [ Definition "true" (SLambda "a" (SLambda "b" (SId 2))) (SFunctionType (SGenericType 1) (SFunctionType (SGenericType 2) (SGenericType 1))),
+      Definition "false" (SLambda "a" (SLambda "b" (SId 1))) (SFunctionType (SGenericType 1) (SFunctionType (SGenericType 2) (SGenericType 2)))
     ]
 
 program2 :: String
@@ -249,16 +261,16 @@ program2 =
     ++ "not := \\a. a false true\n"
     ++ "xor := \\a.\\b. a (not b) b"
 
-program2ShouldBe :: SemProgram
+program2ShouldBe :: Program
 program2ShouldBe =
-  SemProgram
+  Program
     ["true", "false", "and", "or", "not", "xor"]
-    [ SemDefinition "true" (SLambda "a" (SLambda "b" (SId 2))) (SFunctionType (SGenericType 1) (SFunctionType (SGenericType 2) (SGenericType 1))),
-      SemDefinition "false" (SLambda "a" (SLambda "b" (SId 1))) (SFunctionType (SGenericType 1) (SFunctionType (SGenericType 2) (SGenericType 2))),
-      SemDefinition "and" (SLambda "a" (SLambda "b" (SApplication (SApplication (SId 2) (SId 1)) (SRef "false")))) (SFunctionType (SFunctionType (SGenericType 1) (SFunctionType (SFunctionType (SGenericType 2) (SFunctionType (SGenericType 3) (SGenericType 3))) (SGenericType 4))) (SFunctionType (SGenericType 1) (SGenericType 4))),
-      SemDefinition "or" (SLambda "a" (SLambda "b" (SApplication (SApplication (SId 2) (SRef "true")) (SId 1)))) (SFunctionType (SFunctionType (SFunctionType (SGenericType 1) (SFunctionType (SGenericType 2) (SGenericType 1))) (SFunctionType (SGenericType 3) (SGenericType 4))) (SFunctionType (SGenericType 3) (SGenericType 4))),
-      SemDefinition "not" (SLambda "a" (SApplication (SApplication (SId 1) (SRef "false")) (SRef "true"))) (SFunctionType (SFunctionType (SFunctionType (SGenericType 1) (SFunctionType (SGenericType 2) (SGenericType 2))) (SFunctionType (SFunctionType (SGenericType 3) (SFunctionType (SGenericType 4) (SGenericType 3))) (SGenericType 5))) (SGenericType 5)),
-      SemDefinition "xor" (SLambda "a" (SLambda "b" (SApplication (SApplication (SId 2) (SApplication (SRef "not") (SId 1))) (SId 1)))) (SFunctionType (SFunctionType (SGenericType 1) (SFunctionType (SFunctionType (SFunctionType (SGenericType 2) (SFunctionType (SGenericType 3) (SGenericType 3))) (SFunctionType (SFunctionType (SGenericType 4) (SFunctionType (SGenericType 5) (SGenericType 4))) (SGenericType 1))) (SGenericType 6))) (SFunctionType (SFunctionType (SFunctionType (SGenericType 2) (SFunctionType (SGenericType 3) (SGenericType 3))) (SFunctionType (SFunctionType (SGenericType 4) (SFunctionType (SGenericType 5) (SGenericType 4))) (SGenericType 1))) (SGenericType 6)))
+    [ Definition "true" (SLambda "a" (SLambda "b" (SId 2))) (SFunctionType (SGenericType 1) (SFunctionType (SGenericType 2) (SGenericType 1))),
+      Definition "false" (SLambda "a" (SLambda "b" (SId 1))) (SFunctionType (SGenericType 1) (SFunctionType (SGenericType 2) (SGenericType 2))),
+      Definition "and" (SLambda "a" (SLambda "b" (SApplication (SApplication (SId 2) (SId 1)) (SRef "false")))) (SFunctionType (SFunctionType (SGenericType 1) (SFunctionType (SFunctionType (SGenericType 2) (SFunctionType (SGenericType 3) (SGenericType 3))) (SGenericType 4))) (SFunctionType (SGenericType 1) (SGenericType 4))),
+      Definition "or" (SLambda "a" (SLambda "b" (SApplication (SApplication (SId 2) (SRef "true")) (SId 1)))) (SFunctionType (SFunctionType (SFunctionType (SGenericType 1) (SFunctionType (SGenericType 2) (SGenericType 1))) (SFunctionType (SGenericType 3) (SGenericType 4))) (SFunctionType (SGenericType 3) (SGenericType 4))),
+      Definition "not" (SLambda "a" (SApplication (SApplication (SId 1) (SRef "false")) (SRef "true"))) (SFunctionType (SFunctionType (SFunctionType (SGenericType 1) (SFunctionType (SGenericType 2) (SGenericType 2))) (SFunctionType (SFunctionType (SGenericType 3) (SFunctionType (SGenericType 4) (SGenericType 3))) (SGenericType 5))) (SGenericType 5)),
+      Definition "xor" (SLambda "a" (SLambda "b" (SApplication (SApplication (SId 2) (SApplication (SRef "not") (SId 1))) (SId 1)))) (SFunctionType (SFunctionType (SGenericType 1) (SFunctionType (SFunctionType (SFunctionType (SGenericType 2) (SFunctionType (SGenericType 3) (SGenericType 3))) (SFunctionType (SFunctionType (SGenericType 4) (SFunctionType (SGenericType 5) (SGenericType 4))) (SGenericType 1))) (SGenericType 6))) (SFunctionType (SFunctionType (SFunctionType (SGenericType 2) (SFunctionType (SGenericType 3) (SGenericType 3))) (SFunctionType (SFunctionType (SGenericType 4) (SFunctionType (SGenericType 5) (SGenericType 4))) (SGenericType 1))) (SGenericType 6)))
     ]
 
 program3 :: String
@@ -274,11 +286,11 @@ program4 :: String
 program4 =
   "te := \\a. \\b. a b\n"
 
-program4ShouldBe :: SemProgram
+program4ShouldBe :: Program
 program4ShouldBe =
-  SemProgram
+  Program
     ["te"]
-    [SemDefinition "te" (SLambda "a" (SLambda "b" (SApplication (SId 2) (SId 1)))) (SFunctionType (SFunctionType (SGenericType 1) (SGenericType 2)) (SFunctionType (SGenericType 1) (SGenericType 2)))]
+    [Definition "te" (SLambda "a" (SLambda "b" (SApplication (SId 2) (SId 1)))) (SFunctionType (SFunctionType (SGenericType 1) (SGenericType 2)) (SFunctionType (SGenericType 1) (SGenericType 2)))]
 
 program5 :: String
 program5 =
@@ -288,23 +300,23 @@ program5 =
     ++ "two := succ one\n"
     ++ "three := succ two\n"
 
-program5ShouldBe :: SemProgram
+program5ShouldBe :: Program
 program5ShouldBe =
-  SemProgram
+  Program
     ["zero", "succ", "one", "two", "three"]
-    [ SemDefinition "zero" (SLambda "f" (SLambda "z" (SId 1))) (SFunctionType (SGenericType 1) (SFunctionType (SGenericType 2) (SGenericType 2))),
-      SemDefinition "succ" (SLambda "n" (SLambda "f" (SLambda "z" (SApplication (SId 2) (SApplication (SApplication (SId 3) (SId 2)) (SId 1)))))) (SFunctionType (SFunctionType (SFunctionType (SGenericType 1) (SGenericType 2)) (SFunctionType (SGenericType 3) (SGenericType 1))) (SFunctionType (SFunctionType (SGenericType 1) (SGenericType 2)) (SFunctionType (SGenericType 3) (SGenericType 2)))),
-      SemDefinition "one" (SApplication (SRef "succ") (SRef "zero")) (SFunctionType (SFunctionType (SGenericType 1) (SGenericType 2)) (SFunctionType (SGenericType 1) (SGenericType 2))),
-      SemDefinition "two" (SApplication (SRef "succ") (SRef "one")) (SFunctionType (SFunctionType (SGenericType 1) (SGenericType 1)) (SFunctionType (SGenericType 1) (SGenericType 1))),
-      SemDefinition "three" (SApplication (SRef "succ") (SRef "two")) (SFunctionType (SFunctionType (SGenericType 1) (SGenericType 1)) (SFunctionType (SGenericType 1) (SGenericType 1)))
+    [ Definition "zero" (SLambda "f" (SLambda "z" (SId 1))) (SFunctionType (SGenericType 1) (SFunctionType (SGenericType 2) (SGenericType 2))),
+      Definition "succ" (SLambda "n" (SLambda "f" (SLambda "z" (SApplication (SId 2) (SApplication (SApplication (SId 3) (SId 2)) (SId 1)))))) (SFunctionType (SFunctionType (SFunctionType (SGenericType 1) (SGenericType 2)) (SFunctionType (SGenericType 3) (SGenericType 1))) (SFunctionType (SFunctionType (SGenericType 1) (SGenericType 2)) (SFunctionType (SGenericType 3) (SGenericType 2)))),
+      Definition "one" (SApplication (SRef "succ") (SRef "zero")) (SFunctionType (SFunctionType (SGenericType 1) (SGenericType 2)) (SFunctionType (SGenericType 1) (SGenericType 2))),
+      Definition "two" (SApplication (SRef "succ") (SRef "one")) (SFunctionType (SFunctionType (SGenericType 1) (SGenericType 1)) (SFunctionType (SGenericType 1) (SGenericType 1))),
+      Definition "three" (SApplication (SRef "succ") (SRef "two")) (SFunctionType (SFunctionType (SGenericType 1) (SGenericType 1)) (SFunctionType (SGenericType 1) (SGenericType 1)))
     ]
 
-program6ShouldBe :: SemProgram
+program6ShouldBe :: Program
 program6ShouldBe =
-  SemProgram
+  Program
     ["true", "false"]
-    [ SemDefinition "true" (SLambda "a" (SLambda "b" (SId 2))) (SFunctionType (SGenericType 1) (SFunctionType (SGenericType 1) (SGenericType 1))),
-      SemDefinition "false" (SLambda "a" (SLambda "b" (SId 1))) (SFunctionType (SGenericType 1) (SFunctionType (SGenericType 1) (SGenericType 1)))
+    [ Definition "true" (SLambda "a" (SLambda "b" (SId 2))) (SFunctionType (SGenericType 1) (SFunctionType (SGenericType 1) (SGenericType 1))),
+      Definition "false" (SLambda "a" (SLambda "b" (SId 1))) (SFunctionType (SGenericType 1) (SFunctionType (SGenericType 1) (SGenericType 1)))
     ]
 
 program6 :: String

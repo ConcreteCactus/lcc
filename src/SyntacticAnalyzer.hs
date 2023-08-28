@@ -2,9 +2,9 @@
 {-# OPTIONS_GHC -Wno-partial-fields #-}
 
 module SyntacticAnalyzer
-  ( SynExpression (..),
-    SynTypeExpression (..),
-    SynProgramPart (..),
+  ( Expression (..),
+    Type (..),
+    ProgramPart (..),
     Literal (..),
     Program,
     parseExpression,
@@ -22,32 +22,32 @@ import Lexer
 
 data Literal = IntegerLiteral Integer deriving (Show, Eq)
 
-data SynExpression
+data Expression
   = Id String
   | Lit Literal
-  | Lambda String SynExpression
-  | Application SynExpression SynExpression
+  | Lambda String Expression
+  | Application Expression Expression
   deriving (Show, Eq)
 
-data SynTypeExpression
+data Type
   = TypeId String
-  | FunctionType SynTypeExpression SynTypeExpression
+  | FunctionType Type Type
   deriving (Show, Eq)
 
-data SynProgramPart = SynDefinition String SynExpression | SynDeclaration String SynTypeExpression deriving (Eq, Show)
+data ProgramPart = SynDefinition String Expression | SynDeclaration String Type deriving (Eq, Show)
 
-type Program = [SynProgramPart]
+type Program = [ProgramPart]
 
-idParser :: Parser SynExpression
+idParser :: Parser Expression
 idParser = Id <$> identifier
 
 integerLiteralParser :: Parser Literal
 integerLiteralParser = IntegerLiteral <$> integer
 
-literalParser :: Parser SynExpression
+literalParser :: Parser Expression
 literalParser = Lit <$> integerLiteralParser
 
-lambdaParser :: Parser SynExpression
+lambdaParser :: Parser Expression
 lambdaParser =
   Lambda
     <$> ( lambda
@@ -56,17 +56,17 @@ lambdaParser =
         )
     <*> expressionParser
 
-applicationsParser :: Parser SynExpression
+applicationsParser :: Parser Expression
 applicationsParser = foldl1 Application <$> sepBy1 whiteSpace parseExpressionWithoutApplication
 
-parseExpressionWithoutApplication :: Parser SynExpression
+parseExpressionWithoutApplication :: Parser Expression
 parseExpressionWithoutApplication =
   literalParser
     <|> idParser
     <|> lambdaParser
     <|> (openParen *> expressionParser <* closeParen)
 
-expressionParser :: Parser SynExpression
+expressionParser :: Parser Expression
 expressionParser =
   applicationsParser
     <|> literalParser
@@ -79,16 +79,16 @@ expressionParser =
                )
         )
 
-parseExpression :: String -> Either CompilerError SynExpression
+parseExpression :: String -> Either CompilerError Expression
 parseExpression s = fst <$> runParser expressionParser s
 
-tIdParser :: Parser SynTypeExpression
+tIdParser :: Parser Type
 tIdParser = TypeId <$> anyCapIdentifier
 
-functionParser :: Parser SynTypeExpression
+functionParser :: Parser Type
 functionParser = FunctionType <$> typeParserWithoutFunction <*> (whiteSpaceO *> arrow *> whiteSpaceO *> typeParser)
 
-typeParserWithoutFunction :: Parser SynTypeExpression
+typeParserWithoutFunction :: Parser Type
 typeParserWithoutFunction =
   tIdParser
     <|> ( whiteSpaceO
@@ -99,7 +99,7 @@ typeParserWithoutFunction =
             <* whiteSpaceO
         )
 
-typeParser :: Parser SynTypeExpression
+typeParser :: Parser Type
 typeParser =
   functionParser
     <|> tIdParser
@@ -111,19 +111,19 @@ typeParser =
             <* whiteSpaceO
         )
 
-parseType :: String -> Either CompilerError SynTypeExpression
+parseType :: String -> Either CompilerError Type
 parseType s = fst <$> runParser typeParser s
 
-declarationParser :: Parser SynProgramPart
+declarationParser :: Parser ProgramPart
 declarationParser = SynDeclaration <$> identifier <*> (whiteSpaceO *> colon *> whiteSpaceO *> typeParser)
 
-definitionParser :: Parser SynProgramPart
+definitionParser :: Parser ProgramPart
 definitionParser = SynDefinition <$> identifier <*> (whiteSpaceO *> colonEquals *> whiteSpaceO *> expressionParser)
 
 blocksParser :: Parser [String]
 blocksParser = filter (not . null) <$> sepBy endOfLine block <* whiteSpaceO <* eof
 
-partParser :: Parser SynProgramPart
+partParser :: Parser ProgramPart
 partParser = definitionParser <|> declarationParser
 
 parseProgram :: String -> Either (Ne.NonEmpty CompilerError) Program

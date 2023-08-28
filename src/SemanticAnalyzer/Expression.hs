@@ -1,5 +1,5 @@
-module SemanticAnalyzer.SemExpression
-  ( SemExpression (..),
+module SemanticAnalyzer.Expression
+  ( Expression (..),
     Env (..),
     createSemanticExpression,
     createSemanticExpressionS,
@@ -13,23 +13,23 @@ where
 import Data.Foldable
 import Errors
 import SemanticAnalyzer.SemType
-import SyntacticAnalyzer
+import qualified SyntacticAnalyzer as Y
 import Util
 
-data SemExpression
+data Expression
   = SId Int
   | SRef String
   | SLit Literal
-  | SLambda String SemExpression
-  | SApplication SemExpression SemExpression
+  | SLambda String Expression
+  | SApplication Expression Expression
   deriving (Eq)
 
 data Env = Env {globals :: [String], scope :: [String], decls :: [(String, SemType)], globalInfers :: [(String, SemType)]} deriving (Eq, Show)
 
-instance Show SemExpression where
+instance Show Expression where
   show = showHelper []
 
-showHelper :: [String] -> SemExpression -> String
+showHelper :: [String] -> Expression -> String
 showHelper names (SId identifier) =
   case names !!! identifier of
     Nothing -> "?_" ++ show identifier
@@ -51,7 +51,7 @@ showHelper names (SApplication expr1 expr2) =
   showHelper names expr1 ++ " " ++ showHelper names expr2
 
 createSemanticExpressionS ::
-  SynExpression -> State Env SemExpression
+  SynExpression -> State Env Expression
 createSemanticExpressionS (Id name) = do
   identM <- findVar name
   case identM of
@@ -74,7 +74,7 @@ createSemanticExpressionS (Application func arg) = do
   return $ SApplication sfunc sarg
 createSemanticExpressionS (Lit l) = return $ SLit l
 
-createSemanticExpression :: SynExpression -> SemExpression
+createSemanticExpression :: Y.Expression -> Expression
 createSemanticExpression expr = execState (createSemanticExpressionS expr) startingEnv
 
 startingEnv :: Env

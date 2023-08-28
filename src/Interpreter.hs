@@ -35,7 +35,7 @@ beta _ _ = error "beta: not a lambda"
 alpha :: SemExpression -> SemExpression -> Bool
 alpha = (==)
 
-evaluate :: [SemProgramPart] -> SemExpression -> Limited (RunErrorable SemExpression)
+evaluate :: [Definition] -> SemExpression -> Limited (RunErrorable SemExpression)
 evaluate parts (SApplication expr1 expr2) = do
   decLimit
   expr1Eval <- evaluate parts expr1

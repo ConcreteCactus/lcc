@@ -30,8 +30,8 @@ library
       Lexer
       Repl
       SemanticAnalyzer
-      SemanticAnalyzer.SemExpression
-      SemanticAnalyzer.SemType
+      SemanticAnalyzer.Expression
+      SemanticAnalyzer.Type
       SyntacticAnalyzer
       Util
       Util.Limited

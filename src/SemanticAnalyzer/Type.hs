@@ -25,7 +25,7 @@ where
 import Control.Monad
 import Data.Bifunctor
 import Errors
-import SyntacticAnalyzer
+import qualified SyntacticAnalyzer as Y
 import Util
 
 data AtomicType = AInt deriving (Show, Eq)
@@ -51,10 +51,10 @@ newtype ReconcileEnv = ReconcileEnv [(Int, SemType)]
 
 data SemanticTypeEnv = SemanticTypeEnv Int [(String, Int)]
 
-createSemanticType :: SynTypeExpression -> SemType
+createSemanticType :: Y.Type -> SemType
 createSemanticType synType = execState (createSemanticTypeS synType) (SemanticTypeEnv 1 [])
 
-createSemanticTypeS :: SynTypeExpression -> State SemanticTypeEnv SemType
+createSemanticTypeS :: Y.Type -> State SemanticTypeEnv SemType
 createSemanticTypeS (TypeId id') = do
   SemanticTypeEnv ident decls <- get
   case lookup id' decls of
