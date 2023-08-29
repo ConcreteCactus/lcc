@@ -32,6 +32,8 @@ ghc-options:
 - -Wmissing-home-modules
 - -Wpartial-fields
 - -Wredundant-constraints
+- -Wincomplete-patterns
+- -Wno-unrecognised-pragmas
 
 library:
   source-dirs: src

@@ -1,8 +1,4 @@
-{-# HLINT ignore "Use tuple-section" #-}
-{-# HLINT ignore "Use execState" #-}
 {-# LANGUAGE TupleSections #-}
-{-# OPTIONS_GHC -Wincomplete-patterns #-}
-{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 module SemanticAnalyzer
   ( SemanticError (..),

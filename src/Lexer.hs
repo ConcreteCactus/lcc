@@ -3,6 +3,7 @@
 module Lexer
   ( CompilerError (..),
     Parser (..),
+    Ident (..),
     whiteSpace,
     whiteSpaceO,
     lambda,
@@ -30,9 +31,9 @@ import Control.Applicative
 import Control.Monad
 import Data.Bifunctor
 import Data.Char
-import Data.List
+import Data.Functor
 import Errors
-import Text.Read
+import Text.Read (readMaybe)
 
 newtype Parser t = Parser {runParser :: String -> Either CompilerError (t, String)}
 
@@ -56,6 +57,8 @@ instance Alternative Parser where
 instance Monad Parser where
   (Parser a) >>= f = Parser (a >=> (\(b, sb) -> runParser (f b) sb))
 
+newtype Ident = Ident String deriving (Show, Eq)
+
 satisfyE :: CompilerError -> (Char -> Bool) -> Parser Char
 satisfyE e p = Parser parse
   where
@@ -73,7 +76,7 @@ sepBy1 :: Parser () -> Parser a -> Parser [a]
 sepBy1 separator token = (:) <$> token <*> many (separator *> token)
 
 sepBy :: Parser () -> Parser a -> Parser [a]
-sepBy separator token = sepBy1 separator token <|> (nothing *> pure [])
+sepBy separator token = sepBy1 separator token <|> (nothing $> [])
 
 isSimpleSpace :: Char -> Bool
 isSimpleSpace '\n' = False
@@ -109,8 +112,8 @@ openParen = void $ charE CompilerError '('
 closeParen :: Parser ()
 closeParen = void $ charE CompilerError ')'
 
-identifier :: Parser String
-identifier = (:) <$> satisfyE (LexicalError CaseError) isLower <*> many (satisfyE CompilerError isAlphaNum)
+identifier :: Parser Ident
+identifier = Ident <$> ((:) <$> satisfyE (LexicalError CaseError) isLower <*> many (satisfyE CompilerError isAlphaNum))
 
 capIdentifier :: Parser String
 capIdentifier = (:) <$> satisfyE (LexicalError CaseError) isUpper <*> many (satisfyE CompilerError isAlphaNum)
@@ -241,8 +244,8 @@ tests =
     runParser block "a : b ->\n c \r\na := \\b.c" == Right ("a : b -> c", "\na := \\b.c"),
     runParser block "a : b -> c \r\na := \\b.c" == Right ("a : b -> c", "\na := \\b.c"),
     runParser block "a\n :\n b\n ->\n c \r\na := \\b.c" == Right ("a : b -> c", "\na := \\b.c"),
-    runParser identifier "a" == Right ("a", ""),
-    runParser identifier "a1" == Right ("a1", ""),
+    runParser identifier "a" == Right (Ident "a", ""),
+    runParser identifier "a1" == Right (Ident "a1", ""),
     runParser identifier "A1b" == Left (LexicalError CaseError),
     runParser capIdentifier "A" == Right ("A", ""),
     runParser capIdentifier "A1" == Right ("A1", ""),

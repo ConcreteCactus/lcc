@@ -55,14 +55,14 @@ createSemanticType :: Y.Type -> SemType
 createSemanticType synType = execState (createSemanticTypeS synType) (SemanticTypeEnv 1 [])
 
 createSemanticTypeS :: Y.Type -> State SemanticTypeEnv SemType
-createSemanticTypeS (TypeId id') = do
+createSemanticTypeS (Y.TypeId id') = do
   SemanticTypeEnv ident decls <- get
   case lookup id' decls of
     Just ident' -> return $ SGenericType ident'
     Nothing -> do
       put $ SemanticTypeEnv (ident + 1) ((id', ident) : decls)
       return $ SGenericType ident
-createSemanticTypeS (FunctionType t1 t2) = do
+createSemanticTypeS (Y.FunctionType t1 t2) = do
   t1' <- createSemanticTypeS t1
   t2' <- createSemanticTypeS t2
   return $ SFunctionType t1' t2'

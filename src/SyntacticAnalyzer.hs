@@ -20,12 +20,12 @@ import qualified Data.List.NonEmpty as Ne
 import Errors
 import Lexer
 
-data Literal = IntegerLiteral Integer deriving (Show, Eq)
+newtype Literal = IntegerLiteral Integer deriving (Show, Eq)
 
 data Expression
-  = Id String
+  = Id Ident
   | Lit Literal
-  | Lambda String Expression
+  | Lambda Ident Expression
   | Application Expression Expression
   deriving (Show, Eq)
 
@@ -34,7 +34,7 @@ data Type
   | FunctionType Type Type
   deriving (Show, Eq)
 
-data ProgramPart = SynDefinition String Expression | SynDeclaration String Type deriving (Eq, Show)
+data ProgramPart = Definition Ident Expression | Declaration Ident Type deriving (Eq, Show)
 
 type Program = [ProgramPart]
 
@@ -82,15 +82,15 @@ expressionParser =
 parseExpression :: String -> Either CompilerError Expression
 parseExpression s = fst <$> runParser expressionParser s
 
-tIdParser :: Parser Type
-tIdParser = TypeId <$> anyCapIdentifier
+typeIdParser :: Parser Type
+typeIdParser = TypeId <$> capIdentifier
 
 functionParser :: Parser Type
 functionParser = FunctionType <$> typeParserWithoutFunction <*> (whiteSpaceO *> arrow *> whiteSpaceO *> typeParser)
 
 typeParserWithoutFunction :: Parser Type
 typeParserWithoutFunction =
-  tIdParser
+  typeIdParser
     <|> ( whiteSpaceO
             *> ( openParen
                    *> (whiteSpaceO *> typeParser <* whiteSpaceO)
@@ -102,7 +102,7 @@ typeParserWithoutFunction =
 typeParser :: Parser Type
 typeParser =
   functionParser
-    <|> tIdParser
+    <|> typeIdParser
     <|> ( whiteSpaceO
             *> ( openParen
                    *> (whiteSpaceO *> typeParser <* whiteSpaceO)
@@ -115,10 +115,10 @@ parseType :: String -> Either CompilerError Type
 parseType s = fst <$> runParser typeParser s
 
 declarationParser :: Parser ProgramPart
-declarationParser = SynDeclaration <$> identifier <*> (whiteSpaceO *> colon *> whiteSpaceO *> typeParser)
+declarationParser = Declaration <$> identifier <*> (whiteSpaceO *> colon *> whiteSpaceO *> typeParser)
 
 definitionParser :: Parser ProgramPart
-definitionParser = SynDefinition <$> identifier <*> (whiteSpaceO *> colonEquals *> whiteSpaceO *> expressionParser)
+definitionParser = Definition <$> identifier <*> (whiteSpaceO *> colonEquals *> whiteSpaceO *> expressionParser)
 
 blocksParser :: Parser [String]
 blocksParser = filter (not . null) <$> sepBy endOfLine block <* whiteSpaceO <* eof
@@ -151,43 +151,55 @@ parseProgramSingleError s = case parseProgram s of
   Left e -> Left $ Ne.head e
   Right a -> Right a
 
-programParser :: Parser Program
-programParser =
-  Parser
-    ( \s -> case parseProgram s of
-        Left e -> Left $ Ne.head e
-        Right a -> Right (a, "")
-    )
+-- programParser :: Parser Program
+-- programParser =
+--   Parser
+--     ( \s -> case parseProgram s of
+--         Left e -> Left $ Ne.head e
+--         Right a -> Right (a, "")
+--     )
 
 -- Unit tests
+
+idI :: String -> Expression
+idI = Id . Ident
+
+lambdaI :: String -> Expression -> Expression
+lambdaI = Lambda . Ident
+
+declI :: String -> Type -> ProgramPart
+declI = Declaration . Ident
+
+defI :: String -> Expression -> ProgramPart
+defI = Definition . Ident
 
 syntacticAnalyzerTests :: [Bool]
 syntacticAnalyzerTests =
   -- Id tests
-  [ runParser expressionParser "hello" == Right (Id "hello", ""),
-    runParser expressionParser "hello   " == Right (Id "hello", "   "),
+  [ runParser expressionParser "hello" == Right (idI "hello", ""),
+    runParser expressionParser "hello   " == Right (idI "hello", "   "),
     runParser expressionParser "   " == Left (LexicalError UnexpectedEndOfFile),
     -- Literal tests
     runParser expressionParser "154381" == Right (Lit (IntegerLiteral 154381), ""),
     runParser expressionParser "15 4381" == Right (Application (Lit (IntegerLiteral 15)) (Lit (IntegerLiteral 4381)), ""),
     runParser expressionParser "0xdeadbeef" == Right (Lit (IntegerLiteral 3735928559), ""),
     -- Lambda tests
-    runParser expressionParser "\\a.b" == Right (Lambda "a" (Id "b"), ""),
-    runParser expressionParser "\\a. b" == Right (Lambda "a" (Id "b"), ""),
-    runParser expressionParser "\\a . b" == Right (Lambda "a" (Id "b"), ""),
-    runParser expressionParser "\\ a . b" == Right (Lambda "a" (Id "b"), ""),
-    runParser expressionParser "\\ a.b" == Right (Lambda "a" (Id "b"), ""),
-    runParser expressionParser "\\a .b" == Right (Lambda "a" (Id "b"), ""),
-    runParser expressionParser "\\a.b  " == Right (Lambda "a" (Id "b"), "  "),
-    runParser expressionParser "\\a.b  b" == Right (Lambda "a" (Application (Id "b") (Id "b")), ""),
+    runParser expressionParser "\\a.b" == Right (lambdaI "a" (idI "b"), ""),
+    runParser expressionParser "\\a. b" == Right (lambdaI "a" (idI "b"), ""),
+    runParser expressionParser "\\a . b" == Right (lambdaI "a" (idI "b"), ""),
+    runParser expressionParser "\\ a . b" == Right (lambdaI "a" (idI "b"), ""),
+    runParser expressionParser "\\ a.b" == Right (lambdaI "a" (idI "b"), ""),
+    runParser expressionParser "\\a .b" == Right (lambdaI "a" (idI "b"), ""),
+    runParser expressionParser "\\a.b  " == Right (lambdaI "a" (idI "b"), "  "),
+    runParser expressionParser "\\a.b  b" == Right (lambdaI "a" (Application (idI "b") (idI "b")), ""),
     -- Application tests
-    runParser expressionParser "a  b" == Right (Application (Id "a") (Id "b"), ""),
-    runParser expressionParser "(\\a.b)  b" == Right (Application (Lambda "a" (Id "b")) (Id "b"), ""),
-    runParser expressionParser "a b" == Right (Application (Id "a") (Id "b"), ""),
-    runParser expressionParser "a b c" == Right (Application (Application (Id "a") (Id "b")) (Id "c"), ""),
-    runParser expressionParser "a b c d" == Right (Application (Application (Application (Id "a") (Id "b")) (Id "c")) (Id "d"), ""),
-    runParser expressionParser "(\\a.a) b c" == Right (Application (Application (Lambda "a" (Id "a")) (Id "b")) (Id "c"), ""),
-    runParser expressionParser "(\\a.\\b.b) b c" == Right (Application (Application (Lambda "a" (Lambda "b" (Id "b"))) (Id "b")) (Id "c"), ""),
+    runParser expressionParser "a  b" == Right (Application (idI "a") (idI "b"), ""),
+    runParser expressionParser "(\\a.b)  b" == Right (Application (lambdaI "a" (idI "b")) (idI "b"), ""),
+    runParser expressionParser "a b" == Right (Application (idI "a") (idI "b"), ""),
+    runParser expressionParser "a b c" == Right (Application (Application (idI "a") (idI "b")) (idI "c"), ""),
+    runParser expressionParser "a b c d" == Right (Application (Application (Application (idI "a") (idI "b")) (idI "c")) (idI "d"), ""),
+    runParser expressionParser "(\\a.a) b c" == Right (Application (Application (lambdaI "a" (idI "a")) (idI "b")) (idI "c"), ""),
+    runParser expressionParser "(\\a.\\b.b) b c" == Right (Application (Application (lambdaI "a" (lambdaI "b" (idI "b"))) (idI "b")) (idI "c"), ""),
     -- Type parser tests
     runParser typeParser "a" == Right (TypeId "a", ""),
     runParser typeParser "ab" == Right (TypeId "ab", ""),
@@ -197,10 +209,10 @@ syntacticAnalyzerTests =
     runParser typeParser "a -> b -> c" == Right (FunctionType (TypeId "a") (FunctionType (TypeId "b") (TypeId "c")), ""),
     runParser typeParser "(a -> b) -> c" == Right (FunctionType (FunctionType (TypeId "a") (TypeId "b")) (TypeId "c"), ""),
     -- Declaration definition
-    runParser declarationParser "hello : string" == Right (SynDeclaration "hello" (TypeId "string"), ""),
-    runParser declarationParser "hello : String" == Right (SynDeclaration "hello" (TypeId "String"), ""),
-    runParser declarationParser "helloWorld : string -> string" == Right (SynDeclaration "helloWorld" (FunctionType (TypeId "string") (TypeId "string")), ""),
-    runParser definitionParser "world := \\a.\\b.a" == Right (SynDefinition "world" (Lambda "a" (Lambda "b" (Id "a"))), ""),
+    runParser declarationParser "hello : string" == Right (declI "hello" (TypeId "string"), ""),
+    runParser declarationParser "hello : String" == Right (declI "hello" (TypeId "String"), ""),
+    runParser declarationParser "helloWorld : string -> string" == Right (declI "helloWorld" (FunctionType (TypeId "string") (TypeId "string")), ""),
+    runParser definitionParser "world := \\a.\\b.a" == Right (defI "world" (lambdaI "a" (lambdaI "b" (idI "a"))), ""),
     -- Whole program parsing
     parseProgram program1 == Right program1ShouldBe,
     parseProgram program2 == Right program2ShouldBe,
@@ -214,8 +226,8 @@ program1 =
 
 program1ShouldBe :: Program
 program1ShouldBe =
-  [ SynDeclaration "hello" (TypeId "string"),
-    SynDefinition "hello" (Id "helloString")
+  [ declI "hello" (TypeId "string"),
+    defI "hello" (idI "helloString")
   ]
 
 program2 :: String
@@ -225,8 +237,8 @@ program2 =
 
 program2ShouldBe :: Program
 program2ShouldBe =
-  [ SynDeclaration "hello" (FunctionType (TypeId "string") (FunctionType (FunctionType (TypeId "string") (TypeId "int")) (TypeId "char"))),
-    SynDefinition "hello" (Lambda "a" (Lambda "b" (Lambda "c" (Id "b"))))
+  [ declI "hello" (FunctionType (TypeId "string") (FunctionType (FunctionType (TypeId "string") (TypeId "int")) (TypeId "char"))),
+    defI "hello" (lambdaI "a" (lambdaI "b" (lambdaI "c" (idI "b"))))
   ]
 
 program3 :: String
@@ -240,10 +252,10 @@ program3 =
 
 program3ShouldBe :: Program
 program3ShouldBe =
-  [ SynDeclaration "true" (FunctionType (TypeId "a") (FunctionType (TypeId "a") (TypeId "a"))),
-    SynDefinition "true" (Lambda "a" (Lambda "b" (Id "a"))),
-    SynDeclaration "false" (FunctionType (TypeId "a") (FunctionType (TypeId "a") (TypeId "a"))),
-    SynDefinition "false" (Lambda "a" (Lambda "b" (Id "b"))),
-    SynDeclaration "one" (TypeId "number"),
-    SynDefinition "one" (Lit (IntegerLiteral 1))
+  [ declI "true" (FunctionType (TypeId "a") (FunctionType (TypeId "a") (TypeId "a"))),
+    defI "true" (lambdaI "a" (lambdaI "b" (idI "a"))),
+    declI "false" (FunctionType (TypeId "a") (FunctionType (TypeId "a") (TypeId "a"))),
+    defI "false" (lambdaI "a" (lambdaI "b" (idI "b"))),
+    declI "one" (TypeId "number"),
+    defI "one" (Lit (IntegerLiteral 1))
   ]

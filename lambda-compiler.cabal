@@ -39,7 +39,7 @@ library
       Paths_lambda_compiler
   hs-source-dirs:
       src
-  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -Wincomplete-patterns -Wno-unrecognised-pragmas
   build-depends:
       base >=4.7 && <5
   default-language: Haskell2010
@@ -50,7 +50,7 @@ executable lambda-compiler-exe
       Paths_lambda_compiler
   hs-source-dirs:
       app
-  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -Wincomplete-patterns -Wno-unrecognised-pragmas -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
     , lambda-compiler
@@ -63,7 +63,7 @@ test-suite lambda-compiler-test
       Paths_lambda_compiler
   hs-source-dirs:
       test
-  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -Wincomplete-patterns -Wno-unrecognised-pragmas -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
     , lambda-compiler
