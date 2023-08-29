@@ -1,16 +1,19 @@
 {-# LANGUAGE TupleSections #-}
 
-module SemanticAnalyzer.SemType
-  ( SemType (..),
+module SemanticAnalyzer.Type
+  ( Type (..),
+    NormType,
     AtomicType (..),
     InferEnv (..),
     ReconcileEnv (..),
-    createSemanticType,
+    ntType,
+    ntMaxId,
+    convertType,
     shiftNewIds,
-    shiftAwayFrom,
+    mkMutExcTy2,
     addNewSubstitutionI,
     updateWithSubstitutionsI,
-    normalizeGenericIndices,
+    mkNormType,
     reconcileTypesS,
     reconcileTypesIS,
     checkType,
@@ -30,68 +33,114 @@ import Util
 
 data AtomicType = AInt deriving (Show, Eq)
 
-data SemType
-  = SAtomicType AtomicType
-  | SGenericType Int
-  | SFunctionType SemType SemType
+data Type
+  = AtomicType AtomicType
+  | GenericType Int
+  | FunctionType Type Type
   deriving (Eq)
 
-instance Show SemType where
-  show (SAtomicType a) = show a
-  show (SGenericType n) = "T" ++ show n
-  show (SFunctionType t1@(SFunctionType _ _) t2) = "(" ++ show t1 ++ ") -> " ++ show t2
-  show (SFunctionType t1 t2) = show t1 ++ " -> " ++ show t2
+data NormType = NormType
+  { ntType :: Type,
+    ntMaxId :: Int
+  }
+  deriving (Eq)
+
+instance Show Type where
+  show (AtomicType a) = show a
+  show (GenericType n) = "T" ++ show n
+  show (FunctionType t1@(FunctionType _ _) t2) = "(" ++ show t1 ++ ") -> " ++ show t2
+  show (FunctionType t1 t2) = show t1 ++ " -> " ++ show t2
+
+instance Show NormType where
+  show nt = show $ ntType nt
+
+-- Mutually exclusive types (they don't share generic ids)
+data MutExcTy2 = MutExcTy2
+  { met2Fst :: NormType,
+    met2Snd :: Type
+  }
 
 data InferEnv = InferEnv Int ReconcileEnv [(String, Int)]
 
 -- Laws
 --   1. forall (a, _) in RE : forall (_, b) in RE : forall genericId in b : a != genericId
 --   2. forall (a, b), (a', b') in RE : b != b' => a != a'
-newtype ReconcileEnv = ReconcileEnv [(Int, SemType)]
+newtype ReconcileEnv = ReconcileEnv [(Int, Type)]
 
-data SemanticTypeEnv = SemanticTypeEnv Int [(String, Int)]
+data ConvertEnv a = ConvertEnv
+  { ceNextId :: Int,
+    ceDict :: [(a, Int)]
+  }
 
-createSemanticType :: Y.Type -> SemType
-createSemanticType synType = execState (createSemanticTypeS synType) (SemanticTypeEnv 1 [])
+convertType :: Y.Type -> NormType
+convertType synType = NormType typ (nextId - 1)
+  where
+    (ConvertEnv nextId _, typ) = runState (convertTypeS synType) (ConvertEnv 1 [])
 
-createSemanticTypeS :: Y.Type -> State SemanticTypeEnv SemType
-createSemanticTypeS (Y.TypeId id') = do
-  SemanticTypeEnv ident decls <- get
+convertTypeS :: Y.Type -> State (ConvertEnv String) Type
+convertTypeS (Y.TypeId id') = do
+  ConvertEnv ident decls <- get
   case lookup id' decls of
-    Just ident' -> return $ SGenericType ident'
+    Just ident' -> return $ GenericType ident'
     Nothing -> do
-      put $ SemanticTypeEnv (ident + 1) ((id', ident) : decls)
-      return $ SGenericType ident
-createSemanticTypeS (Y.FunctionType t1 t2) = do
-  t1' <- createSemanticTypeS t1
-  t2' <- createSemanticTypeS t2
-  return $ SFunctionType t1' t2'
+      put $ ConvertEnv (ident + 1) ((id', ident) : decls)
+      return $ GenericType ident
+convertTypeS (Y.FunctionType t1 t2) = do
+  t1' <- convertTypeS t1
+  t2' <- convertTypeS t2
+  return $ FunctionType t1' t2'
 
-shiftAwayFrom :: SemType -> SemType -> SemType
-shiftAwayFrom original shiftCandidate =
-  fst $ shiftIds (getHighestId original + 1) shiftCandidate
+mkNormType :: Type -> NormType
+mkNormType typ = NormType typ' (maxId - 1)
+  where
+    (ConvertEnv maxId _, typ') = runState (mkNormTypeS typ) (ConvertEnv 1 [])
 
-shiftNewIds :: SemType -> State InferEnv SemType
+mkNormTypeS :: Type -> State (ConvertEnv Int) Type
+mkNormTypeS (GenericType ind) = do
+  env <- get
+  case lookup ind (ceDict env) of
+    Nothing -> do
+      put $
+        ConvertEnv
+          { ceNextId = ceNextId env + 1,
+            ceDict = (ind, ceNextId env) : ceDict env
+          }
+      return $ GenericType (ceNextId env + 1)
+    Just ind' -> return $ GenericType ind'
+mkNormTypeS (AtomicType atomicType) = return $ AtomicType atomicType
+mkNormTypeS (FunctionType paramType returnType) = do
+  normalizedParam <- mkNormTypeS paramType
+  normalizedReturn <- mkNormTypeS returnType
+  return $ FunctionType normalizedParam normalizedReturn
+
+mkMutExcTy2 :: NormType -> NormType -> MutExcTy2
+mkMutExcTy2 original shiftCandidate =
+  MutExcTy2 original $
+    fst $
+      shiftIds (ntMaxId original + 1) $
+        ntType shiftCandidate
+
+shiftNewIds :: Type -> State InferEnv Type
 shiftNewIds typ = do
   InferEnv ident rec refs <- get
   let (newTyp, maxIdent) = shiftIds ident typ
   put $ InferEnv (maxIdent + 1) rec refs
   return newTyp
 
-getHighestId :: SemType -> Int
-getHighestId (SAtomicType _) = 0
-getHighestId (SFunctionType t1 t2) = max (getHighestId t1) (getHighestId t2)
-getHighestId (SGenericType n) = n
+getHighestId :: Type -> Int
+getHighestId (AtomicType _) = 0
+getHighestId (FunctionType t1 t2) = max (getHighestId t1) (getHighestId t2)
+getHighestId (GenericType n) = n
 
-shiftIds :: Int -> SemType -> (SemType, Int)
-shiftIds ident (SAtomicType a) = (SAtomicType a, ident)
-shiftIds ident (SFunctionType t1 t2) =
+shiftIds :: Int -> Type -> (Type, Int)
+shiftIds ident (AtomicType a) = (AtomicType a, ident)
+shiftIds ident (FunctionType t1 t2) =
   let (newT1, maxIdent1) = shiftIds ident t1
       (newT2, maxIdent2) = shiftIds ident t2
-   in (SFunctionType newT1 newT2, max maxIdent1 maxIdent2)
-shiftIds ident (SGenericType gid) = (SGenericType (gid + ident), gid + ident)
+   in (FunctionType newT1 newT2, max maxIdent1 maxIdent2)
+shiftIds ident (GenericType gid) = (GenericType (gid + ident), gid + ident)
 
-addNewSubstitution :: Int -> SemType -> State ReconcileEnv (Either STypeError ())
+addNewSubstitution :: Int -> Type -> State ReconcileEnv (Either STypeError ())
 addNewSubstitution genericId typ = do
   ReconcileEnv env <- get
   let substituted = checkAndSubstitute env typ
@@ -103,79 +152,79 @@ addNewSubstitution genericId typ = do
       return $ Right ()
   where
     -- 1. Check for and substitute references in the new substitution
-    checkAndSubstitute :: [(Int, SemType)] -> SemType -> SemType
-    checkAndSubstitute subs (SGenericType genericId') = case lookup genericId' subs of
-      Nothing -> SGenericType genericId'
+    checkAndSubstitute :: [(Int, Type)] -> Type -> Type
+    checkAndSubstitute subs (GenericType genericId') = case lookup genericId' subs of
+      Nothing -> GenericType genericId'
       Just typ' -> typ'
-    checkAndSubstitute _ (SAtomicType atomicType) = SAtomicType atomicType
-    checkAndSubstitute subs (SFunctionType paramType returnType) =
-      SFunctionType (checkAndSubstitute subs paramType) (checkAndSubstitute subs returnType)
+    checkAndSubstitute _ (AtomicType atomicType) = AtomicType atomicType
+    checkAndSubstitute subs (FunctionType paramType returnType) =
+      FunctionType (checkAndSubstitute subs paramType) (checkAndSubstitute subs returnType)
     -- 2. Check for self references in the new substitution (fail if found)
-    checkSelfRefs :: Int -> SemType -> Bool
-    checkSelfRefs genericId' (SGenericType genericId'') = genericId' == genericId''
-    checkSelfRefs _ (SAtomicType _) = False
-    checkSelfRefs genericId' (SFunctionType paramType returnType) =
+    checkSelfRefs :: Int -> Type -> Bool
+    checkSelfRefs genericId' (GenericType genericId'') = genericId' == genericId''
+    checkSelfRefs _ (AtomicType _) = False
+    checkSelfRefs genericId' (FunctionType paramType returnType) =
       checkSelfRefs genericId' paramType || checkSelfRefs genericId' returnType
     -- 3. Check for and substitute references in the old substitutions
-    substituteSimple :: Int -> SemType -> SemType -> SemType
-    substituteSimple genericId' typ' (SGenericType genericId'') =
+    substituteSimple :: Int -> Type -> Type -> Type
+    substituteSimple genericId' typ' (GenericType genericId'') =
       if genericId' == genericId''
         then typ'
-        else SGenericType genericId''
-    substituteSimple _ _ (SAtomicType atomicType) = SAtomicType atomicType
-    substituteSimple genericId' typ' (SFunctionType paramType returnType) =
-      SFunctionType (substituteSimple genericId' typ' paramType) (substituteSimple genericId' typ' returnType)
-    substituteOldSubs :: Int -> SemType -> [(Int, SemType)] -> [(Int, SemType)]
+        else GenericType genericId''
+    substituteSimple _ _ (AtomicType atomicType) = AtomicType atomicType
+    substituteSimple genericId' typ' (FunctionType paramType returnType) =
+      FunctionType (substituteSimple genericId' typ' paramType) (substituteSimple genericId' typ' returnType)
+    substituteOldSubs :: Int -> Type -> [(Int, Type)] -> [(Int, Type)]
     substituteOldSubs genericId' typ' =
       map (second (substituteSimple genericId' typ'))
 
-addNewSubstitutionI :: Int -> SemType -> State InferEnv (Either STypeError ())
+addNewSubstitutionI :: Int -> Type -> State InferEnv (Either STypeError ())
 addNewSubstitutionI genericId typ = do
   InferEnv count renv refs <- get
   let (newREnv, result) = runState (addNewSubstitution genericId typ) renv
   put $ InferEnv count newREnv refs
   return result
 
-updateWithSubstitutions :: SemType -> State ReconcileEnv SemType
+updateWithSubstitutions :: Type -> State ReconcileEnv Type
 updateWithSubstitutions typ = do
   ReconcileEnv env <- get
   return $ updateWithSubstitutions' env typ
   where
-    updateWithSubstitutions' :: [(Int, SemType)] -> SemType -> SemType
-    updateWithSubstitutions' subs (SGenericType genericId) = case lookup genericId subs of
-      Nothing -> SGenericType genericId
+    updateWithSubstitutions' :: [(Int, Type)] -> Type -> Type
+    updateWithSubstitutions' subs (GenericType genericId) = case lookup genericId subs of
+      Nothing -> GenericType genericId
       Just typ' -> typ'
-    updateWithSubstitutions' _ (SAtomicType atomicType) = SAtomicType atomicType
-    updateWithSubstitutions' subs (SFunctionType paramType returnType) =
-      SFunctionType (updateWithSubstitutions' subs paramType) (updateWithSubstitutions' subs returnType)
+    updateWithSubstitutions' _ (AtomicType atomicType) = AtomicType atomicType
+    updateWithSubstitutions' subs (FunctionType paramType returnType) =
+      FunctionType (updateWithSubstitutions' subs paramType) (updateWithSubstitutions' subs returnType)
 
-updateWithSubstitutionsI :: SemType -> State InferEnv SemType
+updateWithSubstitutionsI :: Type -> State InferEnv Type
 updateWithSubstitutionsI typ = do
   InferEnv count renv refs <- get
   let (newREnv, newTyp) = runState (updateWithSubstitutions typ) renv
   put $ InferEnv count newREnv refs
   return newTyp
 
-reconcileTypesS :: SemType -> SemType -> State ReconcileEnv (Either STypeError SemType)
-reconcileTypesS (SGenericType genericId) (SGenericType genericId')
-  | genericId == genericId' = return $ Right (SGenericType genericId)
-reconcileTypesS (SGenericType genericId) typ = do
+reconcileTypesS :: Type -> Type -> State ReconcileEnv (Either STypeError Type)
+reconcileTypesS (GenericType genericId) (GenericType genericId')
+  | genericId == genericId' = return $ Right (GenericType genericId)
+reconcileTypesS (GenericType genericId) typ = do
   added <- addNewSubstitution genericId typ
   case added of
     Left e -> return $ Left e
     Right _ -> return $ Right typ
-reconcileTypesS typ (SGenericType genericId) = do
+reconcileTypesS typ (GenericType genericId) = do
   added <- addNewSubstitution genericId typ
   case added of
     Left e -> return $ Left e
     Right _ -> return $ Right typ
-reconcileTypesS (SAtomicType atomicType) (SAtomicType atomicType') =
+reconcileTypesS (AtomicType atomicType) (AtomicType atomicType') =
   if atomicType == atomicType'
-    then return $ Right (SAtomicType atomicType)
+    then return $ Right (AtomicType atomicType)
     else return $ Left $ STAtomicTypeMismatch (show atomicType) (show atomicType')
 reconcileTypesS
-  (SFunctionType paramType returnType)
-  (SFunctionType paramType' returnType') = do
+  (FunctionType paramType returnType)
+  (FunctionType paramType' returnType') = do
     reconciledParam <- reconcileTypesS paramType paramType'
     updatedReturn <- updateWithSubstitutions returnType
     updatedReturn' <- updateWithSubstitutions returnType'
@@ -184,28 +233,28 @@ reconcileTypesS
       (Left e, _) -> return $ Left e
       (_, Left e) -> return $ Left e
       (Right reconciledParam', Right reconciledReturn') ->
-        return $ Right (SFunctionType reconciledParam' reconciledReturn')
+        return $ Right (FunctionType reconciledParam' reconciledReturn')
 reconcileTypesS typ typ' = return $ Left $ STTypeMismatch (show typ) (show typ')
 
-checkTypeS :: Int -> SemType -> SemType -> State ReconcileEnv (Either STypeError ())
-checkTypeS _ (SGenericType genericId) (SGenericType genericId')
+checkTypeS :: Int -> Type -> Type -> State ReconcileEnv (Either STypeError ())
+checkTypeS _ (GenericType genericId) (GenericType genericId')
   | genericId == genericId' = return $ Right ()
-checkTypeS hi typ (SGenericType genericId)
-  | genericId > hi = return $ Left $ STTypeMismatch (show (SGenericType genericId)) $ show typ
-checkTypeS _ typ (SGenericType genericId) = do
+checkTypeS hi typ (GenericType genericId)
+  | genericId > hi = return $ Left $ STTypeMismatch (show (GenericType genericId)) $ show typ
+checkTypeS _ typ (GenericType genericId) = do
   added <- addNewSubstitution genericId typ
   case added of
-    Left _ -> return $ Left $ STTypeMismatch (show (SGenericType genericId)) $ show typ
+    Left _ -> return $ Left $ STTypeMismatch (show (GenericType genericId)) $ show typ
     Right _ -> return $ Right ()
-checkTypeS _ (SGenericType genericId) typ =
+checkTypeS _ (GenericType genericId) typ =
   return $
     Left $
-      STTypeMismatch (show typ) (show $ SGenericType genericId)
-checkTypeS _ (SAtomicType atomicType) (SAtomicType atomicType') =
+      STTypeMismatch (show typ) (show $ GenericType genericId)
+checkTypeS _ (AtomicType atomicType) (AtomicType atomicType') =
   if atomicType == atomicType'
     then return $ Right ()
     else return $ Left $ STAtomicTypeMismatch (show atomicType) (show atomicType')
-checkTypeS hi (SFunctionType paramType returnType) (SFunctionType paramType' returnType') = do
+checkTypeS hi (FunctionType paramType returnType) (FunctionType paramType' returnType') = do
   checkedParam <- checkTypeS hi paramType paramType'
   updatedReturn' <- updateWithSubstitutions returnType'
   checkedReturn <- checkTypeS hi returnType updatedReturn'
@@ -215,7 +264,7 @@ checkTypeS hi (SFunctionType paramType returnType) (SFunctionType paramType' ret
     (Right _, Right _) -> return $ Right ()
 checkTypeS _ typ typ' = return $ Left $ STTypeMismatch (show typ) (show typ')
 
-reconcileTypesIS :: SemType -> SemType -> State InferEnv (Either STypeError SemType)
+reconcileTypesIS :: Type -> Type -> State InferEnv (Either STypeError Type)
 reconcileTypesIS t1 t2 = do
   InferEnv count renv refs <- get
   let (newREnv, reconciledM) = runState (reconcileTypesS t1 t2) renv
@@ -225,19 +274,19 @@ reconcileTypesIS t1 t2 = do
       put $ InferEnv count newREnv refs
       return $ Right reconciled
 
-checkType :: SemType -> SemType -> Either STypeError ()
-checkType t1 t2 = execState (checkTypeS highestIdT2 st1 t2) (ReconcileEnv [])
+checkType :: MutExcTy2 -> Either STypeError ()
+checkType excTys = execState (checkTypeS highestIdT2 st1 (met2Snd excTys)) (ReconcileEnv [])
   where
-    (st1, _) = shiftIds highestIdT2 t1
-    highestIdT2 = getHighestId t2
+    (st1, _) = shiftIds highestIdT2 (ntType $ met2Fst excTys)
+    highestIdT2 = getHighestId (met2Snd excTys)
 
 -- Also returns the last element of the list
-createGenericList :: Int -> State InferEnv ([SemType], SemType)
+createGenericList :: Int -> State InferEnv ([Type], Type)
 createGenericList 0 = error "createGenericList called with 0"
 createGenericList n = do
-  start <- replicateM (n - 1) (SGenericType <$> getNewId)
+  start <- replicateM (n - 1) (GenericType <$> getNewId)
   lastId <- getNewId
-  return (start ++ [SGenericType lastId], SGenericType lastId)
+  return (start ++ [GenericType lastId], GenericType lastId)
 
 getNewId :: State InferEnv Int
 getNewId = do
@@ -255,47 +304,32 @@ getOrCreateIdOfRefSI refName = do
       return refId
     Just refId -> return refId
 
-getTypeInferredToRefSI :: String -> State InferEnv SemType
+getTypeInferredToRefSI :: String -> State InferEnv Type
 getTypeInferredToRefSI refName = do
   refId <- getOrCreateIdOfRefSI refName
-  updateWithSubstitutionsI (SGenericType refId)
+  updateWithSubstitutionsI (GenericType refId)
 
-getAllTypesInferredToRefsSI :: State InferEnv [(String, SemType)]
+getAllTypesInferredToRefsSI :: State InferEnv [(String, Type)]
 getAllTypesInferredToRefsSI = do
   InferEnv _ _ refs <- get
   mapM (\(refName, _) -> (refName,) <$> getTypeInferredToRefSI refName) refs
-
-normalizeGenericIndices :: SemType -> SemType
-normalizeGenericIndices typ = execState (normalizeGenericIndicesS typ) []
-
-normalizeGenericIndicesS :: SemType -> State [(Int, Int)] SemType
-normalizeGenericIndicesS (SGenericType ind) = do
-  dict <- get
-  case lookup ind dict of
-    Nothing -> do
-      put $ (ind, length dict + 1) : dict
-      return $ SGenericType (length dict + 1)
-    Just ind' -> return $ SGenericType ind'
-normalizeGenericIndicesS (SAtomicType atomicType) = return $ SAtomicType atomicType
-normalizeGenericIndicesS (SFunctionType paramType returnType) = do
-  normalizedParam <- normalizeGenericIndicesS paramType
-  normalizedReturn <- normalizeGenericIndicesS returnType
-  return $ SFunctionType normalizedParam normalizedReturn
 
 -- Unit tests
 
 semanticAnalyzerSemTypeTests :: [Bool]
 semanticAnalyzerSemTypeTests =
-  [ checkType (a AInt) (a AInt) == Right (),
-    checkType (a AInt) (t 1) == Right (),
-    checkType (t 1) (a AInt) == Left (STTypeMismatch "AInt" "T1"),
-    checkType (t 1 --> t 2) (t 1 --> t 2) == Right (),
-    checkType (t 1 --> t 2) (t 1 --> t 3) == Right (),
-    checkType (t 1 --> t 2) (t 1 --> t 1) == Left (STTypeMismatch "T2" "T3"),
-    checkType (t 1 --> a AInt) (t 1 --> t 1) == Left (STTypeMismatch "T2" "AInt"),
-    checkType (t 1 --> t 2) (t 3 --> t 2) == Right ()
+  [ checkType (MutExcTy2 (na AInt) (a AInt)) == Right (),
+    checkType (MutExcTy2 (na AInt) (t 1)) == Right (),
+    checkType (MutExcTy2 (mn $ t 1) (a AInt)) == Left (STTypeMismatch "AInt" "T1"),
+    checkType (MutExcTy2 (mn $ t 1 --> t 2) (t 1 --> t 2)) == Right (),
+    checkType (MutExcTy2 (mn $ t 1 --> t 2) (t 1 --> t 3)) == Right (),
+    checkType (MutExcTy2 (mn $ t 1 --> t 2) (t 1 --> t 1)) == Left (STTypeMismatch "T2" "T3"),
+    checkType (MutExcTy2 (mn $ t 1 --> a AInt) (t 1 --> t 1)) == Left (STTypeMismatch "T2" "AInt"),
+    checkType (MutExcTy2 (mn $ t 1 --> t 2) (t 3 --> t 2)) == Right ()
   ]
   where
-    (-->) = SFunctionType
-    t = SGenericType
-    a = SAtomicType
+    (-->) = FunctionType
+    t = GenericType
+    a = AtomicType
+    na at = NormType (AtomicType at) 0
+    mn = mkNormType
