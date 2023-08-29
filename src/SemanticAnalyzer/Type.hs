@@ -11,6 +11,8 @@ module SemanticAnalyzer.Type
     convertType,
     shiftNewIds,
     mkMutExcTy2,
+    met2Fst,
+    met2Snd,
     addNewSubstitutionI,
     updateWithSubstitutionsI,
     mkNormType,
@@ -28,6 +30,7 @@ where
 import Control.Monad
 import Data.Bifunctor
 import Errors
+import qualified Lexer as L
 import qualified SyntacticAnalyzer as Y
 import Util
 
@@ -60,7 +63,7 @@ data MutExcTy2 = MutExcTy2
     met2Snd :: Type
   }
 
-data InferEnv = InferEnv Int ReconcileEnv [(String, Int)]
+data InferEnv = InferEnv Int ReconcileEnv [(L.Ident, Int)]
 
 -- Laws
 --   1. forall (a, _) in RE : forall (_, b) in RE : forall genericId in b : a != genericId
@@ -77,7 +80,7 @@ convertType synType = NormType typ (nextId - 1)
   where
     (ConvertEnv nextId _, typ) = runState (convertTypeS synType) (ConvertEnv 1 [])
 
-convertTypeS :: Y.Type -> State (ConvertEnv String) Type
+convertTypeS :: Y.Type -> State (ConvertEnv L.Ident) Type
 convertTypeS (Y.TypeId id') = do
   ConvertEnv ident decls <- get
   case lookup id' decls of
@@ -294,7 +297,7 @@ getNewId = do
   put $ InferEnv (ident + 1) rec refs
   return ident
 
-getOrCreateIdOfRefSI :: String -> State InferEnv Int
+getOrCreateIdOfRefSI :: L.Ident -> State InferEnv Int
 getOrCreateIdOfRefSI refName = do
   InferEnv ident rec refs <- get
   case lookup refName refs of
@@ -304,12 +307,12 @@ getOrCreateIdOfRefSI refName = do
       return refId
     Just refId -> return refId
 
-getTypeInferredToRefSI :: String -> State InferEnv Type
+getTypeInferredToRefSI :: L.Ident -> State InferEnv Type
 getTypeInferredToRefSI refName = do
   refId <- getOrCreateIdOfRefSI refName
   updateWithSubstitutionsI (GenericType refId)
 
-getAllTypesInferredToRefsSI :: State InferEnv [(String, Type)]
+getAllTypesInferredToRefsSI :: State InferEnv [(L.Ident, Type)]
 getAllTypesInferredToRefsSI = do
   InferEnv _ _ refs <- get
   mapM (\(refName, _) -> (refName,) <$> getTypeInferredToRefSI refName) refs

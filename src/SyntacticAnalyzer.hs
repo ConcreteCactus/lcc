@@ -30,7 +30,7 @@ data Expression
   deriving (Show, Eq)
 
 data Type
-  = TypeId String
+  = TypeId Ident
   | FunctionType Type Type
   deriving (Show, Eq)
 
@@ -83,7 +83,7 @@ parseExpression :: String -> Either CompilerError Expression
 parseExpression s = fst <$> runParser expressionParser s
 
 typeIdParser :: Parser Type
-typeIdParser = TypeId <$> capIdentifier
+typeIdParser = TypeId . Ident <$> capIdentifier
 
 functionParser :: Parser Type
 functionParser = FunctionType <$> typeParserWithoutFunction <*> (whiteSpaceO *> arrow *> whiteSpaceO *> typeParser)
@@ -173,6 +173,9 @@ declI = Declaration . Ident
 defI :: String -> Expression -> ProgramPart
 defI = Definition . Ident
 
+typeIdI :: String -> Type
+typeIdI = TypeId . Ident
+
 syntacticAnalyzerTests :: [Bool]
 syntacticAnalyzerTests =
   -- Id tests
@@ -201,17 +204,17 @@ syntacticAnalyzerTests =
     runParser expressionParser "(\\a.a) b c" == Right (Application (Application (lambdaI "a" (idI "a")) (idI "b")) (idI "c"), ""),
     runParser expressionParser "(\\a.\\b.b) b c" == Right (Application (Application (lambdaI "a" (lambdaI "b" (idI "b"))) (idI "b")) (idI "c"), ""),
     -- Type parser tests
-    runParser typeParser "a" == Right (TypeId "a", ""),
-    runParser typeParser "ab" == Right (TypeId "ab", ""),
-    runParser typeParser "ab1  " == Right (TypeId "ab1", "  "),
-    runParser typeParser "a -> b" == Right (FunctionType (TypeId "a") (TypeId "b"), ""),
-    runParser typeParser "a->b" == Right (FunctionType (TypeId "a") (TypeId "b"), ""),
-    runParser typeParser "a -> b -> c" == Right (FunctionType (TypeId "a") (FunctionType (TypeId "b") (TypeId "c")), ""),
-    runParser typeParser "(a -> b) -> c" == Right (FunctionType (FunctionType (TypeId "a") (TypeId "b")) (TypeId "c"), ""),
+    runParser typeParser "a" == Right (typeIdI "a", ""),
+    runParser typeParser "ab" == Right (typeIdI "ab", ""),
+    runParser typeParser "ab1  " == Right (typeIdI "ab1", "  "),
+    runParser typeParser "a -> b" == Right (FunctionType (typeIdI "a") (typeIdI "b"), ""),
+    runParser typeParser "a->b" == Right (FunctionType (typeIdI "a") (typeIdI "b"), ""),
+    runParser typeParser "a -> b -> c" == Right (FunctionType (typeIdI "a") (FunctionType (typeIdI "b") (typeIdI "c")), ""),
+    runParser typeParser "(a -> b) -> c" == Right (FunctionType (FunctionType (typeIdI "a") (typeIdI "b")) (typeIdI "c"), ""),
     -- Declaration definition
-    runParser declarationParser "hello : string" == Right (declI "hello" (TypeId "string"), ""),
-    runParser declarationParser "hello : String" == Right (declI "hello" (TypeId "String"), ""),
-    runParser declarationParser "helloWorld : string -> string" == Right (declI "helloWorld" (FunctionType (TypeId "string") (TypeId "string")), ""),
+    runParser declarationParser "hello : string" == Right (declI "hello" (typeIdI "string"), ""),
+    runParser declarationParser "hello : String" == Right (declI "hello" (typeIdI "String"), ""),
+    runParser declarationParser "helloWorld : string -> string" == Right (declI "helloWorld" (FunctionType (typeIdI "string") (typeIdI "string")), ""),
     runParser definitionParser "world := \\a.\\b.a" == Right (defI "world" (lambdaI "a" (lambdaI "b" (idI "a"))), ""),
     -- Whole program parsing
     parseProgram program1 == Right program1ShouldBe,
@@ -226,7 +229,7 @@ program1 =
 
 program1ShouldBe :: Program
 program1ShouldBe =
-  [ declI "hello" (TypeId "string"),
+  [ declI "hello" (typeIdI "string"),
     defI "hello" (idI "helloString")
   ]
 
@@ -237,7 +240,7 @@ program2 =
 
 program2ShouldBe :: Program
 program2ShouldBe =
-  [ declI "hello" (FunctionType (TypeId "string") (FunctionType (FunctionType (TypeId "string") (TypeId "int")) (TypeId "char"))),
+  [ declI "hello" (FunctionType (typeIdI "string") (FunctionType (FunctionType (typeIdI "string") (typeIdI "int")) (typeIdI "char"))),
     defI "hello" (lambdaI "a" (lambdaI "b" (lambdaI "c" (idI "b"))))
   ]
 
@@ -252,10 +255,10 @@ program3 =
 
 program3ShouldBe :: Program
 program3ShouldBe =
-  [ declI "true" (FunctionType (TypeId "a") (FunctionType (TypeId "a") (TypeId "a"))),
+  [ declI "true" (FunctionType (typeIdI "a") (FunctionType (typeIdI "a") (typeIdI "a"))),
     defI "true" (lambdaI "a" (lambdaI "b" (idI "a"))),
-    declI "false" (FunctionType (TypeId "a") (FunctionType (TypeId "a") (TypeId "a"))),
+    declI "false" (FunctionType (typeIdI "a") (FunctionType (typeIdI "a") (typeIdI "a"))),
     defI "false" (lambdaI "a" (lambdaI "b" (idI "b"))),
-    declI "one" (TypeId "number"),
+    declI "one" (typeIdI "number"),
     defI "one" (Lit (IntegerLiteral 1))
   ]

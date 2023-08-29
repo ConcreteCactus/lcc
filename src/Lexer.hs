@@ -24,6 +24,7 @@ module Lexer
     capIdentifier,
     anyCapIdentifier,
     (<|>),
+    unIdent,
   )
 where
 
@@ -58,6 +59,9 @@ instance Monad Parser where
   (Parser a) >>= f = Parser (a >=> (\(b, sb) -> runParser (f b) sb))
 
 newtype Ident = Ident String deriving (Show, Eq)
+
+unIdent :: Ident -> String
+unIdent (Ident s) = s
 
 satisfyE :: CompilerError -> (Char -> Bool) -> Parser Char
 satisfyE e p = Parser parse
