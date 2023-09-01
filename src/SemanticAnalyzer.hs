@@ -41,9 +41,18 @@ instance Show Definition where
 
 type SourceCode = String
 
+-- Type-inferred expression with dependencies
+data DepInfExpr = DepInfExpr
+  { dieExpr :: Expression,
+    dieType :: Type,
+    dieGlobEnv :: [Definition],
+    dieDeps :: [(L.Ident, NormType)]
+  }
+
+-- Type-inferred expression
 data InfExpr = InfExpr
-  { infExpr :: Expression,
-    infType :: NormType
+  { ieExpr :: Expression,
+    ieType :: NormType
   }
   deriving (Eq)
 
@@ -64,7 +73,7 @@ createSemanticPartsS = foldEitherM (flip helper) []
       return $ Right parts
     helper parts (Y.Definition name expr) = do
       semExpr <- convertExpressionS expr
-      let typM = inferType parts semExpr
+      let typM = mkDepInfExpr parts semExpr
       case typM of
         Left e -> return $ Left $ SemanticError $ STypeError e
         Right (typ, newGlobalInfers) -> do
@@ -88,7 +97,7 @@ createSemanticProgram prog = Program globs <$> (semProgParts >>= sinkError . che
 checkSemProgParts :: [(L.Ident, NormType)] -> [Definition] -> Either STypeError [Definition]
 checkSemProgParts declarations =
   mapM
-    ( \(Definition name expr typ) -> case lookup name declarations of
+    ( \(Definition name infexpr) -> case lookup name declarations of
         Nothing -> Right $ Definition name expr typ
         Just declTyp -> case checkType declTyp typ of
           Left e -> Left e
@@ -106,18 +115,18 @@ parseAndCreateExpressionWithProgram (Program globs _) s = do
 lookupRefExp :: [Definition] -> L.Ident -> Maybe Expression
 lookupRefExp parts refName =
   find
-    ( \(Definition name _ _) -> name == refName
+    ( \(Definition name _) -> name == refName
     )
     parts
-    >>= \(Definition _ expr _) -> Just expr
+    >>= \(Definition _ expr) -> Just expr
 
 lookupRefType :: [Definition] -> L.Ident -> Maybe NormType
 lookupRefType parts refName =
   find
-    ( \(Definition name _ _) -> name == refName
+    ( \(Definition name _) -> name == refName
     )
     parts
-    >>= \(Definition _ _ typ) -> Just typ
+    >>= \(Definition _ _) -> Just typ
 
 mergeGlobalInfers ::
   [(L.Ident, NormType)] ->
@@ -151,12 +160,12 @@ mergeWithCurrentGlobalInfers newInfers = do
 emptyProgram :: Program
 emptyProgram = Program [] []
 
-inferTypeS :: [Definition] -> Expression -> State InferEnv (Either STypeError (Type, [Type]))
-inferTypeS _ (Lit (Y.IntegerLiteral _)) = return $ Right (AtomicType AInt, [])
-inferTypeS _ (Ident ident) = do
+mkDepInfExprS :: [Definition] -> Expression -> State InferEnv (Either STypeError (Type, [Type]))
+mkDepInfExprS _ (Lit (Y.IntegerLiteral _)) = return $ Right (AtomicType AInt, [])
+mkDepInfExprS _ (Ident ident) = do
   (generics, lastGeneric) <- createGenericList ident
   return $ Right (lastGeneric, generics)
-inferTypeS parts (Ref refName) = do
+mkDepInfExprS parts (Ref refName) = do
   case lookupRefType parts refName of
     Nothing -> do
       typ <- getTypeInferredToRefSI refName
@@ -164,8 +173,8 @@ inferTypeS parts (Ref refName) = do
     Just typ -> do
       shifted <- shiftNewIds $ ntType typ
       return $ Right (shifted, [])
-inferTypeS parts (Lambda _ expr) = do
-  inferred <- inferTypeS parts expr
+mkDepInfExprS parts (Lambda _ expr) = do
+  inferred <- mkDepInfExprS parts expr
   case inferred of
     Left e -> return $ Left e
     Right (exprType, exprGenerics) -> do
@@ -175,9 +184,9 @@ inferTypeS parts (Lambda _ expr) = do
           return $ Right (FunctionType (GenericType paramId) exprType, [])
         (paramType : otherGenerics) -> do
           return $ Right (FunctionType paramType exprType, otherGenerics)
-inferTypeS parts (Application expr1 expr2) = do
-  inferred1 <- inferTypeS parts expr1
-  inferred2 <- inferTypeS parts expr2
+mkDepInfExprS parts (Application expr1 expr2) = do
+  inferred1 <- mkDepInfExprS parts expr1
+  inferred2 <- mkDepInfExprS parts expr2
   case (inferred1, inferred2) of
     (Left e, _) -> return $ Left e
     (_, Left e) -> return $ Left e
@@ -212,13 +221,18 @@ inferTypeS parts (Application expr1 expr2) = do
                   return $ Right (GenericType newReturnId, updatedGenerics')
             typ -> return $ Left $ STApplyingToANonFunction $ show typ
 
-inferType :: [Definition] -> Expression -> Either STypeError (NormType, [(L.Ident, NormType)])
-inferType parts expr = (,normRefs) <$> normTypeE
+mkDepInfExpr :: [Definition] -> Expression -> Either STypeError DepInfExpr
+mkDepInfExpr parts expr = (,normRefs) <$> normTypeE
   where
-    (ienv, typE) = runState (inferTypeS parts expr) (InferEnv 1 (ReconcileEnv []) [])
+    (ienv, typE) = runState (mkDepInfExprS parts expr) (InferEnv 1 (ReconcileEnv []) [])
     normTypeE = mkNormType . fst <$> typE
     refs = execState getAllTypesInferredToRefsSI ienv
     normRefs = second mkNormType <$> refs
+
+mkInfExpr :: [Definition] -> Expression -> Either STypeError InfExpr
+mkInfExpr parts expr = do
+  (normType, refs) <- mkDepInfExpr parts expr
+  return $ InfExpr expr normType refs
 
 -- Unit tests
 
@@ -356,3 +370,7 @@ program6 =
     ++ "true := \\a.\\b.a\n"
     ++ "false : a -> a -> a\n"
     ++ "false := \\a.\\b.b\n"
+
+at = \x -> bt (x + 1 :: Int)
+
+bt = \x -> at x

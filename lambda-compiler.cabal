@@ -30,6 +30,7 @@ library
       Lexer
       Repl
       SemanticAnalyzer
+      SemanticAnalyzer.DependencyGraph
       SemanticAnalyzer.Expression
       SemanticAnalyzer.Type
       SyntacticAnalyzer
