@@ -41,20 +41,10 @@ instance Show Definition where
 
 type SourceCode = String
 
--- Type-inferred expression with dependencies
-data DepInfExpr = DepInfExpr
-  { dieExpr :: Expression,
-    dieType :: Type,
-    dieGlobEnv :: [Definition],
-    dieDeps :: [(L.Ident, NormType)]
-  }
-
--- Type-inferred expression
 data InfExpr = InfExpr
   { ieExpr :: Expression,
-    ieType :: NormType
+    ieType :: Type
   }
-  deriving (Eq)
 
 createSemanticPartsS :: Y.Program -> State ConvertEnv (Either CompilerError [Definition])
 createSemanticPartsS = foldEitherM (flip helper) []
