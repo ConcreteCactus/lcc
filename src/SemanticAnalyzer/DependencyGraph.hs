@@ -1,36 +1,48 @@
 {-# LANGUAGE LambdaCase #-}
-module SemanticAnalyzer.DependencyGraph (
-      DependencyGraph,
-      mkDependencyGraph,
-      semanticAnalyzerDependencyGraphTests
-    ) where
+
+module SemanticAnalyzer.DependencyGraph
+  ( DependencyGraph (..),
+    mkDependencyGraph,
+    semanticAnalyzerDependencyGraphTests,
+    dgFoldr,
+    getFieldDepGraphs,
+  )
+where
 
 import Util
 
-data (Eq a) => DependencyGraph a
+data DependencyGraph a
   = DependencyTree a [DependencyGraph a]
   | DependencyCycle [a] [DependencyGraph a]
 
-newtype (Eq a) => MkDepGEnv a = MkDepGEnv [a]
+newtype MkDepGEnv a = MkDepGEnv [a]
 
 instance (Eq a) => Eq (DependencyGraph a) where
   DependencyTree a _ == DependencyTree b _ = a == b
   DependencyCycle a _ == DependencyCycle b _ = a == b
   _ == _ = False
 
+instance Functor DependencyGraph where
+  fmap f (DependencyTree a adeps) = DependencyTree (f a) (fmap f `fmap` adeps)
+  fmap f (DependencyCycle as asdeps) = DependencyCycle (fmap f as) (fmap f `fmap` asdeps)
+
+instance Foldable DependencyGraph where
+  foldr f b (DependencyTree a adeps) = f a (foldr (flip (foldr f)) b adeps)
+  foldr f b (DependencyCycle as asdeps) = foldr f (foldr (flip (foldr f)) b asdeps) as
+
 instance (Eq a, Show a) => Show (DependencyGraph a) where
   show graph = showH graph 0
 
 showH :: (Eq a, Show a) => DependencyGraph a -> Int -> String
-showH (DependencyTree a deps) n = replicate (2*n) ' ' ++ show a ++ "\n" ++ concatMap (`showH` (n+1)) deps
-showH (DependencyCycle nodes deps) n = replicate (2*n) ' ' ++ show nodes ++ "\n" ++ concatMap (`showH` (n+1)) deps
+showH (DependencyTree a deps) n = replicate (2 * n) ' ' ++ show a ++ "\n" ++ concatMap (`showH` (n + 1)) deps
+showH (DependencyCycle nodes deps) n = replicate (2 * n) ' ' ++ show nodes ++ "\n" ++ concatMap (`showH` (n + 1)) deps
 
 type PrevPath a = [a]
 
 mkDependencyGraph :: (Eq a) => [a] -> (a -> [a]) -> [DependencyGraph a]
 mkDependencyGraph vals depf = execState (mkDependencyGraphS vals depf) (MkDepGEnv [])
 
-dgeSetWalked :: (Eq a) => a -> State (MkDepGEnv a) ()
+dgeSetWalked :: a -> State (MkDepGEnv a) ()
 dgeSetWalked a = do
   (MkDepGEnv env) <- get
   put $ MkDepGEnv $ a : env
@@ -41,34 +53,40 @@ dgeIsWalked a = do
   return $ a `elem` env
 
 dependsOn :: (Eq a) => DependencyGraph a -> a -> Bool
-dependsOn (DependencyTree a adeps) b = a == b || any (`dependsOn`b) adeps
-dependsOn (DependencyCycle as asdeps) b = b `elem` as || any (`dependsOn`b) asdeps
+dependsOn (DependencyTree a adeps) b = a == b || any (`dependsOn` b) adeps
+dependsOn (DependencyCycle as asdeps) b = b `elem` as || any (`dependsOn` b) asdeps
 
 mkDependencyGraphS :: (Eq a) => [a] -> (a -> [a]) -> State (MkDepGEnv a) [DependencyGraph a]
 mkDependencyGraphS [] _ = return []
-mkDependencyGraphS (a:as) depf = do
+mkDependencyGraphS (a : as) depf = do
   walked <- dgeIsWalked a
-  if walked then do
-    mkDependencyGraphS as depf
-  else do
-    dgeSetWalked a
-    next <- mkDependencyGraphS as depf
-    let (ad, _) = mkDependencyGraphH depf [] a
-    return $ ad : filter (\case
-        DependencyCycle as' _ -> not $ any (ad`dependsOn`) as'
-        DependencyTree a' _ -> not $ ad `dependsOn` a'
-      ) next
+  if walked
+    then do
+      mkDependencyGraphS as depf
+    else do
+      dgeSetWalked a
+      next <- mkDependencyGraphS as depf
+      let (ad, _) = mkDependencyGraphH depf [] a
+      return $
+        ad
+          : filter
+            ( \case
+                DependencyCycle as' _ -> not $ any (ad `dependsOn`) as'
+                DependencyTree a' _ -> not $ ad `dependsOn` a'
+            )
+            next
 
 mkDependencyGraphH :: (Eq a) => (a -> [a]) -> PrevPath a -> a -> (DependencyGraph a, Int)
-mkDependencyGraphH depf prevPath node = if node `elem` prevPath 
-    then let dcycle = takeWhile (/=node) prevPath in
-      (DependencyCycle [] [], length dcycle + 1)
-    else 
-      let (prGraph, n) = foldr procNexts (DependencyTree node [], 0) nexts in
-        case prGraph of
-          cy@(DependencyCycle a adeps) -> (cy, n-1)
-          a -> (a, 0)
-        
+mkDependencyGraphH depf prevPath node =
+  if node `elem` prevPath
+    then
+      let dcycle = takeWhile (/= node) prevPath
+       in (DependencyCycle [] [], length dcycle + 1)
+    else
+      let (prGraph, n) = foldr procNexts (DependencyTree node [], 0) nexts
+       in case prGraph of
+            cy@(DependencyCycle _ _) -> (cy, n - 1)
+            a -> (a, 0)
   where
     nexts = map (mkDependencyGraphH depf (node : prevPath)) (depf node)
     procNexts :: Eq a => (DependencyGraph a, Int) -> (DependencyGraph a, Int) -> (DependencyGraph a, Int)
@@ -80,11 +98,9 @@ mkDependencyGraphH depf prevPath node = if node `elem` prevPath
     procNexts (DependencyCycle anodes' adeps, an) (DependencyCycle bnodes' bdeps, bn) =
       (DependencyCycle (anodes' +-+ bnodes') (adeps +-+ bdeps), max an bn)
 
-(+-+) :: (Eq a) => [a] -> [a] -> [a]
-(a : as) +-+ bs
-  | a `elem` bs = as +-+ bs
-  | otherwise = a : (as +-+ bs)
-[] +-+ bs = bs
+dgFoldr :: ([a] -> b -> b) -> (a -> b -> b) -> b -> DependencyGraph a -> b
+dgFoldr fc ft b (DependencyTree a adeps) = ft a (foldr (flip $ dgFoldr fc ft) b adeps)
+dgFoldr fc ft b (DependencyCycle as asdeps) = fc as (foldr (flip $ dgFoldr fc ft) b asdeps)
 
 -- Unit tests
 hasNoDups :: (Eq a) => [a] -> Bool
@@ -103,8 +119,8 @@ testDepGraphDepsCantHaveDuplicates (DependencyCycle _ deps) = hasNoDups deps
 
 testDepGraphNodeCantAppearInDifferentCycles :: (Eq a) => DependencyGraph a -> DependencyGraph a -> Bool
 testDepGraphNodeCantAppearInDifferentCycles (DependencyCycle anodes _) (DependencyCycle bnodes _) =
-  (all (`notElem`bnodes) anodes && all (`notElem`anodes) bnodes)
-  || (all (`elem`bnodes) anodes && all (`elem`anodes) bnodes)
+  (all (`notElem` bnodes) anodes && all (`notElem` anodes) bnodes)
+    || (all (`elem` bnodes) anodes && all (`elem` anodes) bnodes)
 testDepGraphNodeCantAppearInDifferentCycles _ _ = True
 
 testNodeInACycleCantAppearInATree :: (Eq a) => DependencyGraph a -> DependencyGraph a -> Bool
@@ -117,6 +133,7 @@ field1 1 2 = True
 field1 1 3 = True
 field1 3 4 = True
 field1 _ _ = False
+
 field1Elems :: [Int]
 field1Elems = [1, 2, 3, 4]
 
@@ -127,6 +144,7 @@ field2 3 4 = True
 field2 4 5 = True
 field2 5 3 = True
 field2 _ _ = False
+
 field2Elems :: [Int]
 field2Elems = [1, 2, 3, 4, 5]
 
@@ -141,8 +159,9 @@ field3 5 3 = True
 field3 5 6 = True
 field3 6 3 = True
 field3 _ _ = False
+
 field3Elems :: [Int]
-field3Elems = [1..6]
+field3Elems = [1 .. 6]
 
 -- 1 -> 2
 --   -> 3 -> 4 -> 5 -> 3!
@@ -158,8 +177,9 @@ field4 7 3 = True
 field4 5 6 = True
 field4 6 3 = True
 field4 _ _ = False
+
 field4Elems :: [Int]
-field4Elems = [1..7]
+field4Elems = [1 .. 7]
 
 -- 1 -> 2
 --   -> 3 -> 4 -> 5 -> 7 -> 3!
@@ -175,8 +195,9 @@ field5 7 2 = True
 field5 5 6 = True
 field5 6 3 = True
 field5 _ _ = False
+
 field5Elems :: [Int]
-field5Elems = [1..7]
+field5Elems = [1 .. 7]
 
 -- 1 -> 2
 --   -> 3 -> 4 -> 5 -> 7 -> 2!
@@ -194,8 +215,9 @@ field6 5 6 = True
 field6 6 3 = True
 field6 8 4 = True
 field6 _ _ = False
+
 field6Elems :: [Int]
-field6Elems = [1..8]
+field6Elems = [1 .. 8]
 
 -- 1 -> 2
 --   -> 3 -> 4 -> 5 -> 6 -> 3!
@@ -211,16 +233,18 @@ getFieldDepGraphs :: (Eq a) => [a] -> (a -> a -> Bool) -> [DependencyGraph a]
 getFieldDepGraphs elems rel = getDepGraphs elems (mkDepf elems rel)
 
 testDepGraphs :: (Eq a) => [DependencyGraph a] -> Bool
-testDepGraphs graphs = all testDepGraphDepsCantHaveDuplicates graphs && all testDepCycleCantHaveDuplicates graphs
-  && all (uncurry testDepGraphNodeCantAppearInDifferentCycles) [(a, b) | a <- graphs, b <- graphs]
-  && all (uncurry testNodeInACycleCantAppearInATree) [(a, b) | a <- graphs, b <- graphs]
+testDepGraphs graphs =
+  all testDepGraphDepsCantHaveDuplicates graphs
+    && all testDepCycleCantHaveDuplicates graphs
+    && all (uncurry testDepGraphNodeCantAppearInDifferentCycles) [(a, b) | a <- graphs, b <- graphs]
+    && all (uncurry testNodeInACycleCantAppearInATree) [(a, b) | a <- graphs, b <- graphs]
 
 testField :: (Eq a) => [a] -> (a -> a -> Bool) -> Bool
 testField elems rel = testDepGraphs (getDepGraphs elems (mkDepf elems rel))
 
 semanticAnalyzerDependencyGraphTests :: [Bool]
-semanticAnalyzerDependencyGraphTests = [
-    testField field1Elems field1,
+semanticAnalyzerDependencyGraphTests =
+  [ testField field1Elems field1,
     testField field2Elems field2,
     testField field3Elems field3,
     testField field4Elems field4,

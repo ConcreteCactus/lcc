@@ -21,8 +21,6 @@ module SemanticAnalyzer.Type
     checkType,
     createGenericList,
     getNewId,
-    getTypeInferredToRefSI,
-    getAllTypesInferredToRefsSI,
     semanticAnalyzerSemTypeTests,
   )
 where
@@ -63,7 +61,7 @@ data MutExcTy2 = MutExcTy2
     met2Snd :: Type
   }
 
-data InferEnv = InferEnv Int ReconcileEnv [(L.Ident, Int)]
+data InferEnv = InferEnv Int ReconcileEnv
 
 -- Laws
 --   1. forall (a, _) in RE : forall (_, b) in RE : forall genericId in b : a != genericId
@@ -125,9 +123,9 @@ mkMutExcTy2 original shiftCandidate =
 
 shiftNewIds :: Type -> State InferEnv Type
 shiftNewIds typ = do
-  InferEnv ident rec refs <- get
+  InferEnv ident rec <- get
   let (newTyp, maxIdent) = shiftIds ident typ
-  put $ InferEnv (maxIdent + 1) rec refs
+  put $ InferEnv (maxIdent + 1) rec
   return newTyp
 
 getHighestId :: Type -> Int
@@ -183,9 +181,9 @@ addNewSubstitution genericId typ = do
 
 addNewSubstitutionI :: Int -> Type -> State InferEnv (Either STypeError ())
 addNewSubstitutionI genericId typ = do
-  InferEnv count renv refs <- get
+  InferEnv count renv <- get
   let (newREnv, result) = runState (addNewSubstitution genericId typ) renv
-  put $ InferEnv count newREnv refs
+  put $ InferEnv count newREnv
   return result
 
 updateWithSubstitutions :: Type -> State ReconcileEnv Type
@@ -203,9 +201,9 @@ updateWithSubstitutions typ = do
 
 updateWithSubstitutionsI :: Type -> State InferEnv Type
 updateWithSubstitutionsI typ = do
-  InferEnv count renv refs <- get
+  InferEnv count renv <- get
   let (newREnv, newTyp) = runState (updateWithSubstitutions typ) renv
-  put $ InferEnv count newREnv refs
+  put $ InferEnv count newREnv
   return newTyp
 
 reconcileTypesS :: Type -> Type -> State ReconcileEnv (Either STypeError Type)
@@ -269,12 +267,12 @@ checkTypeS _ typ typ' = return $ Left $ STTypeMismatch (show typ) (show typ')
 
 reconcileTypesIS :: Type -> Type -> State InferEnv (Either STypeError Type)
 reconcileTypesIS t1 t2 = do
-  InferEnv count renv refs <- get
+  InferEnv count renv <- get
   let (newREnv, reconciledM) = runState (reconcileTypesS t1 t2) renv
   case reconciledM of
     Left e -> return $ Left e
     Right reconciled -> do
-      put $ InferEnv count newREnv refs
+      put $ InferEnv count newREnv
       return $ Right reconciled
 
 checkType :: MutExcTy2 -> Either STypeError ()
@@ -293,29 +291,9 @@ createGenericList n = do
 
 getNewId :: State InferEnv Int
 getNewId = do
-  InferEnv ident rec refs <- get
-  put $ InferEnv (ident + 1) rec refs
+  InferEnv ident rec <- get
+  put $ InferEnv (ident + 1) rec
   return ident
-
-getOrCreateIdOfRefSI :: L.Ident -> State InferEnv Int
-getOrCreateIdOfRefSI refName = do
-  InferEnv ident rec refs <- get
-  case lookup refName refs of
-    Nothing -> do
-      refId <- getNewId
-      put $ InferEnv ident rec ((refName, refId) : refs)
-      return refId
-    Just refId -> return refId
-
-getTypeInferredToRefSI :: L.Ident -> State InferEnv Type
-getTypeInferredToRefSI refName = do
-  refId <- getOrCreateIdOfRefSI refName
-  updateWithSubstitutionsI (GenericType refId)
-
-getAllTypesInferredToRefsSI :: State InferEnv [(L.Ident, Type)]
-getAllTypesInferredToRefsSI = do
-  InferEnv _ _ refs <- get
-  mapM (\(refName, _) -> (refName,) <$> getTypeInferredToRefSI refName) refs
 
 -- Unit tests
 

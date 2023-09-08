@@ -10,6 +10,7 @@ module Util
     evalState,
     trim,
     (!!!),
+    (+-+),
     forgivingZipWith,
     forgivingZipWithM,
     forgivingZipWithME,
@@ -96,3 +97,9 @@ forgivingZipWithME :: (Applicative m) => (a -> a -> m (Either e a)) -> [a] -> [a
 forgivingZipWithME _ [] r = pure (Right <$> r)
 forgivingZipWithME _ r [] = pure (Right <$> r)
 forgivingZipWithME f (x : xs) (y : ys) = (:) <$> f x y <*> forgivingZipWithME f xs ys
+
+(+-+) :: (Eq a) => [a] -> [a] -> [a]
+(a : as) +-+ bs
+  | a `elem` bs = as +-+ bs
+  | otherwise = a : (as +-+ bs)
+[] +-+ bs = bs

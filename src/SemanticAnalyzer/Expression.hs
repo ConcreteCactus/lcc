@@ -4,6 +4,7 @@ module SemanticAnalyzer.Expression
     convertExpression,
     convertExpressionS,
     addGlobal,
+    findGlobal,
     addDecl,
     findDecl,
   )
