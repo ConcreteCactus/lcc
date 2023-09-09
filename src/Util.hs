@@ -14,6 +14,9 @@ module Util
     forgivingZipWith,
     forgivingZipWithM,
     forgivingZipWithME,
+    (<<$>>),
+    fstMap,
+    sndMap,
   )
 where
 
@@ -103,3 +106,12 @@ forgivingZipWithME f (x : xs) (y : ys) = (:) <$> f x y <*> forgivingZipWithME f 
   | a `elem` bs = as +-+ bs
   | otherwise = a : (as +-+ bs)
 [] +-+ bs = bs
+
+(<<$>>) :: (Functor f, Functor g) => (a -> b) -> f (g a) -> f (g b)
+(<<$>>) = fmap . fmap
+
+fstMap :: (a -> b) -> (a, c) -> (b, c)
+fstMap f (a, c) = (f a, c)
+
+sndMap :: (a -> b) -> (c, a) -> (c, b)
+sndMap f (c, a) = (c, f a)
