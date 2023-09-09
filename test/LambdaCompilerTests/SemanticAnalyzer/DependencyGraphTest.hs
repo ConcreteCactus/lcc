@@ -27,7 +27,7 @@ spec = do
         ( \(DepGraphList xs) -> case xs of
             [] -> True
             [_] -> True
-            (x : y : _) -> testDepGraphNodeCantAppearInDifferentCycles x (y :: DependencyGraph Int)
+            (x : y : _) -> testNodeInACycleCantAppearInATree x (y :: DependencyGraph Int)
         )
   describe "+-+" $ do
     it "has no duplicates" $ do
@@ -115,126 +115,127 @@ testNodeInACycleCantAppearInATree (DependencyTree node _) (DependencyCycle nodes
 testNodeInACycleCantAppearInATree (DependencyCycle nodes _) (DependencyTree node _) = node `notElem` nodes
 testNodeInACycleCantAppearInATree _ _ = True
 
-field1 :: Int -> Int -> Bool
-field1 1 2 = True
-field1 1 3 = True
-field1 3 4 = True
-field1 _ _ = False
-
-field1Elems :: [Int]
-field1Elems = [1, 2, 3, 4]
-
-field2 :: Int -> Int -> Bool
-field2 1 2 = True
-field2 1 3 = True
-field2 3 4 = True
-field2 4 5 = True
-field2 5 3 = True
-field2 _ _ = False
-
-field2Elems :: [Int]
-field2Elems = [1, 2, 3, 4, 5]
-
--- 1 -> 2 -> 3 -> 4 -> 5 -> 3!
-
-field3 :: Int -> Int -> Bool
-field3 1 2 = True
-field3 1 3 = True
-field3 3 4 = True
-field3 4 5 = True
-field3 5 3 = True
-field3 5 6 = True
-field3 6 3 = True
-field3 _ _ = False
-
-field3Elems :: [Int]
-field3Elems = [1 .. 6]
-
--- 1 -> 2
---   -> 3 -> 4 -> 5 -> 3!
---                  -> 6 -> 3!
-
-field4 :: Int -> Int -> Bool
-field4 1 2 = True
-field4 1 3 = True
-field4 3 4 = True
-field4 4 5 = True
-field4 5 7 = True
-field4 7 3 = True
-field4 5 6 = True
-field4 6 3 = True
-field4 _ _ = False
-
-field4Elems :: [Int]
-field4Elems = [1 .. 7]
-
--- 1 -> 2
---   -> 3 -> 4 -> 5 -> 7 -> 3!
---                  -> 6 -> 3!
-
-field5 :: Int -> Int -> Bool
-field5 1 2 = True
-field5 1 3 = True
-field5 3 4 = True
-field5 4 5 = True
-field5 5 7 = True
-field5 7 2 = True
-field5 5 6 = True
-field5 6 3 = True
-field5 _ _ = False
-
-field5Elems :: [Int]
-field5Elems = [1 .. 7]
-
--- 1 -> 2
---   -> 3 -> 4 -> 5 -> 7 -> 2!
---                  -> 6 -> 3!
-
-field6 :: Int -> Int -> Bool
-field6 1 2 = True
-field6 1 3 = True
-field6 3 4 = True
-field6 4 5 = True
-field6 5 7 = True
-field6 7 2 = True
-field6 7 8 = True
-field6 5 6 = True
-field6 6 3 = True
-field6 8 4 = True
-field6 _ _ = False
-
-field6Elems :: [Int]
-field6Elems = [1 .. 8]
-
--- 1 -> 2
---   -> 3 -> 4 -> 5 -> 6 -> 3!
---                  -> 7 -> 2!
---                       -> 8 -> 4!
-mkDepf :: [a] -> (a -> a -> Bool) -> (a -> [a])
-mkDepf elems rel a = filter (rel a) elems
-
 getDepGraphs :: (Eq a) => [a] -> (a -> [a]) -> [DependencyGraph a]
 getDepGraphs elems deps = fst . mkDependencyGraphH deps [] <$> elems
 
-getFieldDepGraphs :: (Eq a) => [a] -> (a -> a -> Bool) -> [DependencyGraph a]
-getFieldDepGraphs elems rel = getDepGraphs elems (mkDepf elems rel)
+--
+-- field1 :: Int -> Int -> Bool
+-- field1 1 2 = True
+-- field1 1 3 = True
+-- field1 3 4 = True
+-- field1 _ _ = False
+--
+-- field1Elems :: [Int]
+-- field1Elems = [1, 2, 3, 4]
+--
+-- field2 :: Int -> Int -> Bool
+-- field2 1 2 = True
+-- field2 1 3 = True
+-- field2 3 4 = True
+-- field2 4 5 = True
+-- field2 5 3 = True
+-- field2 _ _ = False
+--
+-- field2Elems :: [Int]
+-- field2Elems = [1, 2, 3, 4, 5]
+--
+-- -- 1 -> 2 -> 3 -> 4 -> 5 -> 3!
+--
+-- field3 :: Int -> Int -> Bool
+-- field3 1 2 = True
+-- field3 1 3 = True
+-- field3 3 4 = True
+-- field3 4 5 = True
+-- field3 5 3 = True
+-- field3 5 6 = True
+-- field3 6 3 = True
+-- field3 _ _ = False
+--
+-- field3Elems :: [Int]
+-- field3Elems = [1 .. 6]
+--
+-- -- 1 -> 2
+-- --   -> 3 -> 4 -> 5 -> 3!
+-- --                  -> 6 -> 3!
+--
+-- field4 :: Int -> Int -> Bool
+-- field4 1 2 = True
+-- field4 1 3 = True
+-- field4 3 4 = True
+-- field4 4 5 = True
+-- field4 5 7 = True
+-- field4 7 3 = True
+-- field4 5 6 = True
+-- field4 6 3 = True
+-- field4 _ _ = False
+--
+-- field4Elems :: [Int]
+-- field4Elems = [1 .. 7]
+--
+-- -- 1 -> 2
+-- --   -> 3 -> 4 -> 5 -> 7 -> 3!
+-- --                  -> 6 -> 3!
+--
+-- field5 :: Int -> Int -> Bool
+-- field5 1 2 = True
+-- field5 1 3 = True
+-- field5 3 4 = True
+-- field5 4 5 = True
+-- field5 5 7 = True
+-- field5 7 2 = True
+-- field5 5 6 = True
+-- field5 6 3 = True
+-- field5 _ _ = False
+--
+-- field5Elems :: [Int]
+-- field5Elems = [1 .. 7]
+--
+-- -- 1 -> 2
+-- --   -> 3 -> 4 -> 5 -> 7 -> 2!
+-- --                  -> 6 -> 3!
+--
+-- field6 :: Int -> Int -> Bool
+-- field6 1 2 = True
+-- field6 1 3 = True
+-- field6 3 4 = True
+-- field6 4 5 = True
+-- field6 5 7 = True
+-- field6 7 2 = True
+-- field6 7 8 = True
+-- field6 5 6 = True
+-- field6 6 3 = True
+-- field6 8 4 = True
+-- field6 _ _ = False
 
-testDepGraphs :: (Eq a) => [DependencyGraph a] -> Bool
-testDepGraphs graphs =
-  all testDepGraphDepsCantHaveDuplicates graphs
-    && all testDepCycleCantHaveDuplicates graphs
-    && all (uncurry testDepGraphNodeCantAppearInDifferentCycles) [(a, b) | a <- graphs, b <- graphs]
-    && all (uncurry testNodeInACycleCantAppearInATree) [(a, b) | a <- graphs, b <- graphs]
+-- field6Elems :: [Int]
+-- field6Elems = [1 .. 8]
+--
+-- -- 1 -> 2
+-- --   -> 3 -> 4 -> 5 -> 6 -> 3!
+-- --                  -> 7 -> 2!
+-- --                       -> 8 -> 4!
+-- mkDepf :: [a] -> (a -> a -> Bool) -> (a -> [a])
+-- mkDepf elems rel a = filter (rel a) elems
+--
+-- getFieldDepGraphs :: (Eq a) => [a] -> (a -> a -> Bool) -> [DependencyGraph a]
+-- getFieldDepGraphs elems rel = getDepGraphs elems (mkDepf elems rel)
+--
+-- testDepGraphs :: (Eq a) => [DependencyGraph a] -> Bool
+-- testDepGraphs graphs =
+--   all testDepGraphDepsCantHaveDuplicates graphs
+--     && all testDepCycleCantHaveDuplicates graphs
+--     && all (uncurry testDepGraphNodeCantAppearInDifferentCycles) [(a, b) | a <- graphs, b <- graphs]
+--     && all (uncurry testNodeInACycleCantAppearInATree) [(a, b) | a <- graphs, b <- graphs]
 
-testField :: (Eq a) => [a] -> (a -> a -> Bool) -> Bool
-testField elems rel = testDepGraphs (getDepGraphs elems (mkDepf elems rel))
+-- testField :: (Eq a) => [a] -> (a -> a -> Bool) -> Bool
+-- testField elems rel = testDepGraphs (getDepGraphs elems (mkDepf elems rel))
 
-semanticAnalyzerDependencyGraphTests :: [Bool]
-semanticAnalyzerDependencyGraphTests =
-  [ testField field1Elems field1,
-    testField field2Elems field2,
-    testField field3Elems field3,
-    testField field4Elems field4,
-    testField field5Elems field5,
-    testField field6Elems field6
-  ]
+-- semanticAnalyzerDependencyGraphTests :: [Bool]
+-- semanticAnalyzerDependencyGraphTests =
+--   [ testField field1Elems field1,
+--     testField field2Elems field2,
+--     testField field3Elems field3,
+--     testField field4Elems field4,
+--     testField field5Elems field5,
+--     testField field6Elems field6
+--   ]
