@@ -31,6 +31,7 @@ library
       Repl
       SemanticAnalyzer
       SemanticAnalyzer.DependencyGraph
+      SemanticAnalyzer.DependencyGraph.Internal
       SemanticAnalyzer.Expression
       SemanticAnalyzer.Type
       SyntacticAnalyzer
@@ -61,11 +62,13 @@ test-suite lambda-compiler-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
+      LambdaCompilerTests.SemanticAnalyzer.DependencyGraphTest
       Paths_lambda_compiler
   hs-source-dirs:
       test
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -Wincomplete-patterns -Wno-unrecognised-pragmas -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
+    , hspec
     , lambda-compiler
   default-language: Haskell2010
