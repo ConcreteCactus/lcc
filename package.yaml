@@ -60,3 +60,4 @@ tests:
     dependencies:
     - lambda-compiler
     - hspec
+    - QuickCheck

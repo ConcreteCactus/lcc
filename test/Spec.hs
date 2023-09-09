@@ -1,4 +1,5 @@
+import qualified LambdaCompilerTests.SemanticAnalyzer.DependencyGraphTest as DGTest
 import Test.Hspec
 
 main :: IO ()
-main = putStrLn "Test suite not yet implemented"
+main = hspec DGTest.spec

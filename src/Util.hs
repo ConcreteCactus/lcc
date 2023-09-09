@@ -11,6 +11,7 @@ module Util
     trim,
     (!!!),
     (+-+),
+    (-:),
     forgivingZipWith,
     forgivingZipWithM,
     forgivingZipWithME,
@@ -106,6 +107,11 @@ forgivingZipWithME f (x : xs) (y : ys) = (:) <$> f x y <*> forgivingZipWithME f 
   | a `elem` bs = as +-+ bs
   | otherwise = a : (as +-+ bs)
 [] +-+ bs = bs
+
+(-:) :: (Eq a) => a -> [a] -> [a]
+a -: as
+  | a `elem` as = as
+  | otherwise = a : as
 
 (<<$>>) :: (Functor f, Functor g) => (a -> b) -> f (g a) -> f (g b)
 (<<$>>) = fmap . fmap

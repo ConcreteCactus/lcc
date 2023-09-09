@@ -1,7 +1,7 @@
 module Main (main) where
 
-import Repl
-import System.Environment
+-- import Repl
+-- import System.Environment
 
 main :: IO ()
 main = do
