@@ -25,7 +25,7 @@ data InfExpr = InfExpr
   deriving (Eq)
 
 instance Show InfExpr where
-  show = show . ieExpr
+  show expr = show (ieExpr expr) ++ " : " ++ show (ieType expr)
 
 data Definition = Definition
   { defName :: L.Ident,

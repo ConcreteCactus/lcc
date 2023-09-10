@@ -28,6 +28,16 @@ spec = do
       isRight (testP program4) `shouldBe` True
       isRight (testP program5) `shouldBe` True
       isRight (testP program6) `shouldBe` True
+    it "can infer simple types correctly" $ do
+      ieType . defExpr . head . progDefs <$> testP program1
+        `shouldBe` Right (mkn $ funt (GenericType 1) (funt (GenericType 2) (GenericType 1)))
+      ieType . defExpr . head . tail . progDefs <$> testP program1
+        `shouldBe` Right (mkn $ funt (GenericType 1) (funt (GenericType 2) (GenericType 2)))
+    it "can work with type wishes correctly" $ do
+      ieType . defExpr . head . progDefs <$> testP program6
+        `shouldBe` Right (mkn $ funt (GenericType 1) (funt (GenericType 1) (GenericType 1)))
+      ieType . defExpr . head . tail . progDefs <$> testP program6
+        `shouldBe` Right (mkn $ funt (GenericType 1) (funt (GenericType 1) (GenericType 1)))
 
 isRight :: Either a b -> Bool
 isRight (Right _) = True
