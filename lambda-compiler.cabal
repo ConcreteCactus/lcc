@@ -36,6 +36,7 @@ library
       SemanticAnalyzer.Expression.Internal
       SemanticAnalyzer.Internal
       SemanticAnalyzer.Type
+      SemanticAnalyzer.Type.Internal
       SyntacticAnalyzer
       Util
       Util.Limited
@@ -66,6 +67,7 @@ test-suite lambda-compiler-test
   other-modules:
       LambdaCompilerTests.SemanticAnalyzer.DependencyGraphTest
       LambdaCompilerTests.SemanticAnalyzer.ExpressionTests
+      LambdaCompilerTests.SemanticAnalyzer.TypeTest
       LambdaCompilerTests.SemanticAnalyzerTests
       Paths_lambda_compiler
   hs-source-dirs:

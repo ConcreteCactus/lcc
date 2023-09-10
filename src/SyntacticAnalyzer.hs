@@ -83,7 +83,7 @@ parseExpression :: String -> Either CompilerError Expression
 parseExpression s = fst <$> runParser expressionParser s
 
 typeIdParser :: Parser Type
-typeIdParser = TypeId . Ident <$> capIdentifier
+typeIdParser = TypeId . Ident <$> anyCapIdentifier
 
 functionParser :: Parser Type
 functionParser = FunctionType <$> typeParserWithoutFunction <*> (whiteSpaceO *> arrow *> whiteSpaceO *> typeParser)

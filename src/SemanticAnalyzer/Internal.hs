@@ -103,9 +103,22 @@ mkUninfProgS synProg = do
         (_, Just e) -> return $ Just e
         _ -> return Nothing
 
-mkProgInfDeps :: UninfProg -> ProgInfDeps
-mkProgInfDeps uiprog@(UninfProg uiDefs) = ProgInfDeps uiprog $ mkDependencyGraph (map udefName uiDefs) (getDeps uiprog)
+mkProgInfDeps :: UninfProg -> Either SemanticError ProgInfDeps
+mkProgInfDeps uiprog@(UninfProg uiDefs) = case checkDeps uiprog of
+  Just e -> Left e
+  Nothing -> Right $ ProgInfDeps uiprog $ mkDependencyGraph (map udefName uiDefs) (getDeps uiprog)
   where
+    checkDeps :: UninfProg -> Maybe SemanticError
+    checkDeps (UninfProg uiDefs') =
+      foldr
+        ( \udef acc ->
+            ( if all (`elem` map udefName uiDefs') (getAllRefs (udefExpr udef))
+                then acc
+                else Just $ SUndefinedVariable $ L.unIdent $ udefName udef
+            )
+        )
+        Nothing
+        uiDefs'
     getDeps :: UninfProg -> L.Ident -> [L.Ident]
     getDeps (UninfProg uiDefs') glob = case find ((== glob) . udefName) uiDefs' of
       Nothing -> error "Found an undefined global. This is a bug."
@@ -223,7 +236,10 @@ lookupRefType parts refName =
     >>= \(Definition _ (InfExpr _ typ)) -> Just typ
 
 mkProgramFromSyn :: Y.Program -> Either CompilerError Program
-mkProgramFromSyn syn = first (SemanticError . STypeError) . mkProgram . mkProgInfDeps =<< mkUninfProg syn
+mkProgramFromSyn syn =
+  first (SemanticError . STypeError) . mkProgram
+    =<< first SemanticError . mkProgInfDeps
+    =<< mkUninfProg syn
 
 -- createSemanticProgram :: Y.Program -> Either CompilerError Program
 -- createSemanticProgram prog = Program globs <$> (semProgParts >>= sinkError . checkSemProgParts declarations)

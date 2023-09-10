@@ -14,12 +14,12 @@ spec = do
     it "can convert simple expressions" $ do
       test "\\a.a" `shouldBe` Right (lam "a" (Ident 1))
       test "\\a.\\b.a b" `shouldBe` Right (lam "a" (lam "b" (appl (Ident 2) (Ident 1))))
-      test "(\\a.a) x" `shouldBe` Left (SemanticError $ SUndefinedVariable "x")
+      test "(\\a.a) x" `shouldBe` Right (appl (lam "a" (Ident 1)) (Ref (L.Ident "x")))
   describe "convertType" $ do
     it "can convert simple types" $ do
-      testT "int" `shouldBe` Right (mkn nai)
-      testT "int -> int" `shouldBe` Right (mkn $ funt nai nai)
-      testT "(int -> int) -> int" `shouldBe` Right (mkn $ funt (funt nai nai) nai)
+      testT "a" `shouldBe` Right (mkn (GenericType 1))
+      testT "a -> a" `shouldBe` Right (mkn $ funt (GenericType 1) (GenericType 1))
+      testT "(a -> a) -> a" `shouldBe` Right (mkn $ funt (funt (GenericType 1) (GenericType 1)) (GenericType 1))
   describe "Program" $ do
     it "can parse a simple program" $ do
       isRight (testP program1) `shouldBe` True
