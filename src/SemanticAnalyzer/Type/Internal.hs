@@ -1,4 +1,4 @@
-{-# LANGUAGE TupleSections #-}
+{-# OPTIONS_GHC -Wno-missing-export-lists #-}
 
 module SemanticAnalyzer.Type.Internal where
 
@@ -38,7 +38,7 @@ data MutExcTy2 = MutExcTy2
     met2Snd :: Type
   }
 
-data InferEnv = InferEnv Int ReconcileEnv
+data InferEnv = InferEnv Int ReconcileEnv [(L.Ident, Int)]
 
 -- Laws
 --   1. forall (a, _) in RE : forall (_, b) in RE : forall genericId in b : a != genericId
@@ -98,11 +98,11 @@ mkMutExcTy2 original shiftCandidate =
       shiftIds (ntMaxId original + 1) $
         ntType shiftCandidate
 
-shiftNewIds :: Type -> State InferEnv Type
+shiftNewIds :: NormType -> State InferEnv Type
 shiftNewIds typ = do
-  InferEnv ident rec <- get
-  let (newTyp, maxIdent) = shiftIds ident typ
-  put $ InferEnv (maxIdent + 1) rec
+  InferEnv ident rec glob <- get
+  let (newTyp, maxIdent) = shiftIds ident $ ntType typ
+  put $ InferEnv (maxIdent + 1) rec glob
   return newTyp
 
 getHighestId :: Type -> Int
@@ -158,9 +158,9 @@ addNewSubstitution genericId typ = do
 
 addNewSubstitutionI :: Int -> Type -> State InferEnv (Either STypeError ())
 addNewSubstitutionI genericId typ = do
-  InferEnv count renv <- get
+  InferEnv count renv glob <- get
   let (newREnv, result) = runState (addNewSubstitution genericId typ) renv
-  put $ InferEnv count newREnv
+  put $ InferEnv count newREnv glob
   return result
 
 updateWithSubstitutions :: Type -> State ReconcileEnv Type
@@ -178,9 +178,9 @@ updateWithSubstitutions typ = do
 
 updateWithSubstitutionsI :: Type -> State InferEnv Type
 updateWithSubstitutionsI typ = do
-  InferEnv count renv <- get
+  InferEnv count renv glob <- get
   let (newREnv, newTyp) = runState (updateWithSubstitutions typ) renv
-  put $ InferEnv count newREnv
+  put $ InferEnv count newREnv glob
   return newTyp
 
 reconcileTypesS :: Type -> Type -> State ReconcileEnv (Either STypeError Type)
@@ -244,12 +244,12 @@ checkTypeS _ typ typ' = return $ Left $ STTypeMismatch (show typ) (show typ')
 
 reconcileTypesIS :: Type -> Type -> State InferEnv (Either STypeError Type)
 reconcileTypesIS t1 t2 = do
-  InferEnv count renv <- get
+  InferEnv count renv glob <- get
   let (newREnv, reconciledM) = runState (reconcileTypesS t1 t2) renv
   case reconciledM of
     Left e -> return $ Left e
     Right reconciled -> do
-      put $ InferEnv count newREnv
+      put $ InferEnv count newREnv glob
       return $ Right reconciled
 
 checkType :: MutExcTy2 -> Either STypeError ()
@@ -268,9 +268,24 @@ createGenericList n = do
 
 getNewId :: State InferEnv Int
 getNewId = do
-  InferEnv ident rec <- get
-  put $ InferEnv (ident + 1) rec
+  InferEnv ident rec glob <- get
+  put $ InferEnv (ident + 1) rec glob
   return ident
+
+getTypeOfGlobal :: L.Ident -> State InferEnv Type
+getTypeOfGlobal gname = do
+  InferEnv _ rec glob <- get
+  case lookup gname glob of
+    Nothing -> do
+      newId <- getNewId
+      (InferEnv ident _ _) <- get
+      put $ InferEnv ident rec $ (gname, newId) : glob
+      return $ GenericType newId
+    Just recId -> do
+      let ReconcileEnv recList = rec
+      case lookup recId recList of
+        Nothing -> return $ GenericType recId
+        Just typ -> return typ
 
 -- Unit tests
 

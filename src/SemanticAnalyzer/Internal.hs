@@ -5,6 +5,7 @@ module SemanticAnalyzer.Internal where
 
 import Data.Bifunctor
 import Data.Foldable
+import Debug.Trace
 import Errors
 import qualified Lexer as L
 import SemanticAnalyzer.DependencyGraph
@@ -17,6 +18,7 @@ data UninfDefinition = UninfDefinition
   { udefName :: L.Ident,
     udefExpr :: Expression
   }
+  deriving (Show)
 
 data InfExpr = InfExpr
   { ieExpr :: Expression,
@@ -27,6 +29,15 @@ data InfExpr = InfExpr
 instance Show InfExpr where
   show expr = show (ieExpr expr) ++ " : " ++ show (ieType expr)
 
+data TypedExpr = TypedExpr
+  { teInfExpr :: InfExpr,
+    teType :: NormType
+  }
+  deriving (Eq)
+
+instance Show TypedExpr where
+  show expr = show (teExpr expr) ++ " : " ++ show (teType expr)
+
 data Definition = Definition
   { defName :: L.Ident,
     defExpr :: InfExpr
@@ -34,9 +45,9 @@ data Definition = Definition
   deriving (Eq)
 
 instance Show Definition where
-  show (Definition name infExpr) = L.unIdent name ++ " := " ++ show infExpr
+  show (Definition name expr) = L.unIdent name ++ " := " ++ show expr
 
-newtype UninfProg = UninfProg [UninfDefinition]
+newtype UninfProg = UninfProg [UninfDefinition] deriving (Show)
 
 data ProgInfDeps = ProgInfDeps
   { pidUninfProg :: UninfProg,
@@ -49,6 +60,9 @@ newtype Program = Program
   deriving (Eq, Show)
 
 type SourceCode = String
+
+teExpr :: TypedExpr -> Expression
+teExpr = ieExpr . teInfExpr
 
 mkUninfProg :: Y.Program -> Either CompilerError UninfProg
 mkUninfProg synProg = execState (mkUninfProgS synProg) (ConvertEnv [] [] [] [])
@@ -149,10 +163,10 @@ lookupUDefUnsafe (UninfProg udefs) sname = case find (\(UninfDefinition name _) 
   Just a -> udefExpr a
 
 mkInfExprTree :: [Definition] -> Expression -> Either STypeError InfExpr
-mkInfExprTree defs expr = InfExpr expr . fst <$> execState ((mkNormType `fstMap`) <<$>> infFromExprS defs expr) (InferEnv 1 (ReconcileEnv []))
+mkInfExprTree defs expr = InfExpr expr . fst <$> execState ((mkNormType `fstMap`) <<$>> infFromExprS defs expr) (InferEnv 1 (ReconcileEnv []) [])
 
 mkInfExprCycle :: [Definition] -> [Expression] -> Either STypeError [InfExpr]
-mkInfExprCycle defs exprs = execState (mkInfExprCycleS defs exprs) (InferEnv 1 (ReconcileEnv []))
+mkInfExprCycle defs exprs = execState (mkInfExprCycleS defs exprs) (InferEnv 1 (ReconcileEnv []) [])
 
 mkInfExprCycleS :: [Definition] -> [Expression] -> State InferEnv (Either STypeError [InfExpr])
 mkInfExprCycleS _ [] = return $ Right []
@@ -175,9 +189,11 @@ infFromExprS _ (Ident ident') = do
   return $ Right (lastGeneric, generics)
 infFromExprS defs (Ref refName) = do
   case lookupRefType defs refName of
-    Nothing -> error "Got a lightning strike"
+    Nothing -> do
+      globTyp <- getTypeOfGlobal refName
+      return $ Right (globTyp, [])
     Just typ -> do
-      shifted <- shiftNewIds $ ntType typ
+      shifted <- shiftNewIds typ
       return $ Right (shifted, [])
 infFromExprS parts (Lambda _ expr) = do
   inferred <- infFromExprS parts expr
@@ -213,7 +229,7 @@ infFromExprS parts (Application expr1 expr2) = do
                 Right _ -> do
                   updatedReturn <- updateWithSubstitutionsI returnType
                   return $ Right (updatedReturn, updatedGenerics)
-            GenericType genericId -> do
+            GenericType genericId -> trace (show expr1 ++ " " ++ show expr2 ++ " Gid: " ++ show genericId) $ do
               updatedExpr2Type <- updateWithSubstitutionsI expr2Type
               newReturnId <- getNewId
               addingWorked <-

@@ -38,6 +38,13 @@ spec = do
         `shouldBe` Right (mkn $ funt (GenericType 1) (funt (GenericType 1) (GenericType 1)))
       ieType . defExpr . head . tail . progDefs <$> testP program6
         `shouldBe` Right (mkn $ funt (GenericType 1) (funt (GenericType 1) (GenericType 1)))
+    it "can work with dependency cycles" $ do
+      map (ieType . defExpr) . progDefs <$> testP program7
+        `shouldBe` Right
+          [ mkn $ funt (GenericType 1) (GenericType 2),
+            mkn $ funt (GenericType 1) (GenericType 2),
+            mkn $ funt (GenericType 1) (GenericType 2)
+          ]
 
 isRight :: Either a b -> Bool
 isRight (Right _) = True
@@ -133,6 +140,12 @@ program6 =
     ++ "true := \\a.\\b.a\n"
     ++ "false : a -> a -> a\n"
     ++ "false := \\a.\\b.b\n"
+
+program7 :: SourceCode
+program7 =
+  "a := \\x.c x\n"
+    ++ "b := \\x.a x\n"
+    ++ "c := \\x.b x\n"
 
 --
 -- program1ShouldBe :: Program

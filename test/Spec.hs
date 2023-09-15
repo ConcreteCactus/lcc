@@ -6,6 +6,6 @@ import Test.Hspec
 main :: IO ()
 main = do
   hspec $ do
+    SmATest.spec
     DGTest.spec
     TyTest.spec
-    SmATest.spec

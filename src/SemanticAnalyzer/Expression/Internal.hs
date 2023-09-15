@@ -70,7 +70,7 @@ convertExpressionS (Y.Lit l) = return $ Lit l
 addGlobal :: L.Ident -> State ConvertEnv ()
 addGlobal newGlobal = do
   env <- get
-  put $ env {globals = globals env ++ [newGlobal]}
+  put $ env {globals = newGlobal : globals env}
 
 addVar :: L.Ident -> State ConvertEnv ()
 addVar newVar = do
