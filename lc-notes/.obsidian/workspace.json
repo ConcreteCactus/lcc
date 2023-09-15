@@ -32,6 +32,16 @@
             }
           },
           {
+            "id": "ba9f1d899569c0a6",
+            "type": "leaf",
+            "state": {
+              "type": "release-notes",
+              "state": {
+                "currentVersion": "1.4.5"
+              }
+            }
+          },
+          {
             "id": "d28c28618c66df68",
             "type": "leaf",
             "state": {
@@ -40,7 +50,7 @@
             }
           }
         ],
-        "currentTab": 1
+        "currentTab": 2
       }
     ],
     "direction": "vertical"
@@ -167,7 +177,7 @@
       "command-palette:Open command palette": false
     }
   },
-  "active": "016dad5dc71725d5",
+  "active": "ba9f1d899569c0a6",
   "lastOpenFiles": [
     "De Brujin indices.md",
     "Alpha equivalence is hard.md",
