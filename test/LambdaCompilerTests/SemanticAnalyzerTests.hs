@@ -1,5 +1,6 @@
 module LambdaCompilerTests.SemanticAnalyzerTests (spec) where
 
+import Debug.Trace
 import Errors
 import qualified Lexer as L
 import SemanticAnalyzer.Expression
@@ -45,6 +46,8 @@ spec = do
             mkn $ funt (GenericType 1) (GenericType 2),
             mkn $ funt (GenericType 1) (GenericType 2)
           ]
+    it "can reconcile recursive variables with themselves" $ do
+      isRight (map (ieType . defExpr) . progDefs <$> trace (show $ testP program8) (testP program8)) `shouldBe` False
 
 isRight :: Either a b -> Bool
 isRight (Right _) = True
@@ -80,24 +83,24 @@ ident = L.Ident
 -- defi :: String -> Expression -> Definition
 -- defi s = Definition (ident s)
 
-semanticAnalyzerTests :: [Bool]
-semanticAnalyzerTests =
-  [ test "\\a.a" == Right (lam "a" (Ident 1)),
-    test "\\a.\\b.a b" == Right (lam "a" (lam "b" (Application (Ident 2) (Ident 1)))),
-    test "(\\a.a) x" == Left (SemanticError $ SUndefinedVariable "x"),
-    testT "int" == Right (mkn nai),
-    testT "int -> int" == Right (mkn $ funt nai nai),
-    testT "(int -> int) -> int" == Right (mkn $ funt (funt nai nai) nai)
-    -- testP program1 == Right program1ShouldBe,
-    -- testP program2 == Right program2ShouldBe,
-    -- testP program3 == Left (SemanticError $ SUndefinedVariable "notE")
-    -- parseAndCreateProgram program1 == Right program1ShouldBe,
-    -- parseAndCreateProgram program2 == Right program2ShouldBe,
-    -- (parseAndCreateProgram program1 >>= (`parseAndCreateExpressionWithProgram` "true")) == Right (Ref $ ident "true"),
-    -- parseAndCreateProgram program4 == Right program4ShouldBe,
-    -- parseAndCreateProgram program5 == Right program5ShouldBe,
-    -- parseAndCreateProgram program6 == Right program6ShouldBe
-  ]
+-- semanticAnalyzerTests :: [Bool]
+-- semanticAnalyzerTests =
+--   [ test "\\a.a" == Right (lam "a" (Ident 1)),
+--     test "\\a.\\b.a b" == Right (lam "a" (lam "b" (Application (Ident 2) (Ident 1)))),
+--     test "(\\a.a) x" == Left (SemanticError $ SUndefinedVariable "x"),
+--     testT "int" == Right (mkn nai),
+--     testT "int -> int" == Right (mkn $ funt nai nai),
+--     testT "(int -> int) -> int" == Right (mkn $ funt (funt nai nai) nai)
+--     -- testP program1 == Right program1ShouldBe,
+--     -- testP program2 == Right program2ShouldBe,
+--     -- testP program3 == Left (SemanticError $ SUndefinedVariable "notE")
+--     -- parseAndCreateProgram program1 == Right program1ShouldBe,
+--     -- parseAndCreateProgram program2 == Right program2ShouldBe,
+--     -- (parseAndCreateProgram program1 >>= (`parseAndCreateExpressionWithProgram` "true")) == Right (Ref $ ident "true"),
+--     -- parseAndCreateProgram program4 == Right program4ShouldBe,
+--     -- parseAndCreateProgram program5 == Right program5ShouldBe,
+--     -- parseAndCreateProgram program6 == Right program6ShouldBe
+--   ]
 
 program1 :: SourceCode
 program1 =
@@ -146,6 +149,10 @@ program7 =
   "a := \\x.c x\n"
     ++ "b := \\x.a x\n"
     ++ "c := \\x.b x\n"
+
+program8 :: SourceCode
+program8 =
+  "a := \\x. a"
 
 --
 -- program1ShouldBe :: Program

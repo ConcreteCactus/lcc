@@ -116,6 +116,8 @@ a -: as
 (<<$>>) :: (Functor f, Functor g) => (a -> b) -> f (g a) -> f (g b)
 (<<$>>) = fmap . fmap
 
+infixl 4 <<$>>
+
 fstMap :: (a -> b) -> (a, c) -> (b, c)
 fstMap f (a, c) = (f a, c)
 
