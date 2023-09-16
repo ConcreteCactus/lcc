@@ -1,6 +1,9 @@
 {-# LANGUAGE LambdaCase #-}
 {-# OPTIONS_GHC -Wno-missing-export-lists #-}
 
+{-# HLINT ignore "Redundant lambda" #-}
+{-# HLINT ignore "Collapse lambdas" #-}
+
 module SemanticAnalyzer.Internal where
 
 import Data.Bifunctor
@@ -29,14 +32,12 @@ data InfExpr = InfExpr
 instance Show InfExpr where
   show expr = show (ieExpr expr) ++ " : " ++ show (ieType expr)
 
-data TypedExpr = TypedExpr
-  { teInfExpr :: InfExpr,
-    teType :: NormType
-  }
+data TypedExpr = InfTyExpr InfExpr | WishTyExpr InfExpr NormType
   deriving (Eq)
 
 instance Show TypedExpr where
-  show expr = show (teExpr expr) ++ " : " ++ show (teType expr)
+  show (InfTyExpr infExpr) = show infExpr
+  show (WishTyExpr infExpr typ) = show (ieExpr infExpr) ++ " : " ++ show typ
 
 data Definition = Definition
   { defName :: L.Ident,
@@ -62,7 +63,12 @@ newtype Program = Program
 type SourceCode = String
 
 teExpr :: TypedExpr -> Expression
-teExpr = ieExpr . teInfExpr
+teExpr (InfTyExpr infExpr) = ieExpr infExpr
+teExpr (WishTyExpr infExpr _) = ieExpr infExpr
+
+teType :: TypedExpr -> NormType
+teType (InfTyExpr infExpr) = ieType infExpr
+teType (WishTyExpr _ typ) = typ
 
 mkUninfProg :: Y.Program -> Either CompilerError UninfProg
 mkUninfProg synProg = execState (mkUninfProgS synProg) (ConvertEnv [] [] [] [])
@@ -248,40 +254,39 @@ infFromExprS parts (Lambda _ expr) = do
 infFromExprS parts (Application expr1 expr2) = do
   inferred1 <- infFromExprS parts expr1
   inferred2 <- infFromExprS parts expr2
-  trace ("(" ++ show expr1 ++ ") (" ++ show expr2 ++ ") : " ++ show inferred1 ++ " , " ++ show inferred2) $
-    case (inferred1, inferred2) of
-      (Left e, _) -> return $ Left e
-      (_, Left e) -> return $ Left e
-      (Right (expr1Type, expr1Generics), Right (expr2Type, expr2Generics)) -> do
-        newGenericsM <- sequence <$> forgivingZipWithME reconcileTypesIS expr1Generics expr2Generics
-        case newGenericsM of
-          Left e -> return $ Left e
-          Right newGenerics -> do
-            updatedGenerics <- mapM updateWithSubstitutionsI newGenerics
-            updatedExpr1Type <- updateWithSubstitutionsI expr1Type
-            case updatedExpr1Type of
-              FunctionType paramType returnType -> do
-                updatedExpr2Type <- updateWithSubstitutionsI expr2Type
-                updatedParam <- updateWithSubstitutionsI paramType
-                reconciledParamM <- reconcileTypesIS updatedParam updatedExpr2Type
-                case reconciledParamM of
-                  Left e -> return $ Left e
-                  Right _ -> do
-                    updatedReturn <- updateWithSubstitutionsI returnType
-                    return $ Right (updatedReturn, updatedGenerics)
-              GenericType genericId -> do
-                updatedExpr2Type <- updateWithSubstitutionsI expr2Type
-                newReturnId <- getNewId
-                addingWorked <-
-                  addNewSubstitutionI
-                    genericId
-                    (FunctionType updatedExpr2Type (GenericType newReturnId))
-                case addingWorked of
-                  Left e -> return $ Left e
-                  Right _ -> do
-                    updatedGenerics' <- mapM updateWithSubstitutionsI updatedGenerics
-                    return $ Right (GenericType newReturnId, updatedGenerics')
-              typ -> return $ Left $ STApplyingToANonFunction $ show typ
+  case (inferred1, inferred2) of
+    (Left e, _) -> return $ Left e
+    (_, Left e) -> return $ Left e
+    (Right (expr1Type, expr1Generics), Right (expr2Type, expr2Generics)) -> do
+      newGenericsM <- sequence <$> forgivingZipWithME reconcileTypesIS expr1Generics expr2Generics
+      case newGenericsM of
+        Left e -> return $ Left e
+        Right newGenerics -> do
+          updatedGenerics <- mapM updateWithSubstitutionsI newGenerics
+          updatedExpr1Type <- updateWithSubstitutionsI expr1Type
+          case updatedExpr1Type of
+            FunctionType paramType returnType -> do
+              updatedExpr2Type <- updateWithSubstitutionsI expr2Type
+              updatedParam <- updateWithSubstitutionsI paramType
+              reconciledParamM <- reconcileTypesIS updatedParam updatedExpr2Type
+              case reconciledParamM of
+                Left e -> return $ Left e
+                Right _ -> do
+                  updatedReturn <- updateWithSubstitutionsI returnType
+                  return $ Right (updatedReturn, updatedGenerics)
+            GenericType genericId -> do
+              updatedExpr2Type <- updateWithSubstitutionsI expr2Type
+              newReturnId <- getNewId
+              addingWorked <-
+                addNewSubstitutionI
+                  genericId
+                  (FunctionType updatedExpr2Type (GenericType newReturnId))
+              case addingWorked of
+                Left e -> return $ Left e
+                Right _ -> do
+                  updatedGenerics' <- mapM updateWithSubstitutionsI updatedGenerics
+                  return $ Right (GenericType newReturnId, updatedGenerics')
+            typ -> return $ Left $ STApplyingToANonFunction $ show typ
 
 lookupRefType :: [Definition] -> L.Ident -> Maybe NormType
 lookupRefType parts refName =
@@ -296,3 +301,9 @@ mkProgramFromSyn syn =
   first (SemanticError . STypeError) . mkProgram
     =<< first SemanticError . mkProgInfDeps
     =<< mkUninfProg syn
+
+mkTypedExprInf :: InfExpr -> TypedExpr
+mkTypedExprInf = InfTyExpr
+
+mkTypedExprWish :: InfExpr -> NormType -> Either STypeError NormType
+mkTypedExprWish infExpr typ = typ <$ checkType (mkMutExcTy2 (ieType infExpr) typ)

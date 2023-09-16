@@ -53,7 +53,8 @@ data ConvertEnv a = ConvertEnv
 convertType :: Y.Type -> NormType
 convertType synType = NormType typ (nextId - 1)
   where
-    (ConvertEnv nextId _, typ) = runState (convertTypeS synType) (ConvertEnv 1 [])
+    (ConvertEnv nextId _, typ) =
+      runState (convertTypeS synType) (ConvertEnv 1 [])
 
 convertTypeS :: Y.Type -> State (ConvertEnv L.Ident) Type
 convertTypeS (Y.TypeId id') = do
@@ -253,7 +254,8 @@ reconcileTypesIS t1 t2 = do
       return $ Right reconciled
 
 checkType :: MutExcTy2 -> Either STypeError ()
-checkType excTys = execState (checkTypeS highestIdT2 st1 (met2Snd excTys)) (ReconcileEnv [])
+checkType excTys =
+  execState (checkTypeS highestIdT2 st1 (met2Snd excTys)) (ReconcileEnv [])
   where
     (st1, _) = shiftIds highestIdT2 (ntType $ met2Fst excTys)
     highestIdT2 = getHighestId (met2Snd excTys)
@@ -293,11 +295,14 @@ semanticAnalyzerSemTypeTests :: [Bool]
 semanticAnalyzerSemTypeTests =
   [ checkType (MutExcTy2 (na AInt) (a AInt)) == Right (),
     checkType (MutExcTy2 (na AInt) (t 1)) == Right (),
-    checkType (MutExcTy2 (mn $ t 1) (a AInt)) == Left (STTypeMismatch "AInt" "T1"),
+    checkType (MutExcTy2 (mn $ t 1) (a AInt))
+      == Left (STTypeMismatch "AInt" "T1"),
     checkType (MutExcTy2 (mn $ t 1 --> t 2) (t 1 --> t 2)) == Right (),
     checkType (MutExcTy2 (mn $ t 1 --> t 2) (t 1 --> t 3)) == Right (),
-    checkType (MutExcTy2 (mn $ t 1 --> t 2) (t 1 --> t 1)) == Left (STTypeMismatch "T2" "T3"),
-    checkType (MutExcTy2 (mn $ t 1 --> a AInt) (t 1 --> t 1)) == Left (STTypeMismatch "T2" "AInt"),
+    checkType (MutExcTy2 (mn $ t 1 --> t 2) (t 1 --> t 1))
+      == Left (STTypeMismatch "T2" "T3"),
+    checkType (MutExcTy2 (mn $ t 1 --> a AInt) (t 1 --> t 1))
+      == Left (STTypeMismatch "T2" "AInt"),
     checkType (MutExcTy2 (mn $ t 1 --> t 2) (t 3 --> t 2)) == Right ()
   ]
   where
