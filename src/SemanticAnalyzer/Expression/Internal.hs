@@ -14,7 +14,13 @@ data Expression
   | Application Expression Expression
   deriving (Eq)
 
-data ConvertEnv = ConvertEnv {globals :: [L.Ident], scope :: [L.Ident], decls :: [(L.Ident, NormType)], globalInfers :: [(L.Ident, NormType)]} deriving (Eq, Show)
+data ConvertEnv = ConvertEnv
+  { globals :: [L.Ident],
+    scope :: [L.Ident],
+    decls :: [(L.Ident, NormType)],
+    globalInfers :: [(L.Ident, NormType)]
+  }
+  deriving (Eq, Show)
 
 instance Show Expression where
   show = showHelper []

@@ -1,9 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 {-# OPTIONS_GHC -Wno-missing-export-lists #-}
 
-{-# HLINT ignore "Redundant lambda" #-}
-{-# HLINT ignore "Collapse lambdas" #-}
-
 module SemanticAnalyzer.Internal where
 
 import Data.Bifunctor
@@ -19,7 +16,8 @@ import Util
 
 data UninfDefinition = UninfDefinition
   { udefName :: L.Ident,
-    udefExpr :: Expression
+    udefExpr :: Expression,
+    udefWish :: Maybe NormType
   }
   deriving (Show)
 
@@ -80,6 +78,7 @@ mkUninfProgS synProg = do
     Left e -> return $ Left e
     Right udefs -> do
       errors <- mapM (checkUndefinedReferencesS . udefExpr) udefs
+      udefs' <- mapM addWish udefs
       case find
         ( \case
             Just _ -> True
@@ -88,7 +87,7 @@ mkUninfProgS synProg = do
         errors of
         Just (Just e) -> return $ Left e
         Just Nothing -> error "I've got hit by a lightning bolt."
-        Nothing -> return $ Right $ UninfProg udefs
+        Nothing -> return $ Right $ UninfProg udefs'
   where
     foldEitherM ::
       (Monad m) =>
@@ -113,7 +112,7 @@ mkUninfProgS synProg = do
     helper parts (Y.Definition name expr) = do
       semExpr <- convertExpressionS expr
       addGlobal name
-      return $ Right $ parts ++ [UninfDefinition name semExpr]
+      return $ Right $ parts ++ [UninfDefinition name semExpr Nothing]
     checkUndefinedReferencesS ::
       Expression -> State ConvertEnv (Maybe CompilerError)
     checkUndefinedReferencesS (Ident _) = return Nothing
@@ -132,6 +131,12 @@ mkUninfProgS synProg = do
         (Just e, _) -> return $ Just e
         (_, Just e) -> return $ Just e
         _ -> return Nothing
+    addWish :: UninfDefinition -> State ConvertEnv UninfDefinition
+    addWish udef = do
+      (ConvertEnv _ _ wishes _) <- get
+      case lookup (udefName udef) wishes of
+        Nothing -> return udef
+        Just wish -> return udef {udefWish = Just wish}
 
 mkProgInfDeps :: UninfProg -> Either SemanticError ProgInfDeps
 mkProgInfDeps uiprog@(UninfProg uiDefs) = case checkDeps uiprog of
@@ -176,7 +181,7 @@ mkProgram (ProgInfDeps uprog dgraphs) = Program <$> foldr (helperList uprog) (Ri
     helperCycle _ _ (Left e) = Left e
     helperCycle uprog' as (Right prevDeps) = (++ prevDeps) <$> (zipWith Definition as <$> mkInfExprCycle prevDeps (lookupUDefUnsafe uprog' <$> as))
     lookupUDefUnsafe :: UninfProg -> L.Ident -> UninfDefinition
-    lookupUDefUnsafe (UninfProg udefs) sname = case find (\(UninfDefinition name _) -> name == sname) udefs of
+    lookupUDefUnsafe (UninfProg udefs) sname = case find (\(UninfDefinition name _ _) -> name == sname) udefs of
       Nothing -> error "A global definition wasn't found."
       Just a -> a
 
