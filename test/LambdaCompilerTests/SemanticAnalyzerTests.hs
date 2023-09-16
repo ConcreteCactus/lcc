@@ -14,13 +14,18 @@ spec = do
   describe "convertExpression" $ do
     it "can convert simple expressions" $ do
       test "\\a.a" `shouldBe` Right (lam "a" (Ident 1))
-      test "\\a.\\b.a b" `shouldBe` Right (lam "a" (lam "b" (appl (Ident 2) (Ident 1))))
-      test "(\\a.a) x" `shouldBe` Right (appl (lam "a" (Ident 1)) (Ref (L.Ident "x")))
+      test "\\a.\\b.a b"
+        `shouldBe` Right (lam "a" (lam "b" (appl (Ident 2) (Ident 1))))
+      test "(\\a.a) x"
+        `shouldBe` Right (appl (lam "a" (Ident 1)) (Ref (L.Ident "x")))
   describe "convertType" $ do
     it "can convert simple types" $ do
       testT "a" `shouldBe` Right (mkn (GenericType 1))
-      testT "a -> a" `shouldBe` Right (mkn $ funt (GenericType 1) (GenericType 1))
-      testT "(a -> a) -> a" `shouldBe` Right (mkn $ funt (funt (GenericType 1) (GenericType 1)) (GenericType 1))
+      testT "a -> a"
+        `shouldBe` Right (mkn $ funt (GenericType 1) (GenericType 1))
+      testT "(a -> a) -> a"
+        `shouldBe` Right
+          (mkn $ funt (funt (GenericType 1) (GenericType 1)) (GenericType 1))
   describe "Program" $ do
     it "can parse a simple program" $ do
       isRight (testP program1) `shouldBe` True
@@ -31,14 +36,20 @@ spec = do
       isRight (testP program6) `shouldBe` True
     it "can infer simple types correctly" $ do
       ieType . defExpr . head . progDefs <$> testP program1
-        `shouldBe` Right (mkn $ funt (GenericType 1) (funt (GenericType 2) (GenericType 1)))
+        `shouldBe` Right
+          ( mkn $ funt (GenericType 1) (funt (GenericType 2) (GenericType 1))
+          )
       ieType . defExpr . head . tail . progDefs <$> testP program1
-        `shouldBe` Right (mkn $ funt (GenericType 1) (funt (GenericType 2) (GenericType 2)))
+        `shouldBe` Right
+          ( mkn $ funt (GenericType 1) (funt (GenericType 2) (GenericType 2))
+          )
     it "can work with type wishes correctly" $ do
       ieType . defExpr . head . progDefs <$> testP program6
-        `shouldBe` Right (mkn $ funt (GenericType 1) (funt (GenericType 1) (GenericType 1)))
+        `shouldBe` Right
+          (mkn $ funt (GenericType 1) (funt (GenericType 1) (GenericType 1)))
       ieType . defExpr . head . tail . progDefs <$> testP program6
-        `shouldBe` Right (mkn $ funt (GenericType 1) (funt (GenericType 1) (GenericType 1)))
+        `shouldBe` Right
+          (mkn $ funt (GenericType 1) (funt (GenericType 1) (GenericType 1)))
     it "can work with dependency cycles" $ do
       map (ieType . defExpr) . progDefs <$> testP program7
         `shouldBe` Right
@@ -47,7 +58,10 @@ spec = do
             mkn $ funt (GenericType 1) (GenericType 2)
           ]
     it "can reconcile recursive variables with themselves" $ do
-      isRight (map (ieType . defExpr) . progDefs <$> trace (show $ testP program8) (testP program8)) `shouldBe` False
+      isRight (map (ieType . defExpr) . progDefs <$> testP program8)
+        `shouldBe` False
+      map (ieType . defExpr) . progDefs <$> testP program9
+        `shouldBe` Right [mkn $ funt (GenericType 1) (GenericType 2)]
 
 isRight :: Either a b -> Bool
 isRight (Right _) = True
@@ -153,6 +167,10 @@ program7 =
 program8 :: SourceCode
 program8 =
   "a := \\x. a"
+
+program9 :: SourceCode
+program9 =
+  "a := \\x. a x"
 
 --
 -- program1ShouldBe :: Program

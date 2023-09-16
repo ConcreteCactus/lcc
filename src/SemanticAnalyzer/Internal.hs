@@ -84,14 +84,22 @@ mkUninfProgS synProg = do
         Just Nothing -> error "I've got hit by a lightning bolt."
         Nothing -> return $ Right $ UninfProg udefs
   where
-    foldEitherM :: (Monad m) => (a -> b -> m (Either e b)) -> b -> [a] -> m (Either e b)
+    foldEitherM ::
+      (Monad m) =>
+      (a -> b -> m (Either e b)) ->
+      b ->
+      [a] ->
+      m (Either e b)
     foldEitherM _ acc [] = return $ Right acc
     foldEitherM f acc (x : xs) = do
       res <- f x acc
       case res of
         Left err -> return $ Left err
         Right newAcc -> foldEitherM f newAcc xs
-    helper :: [UninfDefinition] -> Y.ProgramPart -> State ConvertEnv (Either CompilerError [UninfDefinition])
+    helper ::
+      [UninfDefinition] ->
+      Y.ProgramPart ->
+      State ConvertEnv (Either CompilerError [UninfDefinition])
     helper parts (Y.Declaration name typ) = do
       let conTyp = convertType typ
       addDecl name conTyp
@@ -100,13 +108,15 @@ mkUninfProgS synProg = do
       semExpr <- convertExpressionS expr
       addGlobal name
       return $ Right $ parts ++ [UninfDefinition name semExpr]
-    checkUndefinedReferencesS :: Expression -> State ConvertEnv (Maybe CompilerError)
+    checkUndefinedReferencesS ::
+      Expression -> State ConvertEnv (Maybe CompilerError)
     checkUndefinedReferencesS (Ident _) = return Nothing
     checkUndefinedReferencesS (Lit _) = return Nothing
     checkUndefinedReferencesS (Ref name) = do
       globM <- findGlobal name
       case globM of
-        Nothing -> return $ Just $ SemanticError $ SUndefinedVariable (L.unIdent name)
+        Nothing ->
+          return $ Just $ SemanticError $ SUndefinedVariable (L.unIdent name)
         Just _ -> return Nothing
     checkUndefinedReferencesS (Lambda _ expr) = checkUndefinedReferencesS expr
     checkUndefinedReferencesS (Application expr1 expr2) = do
@@ -120,7 +130,10 @@ mkUninfProgS synProg = do
 mkProgInfDeps :: UninfProg -> Either SemanticError ProgInfDeps
 mkProgInfDeps uiprog@(UninfProg uiDefs) = case checkDeps uiprog of
   Just e -> Left e
-  Nothing -> Right $ ProgInfDeps uiprog $ mkDependencyGraph (map udefName uiDefs) (getDeps uiprog)
+  Nothing ->
+    Right $
+      ProgInfDeps uiprog $
+        mkDependencyGraph (map udefName uiDefs) (getDeps uiprog)
   where
     checkDeps :: UninfProg -> Maybe SemanticError
     checkDeps (UninfProg uiDefs') =
@@ -165,7 +178,18 @@ mkInfExprTree :: [Definition] -> UninfDefinition -> Either STypeError InfExpr
 mkInfExprTree defs udef = execState (mkInfExprTreeS defs udef) (InferEnv 1 (ReconcileEnv []) [])
 
 mkInfExprTreeS :: [Definition] -> UninfDefinition -> State InferEnv (Either STypeError InfExpr)
-mkInfExprTreeS defs udef = InfExpr (udefExpr udef) . fst . (mkNormType `fstMap`) <<$>> infFromExprS defs (udefExpr udef)
+mkInfExprTreeS defs udef = do
+  itypE <- infFromExprS defs (udefExpr udef)
+  case itypE of
+    Left e -> return $ Left e
+    Right (ityp, _) -> do
+      InferEnv _ _ globs <- get
+      case lookup (udefName udef) globs of
+        Nothing -> return $ Right $ InfExpr (udefExpr udef) $ mkNormType ityp
+        Just _ -> do
+          defTyp <- getTypeOfGlobal (udefName udef)
+          mergedDefTypE <- reconcileTypesIS ityp defTyp
+          return $ InfExpr (udefExpr udef) . mkNormType <$> mergedDefTypE
 
 mkInfExprCycle :: [Definition] -> [UninfDefinition] -> Either STypeError [InfExpr]
 mkInfExprCycle defs udefs = execState (mkInfExprCycleS defs udefs) (InferEnv 1 (ReconcileEnv []) [])
@@ -176,13 +200,24 @@ mkInfExprCycleS defs (udef : udefs) = do
   infTypE <- infFromExprS defs (udefExpr udef)
   case infTypE of
     Left e -> return $ Left e
-    Right (typ, _) -> do
+    Right (ityp, _) -> do
       nextsE <- mkInfExprCycleS defs udefs
       case nextsE of
         Left e -> return $ Left e
         Right infexprs -> do
-          typ' <- updateWithSubstitutionsI typ
-          return $ Right $ InfExpr (udefExpr udef) (mkNormType typ') : infexprs
+          ityp' <- updateWithSubstitutionsI ityp
+          InferEnv _ _ globs <- get
+          case lookup (udefName udef) globs of
+            Nothing -> return $ Right $ InfExpr (udefExpr udef) (mkNormType ityp') : infexprs
+            Just _ -> do
+              defTyp <- getTypeOfGlobal (udefName udef)
+              mergedDefTypE <- reconcileTypesIS ityp defTyp
+              case mergedDefTypE of
+                Left e -> return $ Left e
+                Right mergedDefTyp ->
+                  return $
+                    Right $
+                      InfExpr (udefExpr udef) (mkNormType mergedDefTyp) : infexprs
 
 infFromExprS :: [Definition] -> Expression -> State InferEnv (Either STypeError (Type, [Type]))
 infFromExprS _ (Lit (Y.IntegerLiteral _)) = return $ Right (AtomicType AInt, [])
@@ -231,7 +266,7 @@ infFromExprS parts (Application expr1 expr2) = do
                 Right _ -> do
                   updatedReturn <- updateWithSubstitutionsI returnType
                   return $ Right (updatedReturn, updatedGenerics)
-            GenericType genericId -> trace (show expr1 ++ " " ++ show expr2 ++ " Gid: " ++ show genericId) $ do
+            GenericType genericId -> do
               updatedExpr2Type <- updateWithSubstitutionsI expr2Type
               newReturnId <- getNewId
               addingWorked <-
