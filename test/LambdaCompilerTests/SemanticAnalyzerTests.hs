@@ -62,6 +62,12 @@ spec = do
         `shouldBe` False
       map (ieType . defExpr) . progDefs <$> testP program9
         `shouldBe` Right [mkn $ funt (GenericType 1) (GenericType 2)]
+    it "can work with recursive definitions and dependency cycles" $ do
+      map (ieType . defExpr) . progDefs <$> testP program10
+        `shouldBe` Right
+          [ mkn $ funt (GenericType 1) (GenericType 1),
+            mkn $ funt (GenericType 1) (funt (GenericType 1) (GenericType 1))
+          ]
 
 isRight :: Either a b -> Bool
 isRight (Right _) = True
@@ -171,6 +177,11 @@ program8 =
 program9 :: SourceCode
 program9 =
   "a := \\x. a x"
+
+program10 :: SourceCode
+program10 =
+  "a := \\x.b x x\n"
+    ++ "b := \\x.\\y.a (b x y)\n"
 
 --
 -- program1ShouldBe :: Program

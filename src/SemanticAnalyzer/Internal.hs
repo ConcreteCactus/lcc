@@ -197,10 +197,12 @@ mkInfExprCycle defs udefs = execState (mkInfExprCycleS defs udefs) (InferEnv 1 (
 mkInfExprCycleS :: [Definition] -> [UninfDefinition] -> State InferEnv (Either STypeError [InfExpr])
 mkInfExprCycleS _ [] = return $ Right []
 mkInfExprCycleS defs (udef : udefs) = do
+  globTyp <- getTypeOfGlobal (udefName udef)
   infTypE <- infFromExprS defs (udefExpr udef)
   case infTypE of
     Left e -> return $ Left e
     Right (ityp, _) -> do
+      _ <- reconcileTypesIS globTyp ityp
       nextsE <- mkInfExprCycleS defs udefs
       case nextsE of
         Left e -> return $ Left e
@@ -246,39 +248,40 @@ infFromExprS parts (Lambda _ expr) = do
 infFromExprS parts (Application expr1 expr2) = do
   inferred1 <- infFromExprS parts expr1
   inferred2 <- infFromExprS parts expr2
-  case (inferred1, inferred2) of
-    (Left e, _) -> return $ Left e
-    (_, Left e) -> return $ Left e
-    (Right (expr1Type, expr1Generics), Right (expr2Type, expr2Generics)) -> do
-      newGenericsM <- sequence <$> forgivingZipWithME reconcileTypesIS expr1Generics expr2Generics
-      case newGenericsM of
-        Left e -> return $ Left e
-        Right newGenerics -> do
-          updatedGenerics <- mapM updateWithSubstitutionsI newGenerics
-          updatedExpr1Type <- updateWithSubstitutionsI expr1Type
-          case updatedExpr1Type of
-            FunctionType paramType returnType -> do
-              updatedExpr2Type <- updateWithSubstitutionsI expr2Type
-              updatedParam <- updateWithSubstitutionsI paramType
-              reconciledParamM <- reconcileTypesIS updatedParam updatedExpr2Type
-              case reconciledParamM of
-                Left e -> return $ Left e
-                Right _ -> do
-                  updatedReturn <- updateWithSubstitutionsI returnType
-                  return $ Right (updatedReturn, updatedGenerics)
-            GenericType genericId -> do
-              updatedExpr2Type <- updateWithSubstitutionsI expr2Type
-              newReturnId <- getNewId
-              addingWorked <-
-                addNewSubstitutionI
-                  genericId
-                  (FunctionType updatedExpr2Type (GenericType newReturnId))
-              case addingWorked of
-                Left e -> return $ Left e
-                Right _ -> do
-                  updatedGenerics' <- mapM updateWithSubstitutionsI updatedGenerics
-                  return $ Right (GenericType newReturnId, updatedGenerics')
-            typ -> return $ Left $ STApplyingToANonFunction $ show typ
+  trace ("(" ++ show expr1 ++ ") (" ++ show expr2 ++ ") : " ++ show inferred1 ++ " , " ++ show inferred2) $
+    case (inferred1, inferred2) of
+      (Left e, _) -> return $ Left e
+      (_, Left e) -> return $ Left e
+      (Right (expr1Type, expr1Generics), Right (expr2Type, expr2Generics)) -> do
+        newGenericsM <- sequence <$> forgivingZipWithME reconcileTypesIS expr1Generics expr2Generics
+        case newGenericsM of
+          Left e -> return $ Left e
+          Right newGenerics -> do
+            updatedGenerics <- mapM updateWithSubstitutionsI newGenerics
+            updatedExpr1Type <- updateWithSubstitutionsI expr1Type
+            case updatedExpr1Type of
+              FunctionType paramType returnType -> do
+                updatedExpr2Type <- updateWithSubstitutionsI expr2Type
+                updatedParam <- updateWithSubstitutionsI paramType
+                reconciledParamM <- reconcileTypesIS updatedParam updatedExpr2Type
+                case reconciledParamM of
+                  Left e -> return $ Left e
+                  Right _ -> do
+                    updatedReturn <- updateWithSubstitutionsI returnType
+                    return $ Right (updatedReturn, updatedGenerics)
+              GenericType genericId -> do
+                updatedExpr2Type <- updateWithSubstitutionsI expr2Type
+                newReturnId <- getNewId
+                addingWorked <-
+                  addNewSubstitutionI
+                    genericId
+                    (FunctionType updatedExpr2Type (GenericType newReturnId))
+                case addingWorked of
+                  Left e -> return $ Left e
+                  Right _ -> do
+                    updatedGenerics' <- mapM updateWithSubstitutionsI updatedGenerics
+                    return $ Right (GenericType newReturnId, updatedGenerics')
+              typ -> return $ Left $ STApplyingToANonFunction $ show typ
 
 lookupRefType :: [Definition] -> L.Ident -> Maybe NormType
 lookupRefType parts refName =
