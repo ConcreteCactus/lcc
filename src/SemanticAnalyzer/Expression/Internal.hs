@@ -17,8 +17,7 @@ data Expression
 data ConvertEnv = ConvertEnv
   { globals :: [L.Ident],
     scope :: [L.Ident],
-    decls :: [(L.Ident, NormType)],
-    globalInfers :: [(L.Ident, NormType)]
+    decls :: [(L.Ident, NormType)]
   }
   deriving (Eq, Show)
 
@@ -47,7 +46,8 @@ showHelper names (Application expr1 expr2) =
   showHelper names expr1 ++ " " ++ showHelper names expr2
 
 convertExpression :: Y.Expression -> Expression
-convertExpression expr = execState (convertExpressionS expr) $ ConvertEnv [] [] [] []
+convertExpression expr =
+  execState (convertExpressionS expr) $ ConvertEnv [] [] []
 
 convertExpressionS ::
   Y.Expression -> State ConvertEnv Expression
@@ -92,7 +92,15 @@ findVar :: L.Ident -> State ConvertEnv (Maybe Int)
 findVar idName = do
   env <- get
   let scopeVars = scope env
-  let (foundNameM, count) = foldr (\name (found, n) -> if name == idName then (Just name, 1) else (found, n + 1)) (Nothing, 0) scopeVars
+  let (foundNameM, count) =
+        foldr
+          ( \name (found, n) ->
+              if name == idName
+                then (Just name, 1)
+                else (found, n + 1)
+          )
+          (Nothing, 0)
+          scopeVars
   case foundNameM of
     Nothing -> return Nothing
     Just _ -> return $ Just count

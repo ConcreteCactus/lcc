@@ -69,7 +69,7 @@ teType (InfTyExpr infExpr) = ieType infExpr
 teType (WishTyExpr _ typ) = typ
 
 mkUninfProg :: Y.Program -> Either CompilerError UninfProg
-mkUninfProg synProg = execState (mkUninfProgS synProg) (ConvertEnv [] [] [] [])
+mkUninfProg synProg = execState (mkUninfProgS synProg) (ConvertEnv [] [] [])
 
 mkUninfProgS :: Y.Program -> State ConvertEnv (Either CompilerError UninfProg)
 mkUninfProgS synProg = do
@@ -133,7 +133,7 @@ mkUninfProgS synProg = do
         _ -> return Nothing
     addWish :: UninfDefinition -> State ConvertEnv UninfDefinition
     addWish udef = do
-      (ConvertEnv _ _ wishes _) <- get
+      (ConvertEnv _ _ wishes) <- get
       case lookup (udefName udef) wishes of
         Nothing -> return udef
         Just wish -> return udef {udefWish = Just wish}
