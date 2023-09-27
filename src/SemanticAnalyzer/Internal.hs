@@ -1,11 +1,11 @@
 {-# LANGUAGE LambdaCase #-}
 {-# OPTIONS_GHC -Wno-missing-export-lists #-}
+{-# LANGUAGE TupleSections #-}
 
 module SemanticAnalyzer.Internal where
 
 import Data.Bifunctor
 import Data.Foldable
-import Debug.Trace
 import Errors
 import qualified Lexer as L
 import SemanticAnalyzer.DependencyGraph
@@ -39,7 +39,7 @@ instance Show TypedExpr where
 
 data Definition = Definition
   { defName :: L.Ident,
-    defExpr :: InfExpr
+    defExpr :: TypedExpr
   }
   deriving (Eq)
 
@@ -158,37 +158,66 @@ mkProgInfDeps uiprog@(UninfProg uiDefs) = case checkDeps uiprog of
         Nothing
         uiDefs'
     getDeps :: UninfProg -> L.Ident -> [L.Ident]
-    getDeps (UninfProg uiDefs') glob = case find ((== glob) . udefName) uiDefs' of
-      Nothing -> error "Found an undefined global. This is a bug."
-      Just definition -> getAllRefs $ udefExpr definition
+    getDeps (UninfProg uiDefs') glob =
+      case find ((== glob) . udefName) uiDefs' of
+        Nothing -> error "Found an undefined global. This is a bug."
+        Just definition -> getAllRefs $ udefExpr definition
     getAllRefs :: Expression -> [L.Ident]
     getAllRefs (Ident _) = []
     getAllRefs (Lit _) = []
     getAllRefs (Ref name) = [name]
     getAllRefs (Lambda _ expr) = getAllRefs expr
-    getAllRefs (Application expr1 expr2) = getAllRefs expr1 +-+ getAllRefs expr2
+    getAllRefs (Application expr1 expr2) =
+      getAllRefs expr1 +-+ getAllRefs expr2
 
 mkProgram :: ProgInfDeps -> Either STypeError Program
-mkProgram (ProgInfDeps uprog dgraphs) = Program <$> foldr (helperList uprog) (Right []) dgraphs
+mkProgram (ProgInfDeps uprog dgraphs) =
+  Program <$> foldr (helperList uprog) (Right []) dgraphs
   where
-    helperList :: UninfProg -> DependencyGraph L.Ident -> Either STypeError [Definition] -> Either STypeError [Definition]
+    helperList ::
+      UninfProg ->
+      DependencyGraph L.Ident ->
+      Either STypeError [Definition] ->
+      Either STypeError [Definition]
     helperList _ _ (Left e) = Left e
-    helperList uprog' dgraph (Right defs) = dgFoldr (helperCycle uprog') (helperTree uprog') (Right defs) dgraph
-    helperTree :: UninfProg -> L.Ident -> Either STypeError [Definition] -> Either STypeError [Definition]
+    helperList uprog' dgraph (Right defs) =
+      dgFoldr (helperCycle uprog') (helperTree uprog') (Right defs) dgraph
+    helperTree ::
+      UninfProg ->
+      L.Ident ->
+      Either STypeError [Definition] ->
+      Either STypeError [Definition]
     helperTree _ _ (Left e) = Left e
-    helperTree uprog' a (Right prevDeps) = (: prevDeps) <$> (Definition a <$> mkInfExprTree prevDeps (lookupUDefUnsafe uprog' a))
-    helperCycle :: UninfProg -> [L.Ident] -> Either STypeError [Definition] -> Either STypeError [Definition]
+    helperTree uprog' a (Right prevDeps) =
+      (: prevDeps)
+        <$> ( Definition a
+                <$> mkInfExprTree prevDeps (lookupUDefUnsafe uprog' a)
+            )
+    helperCycle ::
+      UninfProg ->
+      [L.Ident] ->
+      Either STypeError [Definition] ->
+      Either STypeError [Definition]
     helperCycle _ _ (Left e) = Left e
-    helperCycle uprog' as (Right prevDeps) = (++ prevDeps) <$> (zipWith Definition as <$> mkInfExprCycle prevDeps (lookupUDefUnsafe uprog' <$> as))
+    helperCycle uprog' as (Right prevDeps) =
+      (++ prevDeps)
+        <$> ( zipWith Definition as
+                <$> mkInfExprCycle prevDeps (lookupUDefUnsafe uprog' <$> as)
+            )
     lookupUDefUnsafe :: UninfProg -> L.Ident -> UninfDefinition
-    lookupUDefUnsafe (UninfProg udefs) sname = case find (\(UninfDefinition name _ _) -> name == sname) udefs of
-      Nothing -> error "A global definition wasn't found."
-      Just a -> a
+    lookupUDefUnsafe (UninfProg udefs) sname =
+      case find (\(UninfDefinition name _ _) -> name == sname) udefs of
+        Nothing -> error "A global definition wasn't found."
+        Just a -> a
 
-mkInfExprTree :: [Definition] -> UninfDefinition -> Either STypeError InfExpr
-mkInfExprTree defs udef = execState (mkInfExprTreeS defs udef) (InferEnv 1 (ReconcileEnv []) [])
+mkInfExprTree :: [Definition] -> UninfDefinition -> Either STypeError TypedExpr
+mkInfExprTree defs udef =
+  execState (mkInfExprTreeS defs udef) (InferEnv 1 (ReconcileEnv []) [])
 
-mkInfExprTreeS :: [Definition] -> UninfDefinition -> State InferEnv (Either STypeError InfExpr)
+mkInfExprTreeS ::
+  [Definition] ->
+  UninfDefinition ->
+  State InferEnv (Either STypeError TypedExpr)
 mkInfExprTreeS defs udef = do
   itypE <- infFromExprS defs (udefExpr udef)
   case itypE of
@@ -196,41 +225,74 @@ mkInfExprTreeS defs udef = do
     Right (ityp, _) -> do
       InferEnv _ _ globs <- get
       case lookup (udefName udef) globs of
-        Nothing -> return $ Right $ InfExpr (udefExpr udef) $ mkNormType ityp
+        Nothing -> do
+          let infExpr = InfExpr (udefExpr udef) $ mkNormType ityp
+          return $ addWish udef infExpr
         Just _ -> do
           defTyp <- getTypeOfGlobal (udefName udef)
           mergedDefTypE <- reconcileTypesIS ityp defTyp
-          return $ InfExpr (udefExpr udef) . mkNormType <$> mergedDefTypE
+          case mergedDefTypE of
+            Left e -> return $ Left e
+            Right mergedDefTyp -> do
+              let infExpr = InfExpr (udefExpr udef) (mkNormType mergedDefTyp)
+              return $ addWish udef infExpr
+  where
+    addWish :: UninfDefinition -> InfExpr -> Either STypeError TypedExpr
+    addWish udef' infExpr@(InfExpr _ ityp) = case udefWish udef' of
+      Nothing -> Right $ mkTypedExprInf infExpr
+      Just wish -> mkTypedExprWish infExpr wish
 
-mkInfExprCycle :: [Definition] -> [UninfDefinition] -> Either STypeError [InfExpr]
-mkInfExprCycle defs udefs = execState (mkInfExprCycleS defs udefs) (InferEnv 1 (ReconcileEnv []) [])
+mkInfExprCycle ::
+  [Definition] -> [UninfDefinition] -> Either STypeError [TypedExpr]
+mkInfExprCycle defs udefs =
+  execState (mkInfExprCycleS defs udefs) (InferEnv 1 (ReconcileEnv []) [])
 
-mkInfExprCycleS :: [Definition] -> [UninfDefinition] -> State InferEnv (Either STypeError [InfExpr])
-mkInfExprCycleS _ [] = return $ Right []
-mkInfExprCycleS defs (udef : udefs) = do
-  globTyp <- getTypeOfGlobal (udefName udef)
+mkTyExprCycleS :: [Definition] -> [UninfDefinition] -> State InferEnv (Either STypeError [TypedExpr])
+mkTyExprCycleS defs udefs = do
+  defTypDictE <- inferTypeExprCycleS defs udefs
+  case defTypDictE of
+    Left e -> return $ Left e
+    Right defTypDict -> do
+        helpedTypesE <- sequence <$> mapM helper defTypDict
+        case helpedTypesE of
+          Left e -> return $ Left e
+          Right helpedTypes -> do
+            updatedTypes <- mapM 
+              (\(ty, isW) -> (,isW) <$> updateWithSubstitutionsI ty) helpedTypes
+            return $ Right $ map 
+  where
+  helper :: (UninfDefinition, Type) -> State InferEnv (Either STypeError (Type, Bool))
+  helper (udef, infTyp) = do
+    infTyp' <- updateWithSubstitutionsI infTyp
+    case udefWish udef of
+      Nothing -> return $ Right (infTyp', False)
+      Just wTyp -> do
+        case checkType (mkMutExcTy2 wTyp (mkNormType infTyp')) of
+          Left e -> return $ Left e
+          Right _ -> do
+            wTyp' <- shiftNewIds wTyp
+            recTypE <- reconcileTypesIS wTyp' infTyp'
+            case recTypE of
+              Left e -> error $ "Reconcile after check failed" ++ show e
+              Right _ -> return $ Right (wTyp', True)
+  make
+
+inferTypeExprCycleS ::
+  [Definition] ->
+  [UninfDefinition] ->
+  State InferEnv (Either STypeError [(UninfDefinition, Type)])
+inferTypeExprCycleS _ [] = return $ Right []
+inferTypeExprCycleS defs (udef : udefs) = do
   infTypE <- infFromExprS defs (udefExpr udef)
   case infTypE of
     Left e -> return $ Left e
     Right (ityp, _) -> do
-      _ <- reconcileTypesIS globTyp ityp
-      nextsE <- mkInfExprCycleS defs udefs
+      nextsE <- inferTypeExprCycleS defs udefs
       case nextsE of
         Left e -> return $ Left e
         Right infexprs -> do
           ityp' <- updateWithSubstitutionsI ityp
-          InferEnv _ _ globs <- get
-          case lookup (udefName udef) globs of
-            Nothing -> return $ Right $ InfExpr (udefExpr udef) (mkNormType ityp') : infexprs
-            Just _ -> do
-              defTyp <- getTypeOfGlobal (udefName udef)
-              mergedDefTypE <- reconcileTypesIS ityp defTyp
-              case mergedDefTypE of
-                Left e -> return $ Left e
-                Right mergedDefTyp ->
-                  return $
-                    Right $
-                      InfExpr (udefExpr udef) (mkNormType mergedDefTyp) : infexprs
+          return $ Right $ (udef, ityp') : infexprs
 
 infFromExprS :: [Definition] -> Expression -> State InferEnv (Either STypeError (Type, [Type]))
 infFromExprS _ (Lit (Y.IntegerLiteral _)) = return $ Right (AtomicType AInt, [])
@@ -310,5 +372,5 @@ mkProgramFromSyn syn =
 mkTypedExprInf :: InfExpr -> TypedExpr
 mkTypedExprInf = InfTyExpr
 
-mkTypedExprWish :: InfExpr -> NormType -> Either STypeError NormType
-mkTypedExprWish infExpr typ = typ <$ checkType (mkMutExcTy2 (ieType infExpr) typ)
+mkTypedExprWish :: InfExpr -> NormType -> Either STypeError TypedExpr
+mkTypedExprWish infExpr typ = WishTyExpr infExpr typ <$ checkType (mkMutExcTy2 (ieType infExpr) typ)
