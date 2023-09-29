@@ -58,7 +58,7 @@ spec = do
             mkn $ funt (GenericType 1) (GenericType 2)
           ]
     it "can reconcile recursive variables with themselves" $ do
-      isRight (map (teType . defExpr) . progDefs <$> testP program8)
+      isRight (testP program8)
         `shouldBe` False
       map (teType . defExpr) . progDefs <$> testP program9
         `shouldBe` Right [mkn $ funt (GenericType 1) (GenericType 2)]

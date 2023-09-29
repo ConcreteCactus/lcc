@@ -383,4 +383,4 @@ mkTypedExprInf :: InfExpr -> TypedExpr
 mkTypedExprInf = InfTyExpr
 
 mkTypedExprWish :: InfExpr -> NormType -> Either STypeError TypedExpr
-mkTypedExprWish infExpr typ = WishTyExpr (ieExpr infExpr) typ <$ checkType (mkMutExcTy2 (ieType infExpr) typ)
+mkTypedExprWish infExpr typ = WishTyExpr (ieExpr infExpr) typ <$ checkType (mkMutExcTy2 typ (ieType infExpr))

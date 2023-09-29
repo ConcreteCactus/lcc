@@ -37,7 +37,7 @@ instance Show NormType where
 data MutExcTy2 = MutExcTy2
   { met2Fst :: NormType,
     met2Snd :: Type
-  }
+  } deriving (Show)
 
 data InferEnv = InferEnv Int ReconcileEnv [(L.Ident, Int)]
 
@@ -222,18 +222,23 @@ reconcileTypesS typ typ' =
     Left $
       STTypeMismatch (show typ) (show typ')
 
+reconcileTypesIS :: Type -> Type -> State InferEnv (Either STypeError Type)
+reconcileTypesIS t1 t2 = do
+  InferEnv count renv glob <- get
+  let (newREnv, reconciledM) = runState (reconcileTypesS t1 t2) renv
+  case reconciledM of
+    Left e -> return $ Left e
+    Right reconciled -> do
+      put $ InferEnv count newREnv glob
+      return $ Right reconciled
+
 checkTypeS :: Int -> Type -> Type -> State ReconcileEnv (Either STypeError ())
 checkTypeS _ (GenericType genericId) (GenericType genericId')
   | genericId == genericId' = return $ Right ()
 checkTypeS hi typ (GenericType genericId)
-  | genericId > trace (show hi) hi =
-      trace (show typ ++ " " ++ show genericId) $
-        return $
-          Left $
-            STCheckError (show (GenericType genericId)) $
-              show typ
-checkTypeS _ typ (GenericType genericId) =
-  trace (show typ ++ " " ++ show genericId) $ do
+  | genericId > hi = return $ Left $
+            STCheckError (show (GenericType genericId)) $ show typ
+checkTypeS _ typ (GenericType genericId) = do
     addedE <- addNewSubstitution genericId typ
     case addedE of
       Left e ->
@@ -262,21 +267,11 @@ checkTypeS
       (Left e, _) -> return $ Left e
       (_, Left e) -> return $ Left e
       (Right _, Right _) -> return $ Right ()
-checkTypeS _ typ typ' = trace (show typ ++ " " ++ show typ') 
-    $ return $ Left $ STCheckError (show typ) (show typ')
-
-reconcileTypesIS :: Type -> Type -> State InferEnv (Either STypeError Type)
-reconcileTypesIS t1 t2 = do
-  InferEnv count renv glob <- get
-  let (newREnv, reconciledM) = runState (reconcileTypesS t1 t2) renv
-  case reconciledM of
-    Left e -> return $ Left e
-    Right reconciled -> do
-      put $ InferEnv count newREnv glob
-      return $ Right reconciled
+checkTypeS _ typ typ' = return $ Left $
+        STCheckError (show typ) (show typ')
 
 checkType :: MutExcTy2 -> Either STypeError ()
-checkType excTys =
+checkType excTys = trace (show excTys) $ 
   execState (checkTypeS highestIdT2 st1 (met2Snd excTys)) (ReconcileEnv [])
   where
     (st1, _) = shiftIds highestIdT2 (ntType $ met2Fst excTys)

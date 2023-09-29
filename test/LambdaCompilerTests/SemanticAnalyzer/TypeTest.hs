@@ -29,6 +29,11 @@ spec = do
             )
         )
         `shouldBe` False
+    it "can handle function types" $ do
+      isRight (checkType (mkMutExcTy2 
+        (mkn $ ft (gt 1) (ft (gt 1) (gt 1)))
+        (mkn $ ft (gt 1) (ft (gt 2) (gt 1)))))
+        `shouldBe` True
 
 mkn :: Type -> NormType
 mkn = mkNormType
