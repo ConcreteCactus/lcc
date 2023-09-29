@@ -248,7 +248,10 @@ mkTyExprCycle ::
 mkTyExprCycle defs udefs =
   execState (mkTyExprCycleS defs udefs) (InferEnv 1 (ReconcileEnv []) [])
 
-mkTyExprCycleS :: [Definition] -> [UninfDefinition] -> State InferEnv (Either STypeError [TypedExpr])
+mkTyExprCycleS ::
+  [Definition] ->
+  [UninfDefinition] ->
+  State InferEnv (Either STypeError [TypedExpr])
 mkTyExprCycleS defs udefs = do
   defTypDictE <- inferTypeExprCycleS defs udefs
   case defTypDictE of
@@ -264,7 +267,9 @@ mkTyExprCycleS defs udefs = do
               helpedTypes
           return $ zipWithM (curry makeIntoTyExpr) udefs updatedTypes
   where
-    helper :: (UninfDefinition, Type) -> State InferEnv (Either STypeError (Type, Bool))
+    helper ::
+      (UninfDefinition, Type) ->
+      State InferEnv (Either STypeError (Type, Bool))
     helper (udef, infTyp) = do
       infTyp' <- updateWithSubstitutionsI infTyp
       case udefWish udef of
@@ -278,12 +283,15 @@ mkTyExprCycleS defs udefs = do
               case recTypE of
                 Left e -> error $ "Reconcile after check failed" ++ show e
                 Right _ -> return $ Right (wTyp', True)
-    makeIntoTyExpr :: (UninfDefinition, (Type, Bool)) -> Either STypeError TypedExpr
+    makeIntoTyExpr ::
+      (UninfDefinition, (Type, Bool)) -> Either STypeError TypedExpr
     makeIntoTyExpr (udef, (typ, isWish)) =
       if isWish
         then Right $ mkTypedExprInf (InfExpr (udefExpr udef) (mkNormType typ))
-        else mkTypedExprWish 
-            (InfExpr (udefExpr udef) (mkNormType typ)) (mkNormType typ)
+        else
+          mkTypedExprWish
+            (InfExpr (udefExpr udef) (mkNormType typ))
+            (mkNormType typ)
 
 inferTypeExprCycleS ::
   [Definition] ->
@@ -342,7 +350,9 @@ infFromExprS parts (Application expr1 expr2) = do
     (Left e, _) -> return $ Left e
     (_, Left e) -> return $ Left e
     (Right (expr1Type, expr1Generics), Right (expr2Type, expr2Generics)) -> do
-      newGenericsM <- sequence <$> forgivingZipWithME reconcileTypesIS expr1Generics expr2Generics
+      newGenericsM <-
+        sequence
+          <$> forgivingZipWithME reconcileTypesIS expr1Generics expr2Generics
       case newGenericsM of
         Left e -> return $ Left e
         Right newGenerics -> do
@@ -352,7 +362,8 @@ infFromExprS parts (Application expr1 expr2) = do
             FunctionType paramType returnType -> do
               updatedExpr2Type <- updateWithSubstitutionsI expr2Type
               updatedParam <- updateWithSubstitutionsI paramType
-              reconciledParamM <- reconcileTypesIS updatedParam updatedExpr2Type
+              reconciledParamM <-
+                reconcileTypesIS updatedParam updatedExpr2Type
               case reconciledParamM of
                 Left e -> return $ Left e
                 Right _ -> do
@@ -368,7 +379,8 @@ infFromExprS parts (Application expr1 expr2) = do
               case addingWorked of
                 Left e -> return $ Left e
                 Right _ -> do
-                  updatedGenerics' <- mapM updateWithSubstitutionsI updatedGenerics
+                  updatedGenerics' <-
+                    mapM updateWithSubstitutionsI updatedGenerics
                   return $ Right (GenericType newReturnId, updatedGenerics')
             typ -> return $ Left $ STApplyingToANonFunction $ show typ
 
@@ -393,4 +405,6 @@ mkTypedExprInf :: InfExpr -> TypedExpr
 mkTypedExprInf = InfTyExpr
 
 mkTypedExprWish :: InfExpr -> NormType -> Either STypeError TypedExpr
-mkTypedExprWish infExpr typ = WishTyExpr (ieExpr infExpr) typ <$ checkType (mkMutExcTy2 typ (ieType infExpr))
+mkTypedExprWish infExpr typ =
+  WishTyExpr (ieExpr infExpr) typ
+    <$ checkType (mkMutExcTy2 typ (ieType infExpr))
