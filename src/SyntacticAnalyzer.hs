@@ -29,8 +29,11 @@ data Expression
   | Application Expression Expression
   deriving (Show, Eq)
 
+data AtomicType = AInt deriving (Show, Eq)
+
 data Type
   = TypeId Ident
+  | TypeName AtomicType
   | FunctionType Type Type
   deriving (Show, Eq)
 
@@ -83,7 +86,10 @@ parseExpression :: String -> Either CompilerError Expression
 parseExpression s = fst <$> runParser expressionParser s
 
 typeIdParser :: Parser Type
-typeIdParser = TypeId . Ident <$> anyCapIdentifier
+typeIdParser = TypeId <$> identifier
+
+typeNameParser :: Parser Type
+typeNameParser = TypeName AInt <$ capIdentifier
 
 functionParser :: Parser Type
 functionParser = FunctionType <$> typeParserWithoutFunction <*> (whiteSpaceO *> arrow *> whiteSpaceO *> typeParser)
@@ -91,6 +97,7 @@ functionParser = FunctionType <$> typeParserWithoutFunction <*> (whiteSpaceO *> 
 typeParserWithoutFunction :: Parser Type
 typeParserWithoutFunction =
   typeIdParser
+    <|> typeNameParser
     <|> ( whiteSpaceO
             *> ( openParen
                    *> (whiteSpaceO *> typeParser <* whiteSpaceO)
@@ -103,6 +110,7 @@ typeParser :: Parser Type
 typeParser =
   functionParser
     <|> typeIdParser
+    <|> typeNameParser
     <|> ( whiteSpaceO
             *> ( openParen
                    *> (whiteSpaceO *> typeParser <* whiteSpaceO)
@@ -176,6 +184,9 @@ defI = Definition . Ident
 typeIdI :: String -> Type
 typeIdI = TypeId . Ident
 
+tint :: Type
+tint = TypeName AInt
+
 syntacticAnalyzerTests :: [Bool]
 syntacticAnalyzerTests =
   -- Id tests
@@ -211,6 +222,7 @@ syntacticAnalyzerTests =
     runParser typeParser "a->b" == Right (FunctionType (typeIdI "a") (typeIdI "b"), ""),
     runParser typeParser "a -> b -> c" == Right (FunctionType (typeIdI "a") (FunctionType (typeIdI "b") (typeIdI "c")), ""),
     runParser typeParser "(a -> b) -> c" == Right (FunctionType (FunctionType (typeIdI "a") (typeIdI "b")) (typeIdI "c"), ""),
+    runParser typeParser "Int -> Int -> Int" == Right (FunctionType (FunctionType tint tint) tint, ""),
     -- Declaration definition
     runParser declarationParser "hello : string" == Right (declI "hello" (typeIdI "string"), ""),
     runParser declarationParser "hello : String" == Right (declI "hello" (typeIdI "String"), ""),

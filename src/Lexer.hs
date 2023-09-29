@@ -120,10 +120,16 @@ identifier :: Parser Ident
 identifier = Ident <$> ((:) <$> satisfyE (LexicalError CaseError) isLower <*> many (satisfyE CompilerError isAlphaNum))
 
 capIdentifier :: Parser String
-capIdentifier = (:) <$> satisfyE (LexicalError CaseError) isUpper <*> many (satisfyE CompilerError isAlphaNum)
+capIdentifier =
+  (:)
+    <$> satisfyE (LexicalError CaseError) isUpper
+    <*> many (satisfyE CompilerError isAlphaNum)
 
 anyCapIdentifier :: Parser String
-anyCapIdentifier = (:) <$> satisfyE (LexicalError OtherError) isAlpha <*> many (satisfyE CompilerError isAlphaNum)
+anyCapIdentifier =
+  (:)
+    <$> satisfyE (LexicalError OtherError) isAlpha
+    <*> many (satisfyE CompilerError isAlphaNum)
 
 arrow :: Parser ()
 arrow = void $ stringE CompilerError "->"

@@ -59,6 +59,7 @@ convertType synType = NormType typ (nextId - 1)
       runState (convertTypeS synType) (ConvertEnv 1 [])
 
 convertTypeS :: Y.Type -> State (ConvertEnv L.Ident) Type
+convertTypeS (Y.TypeName _) = return $ AtomicType AInt
 convertTypeS (Y.TypeId id') = do
   ConvertEnv ident decls <- get
   case lookup id' decls of

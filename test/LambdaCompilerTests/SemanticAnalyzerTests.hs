@@ -68,6 +68,24 @@ spec = do
           [ mkn $ funt (GenericType 1) (GenericType 1),
             mkn $ funt (GenericType 1) (funt (GenericType 1) (GenericType 1))
           ]
+    it
+      ( "can work with recursive definitions and dependency cycles"
+          ++ " with a type wish")
+      $ do
+        map (teType . defExpr) . progDefs <$> testP program11
+          `shouldBe` Right
+            [ mkn $ funt (GenericType 1) (GenericType 1),
+              mkn $ funt (GenericType 1) (funt (GenericType 1) (GenericType 1))
+            ]
+    it
+      ( "can work with recursive definitions and dependency cycles"
+          ++ " with a different type wish")
+      $ do
+        map (teType . defExpr) . progDefs <$> testP program12
+          `shouldBe` Right
+            [ mkn $ funt nai nai,
+              mkn $ funt nai (funt nai nai)
+            ]
 
 isRight :: Either a b -> Bool
 isRight (Right _) = True
@@ -181,6 +199,20 @@ program9 =
 program10 :: SourceCode
 program10 =
   "a := \\x.b x x\n"
+    ++ "b := \\x.\\y.a (b x y)\n"
+
+program11 :: SourceCode
+program11 =
+  "a : a -> a \n"
+    ++ "a := \\x.b x x\n"
+    ++ "b : a -> a -> a\n"
+    ++ "b := \\x.\\y.a (b x y)\n"
+
+program12 :: SourceCode
+program12 =
+  "a : Int -> Int \n"
+    ++ "a := \\x.b x x\n"
+    ++ "b : Int -> Int -> Int\n"
     ++ "b := \\x.\\y.a (b x y)\n"
 
 --
