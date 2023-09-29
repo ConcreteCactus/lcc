@@ -35,35 +35,35 @@ spec = do
       isRight (testP program5) `shouldBe` True
       isRight (testP program6) `shouldBe` True
     it "can infer simple types correctly" $ do
-      ieType . defExpr . head . progDefs <$> testP program1
+      teType . defExpr . head . progDefs <$> testP program1
         `shouldBe` Right
           ( mkn $ funt (GenericType 1) (funt (GenericType 2) (GenericType 1))
           )
-      ieType . defExpr . head . tail . progDefs <$> testP program1
+      teType . defExpr . head . tail . progDefs <$> testP program1
         `shouldBe` Right
           ( mkn $ funt (GenericType 1) (funt (GenericType 2) (GenericType 2))
           )
     it "can work with type wishes correctly" $ do
-      ieType . defExpr . head . progDefs <$> testP program6
+      teType . defExpr . head . progDefs <$> testP program6
         `shouldBe` Right
           (mkn $ funt (GenericType 1) (funt (GenericType 1) (GenericType 1)))
-      ieType . defExpr . head . tail . progDefs <$> testP program6
+      teType . defExpr . head . tail . progDefs <$> testP program6
         `shouldBe` Right
           (mkn $ funt (GenericType 1) (funt (GenericType 1) (GenericType 1)))
     it "can work with dependency cycles" $ do
-      map (ieType . defExpr) . progDefs <$> testP program7
+      map (teType . defExpr) . progDefs <$> testP program7
         `shouldBe` Right
           [ mkn $ funt (GenericType 1) (GenericType 2),
             mkn $ funt (GenericType 1) (GenericType 2),
             mkn $ funt (GenericType 1) (GenericType 2)
           ]
     it "can reconcile recursive variables with themselves" $ do
-      isRight (map (ieType . defExpr) . progDefs <$> testP program8)
+      isRight (map (teType . defExpr) . progDefs <$> testP program8)
         `shouldBe` False
-      map (ieType . defExpr) . progDefs <$> testP program9
+      map (teType . defExpr) . progDefs <$> testP program9
         `shouldBe` Right [mkn $ funt (GenericType 1) (GenericType 2)]
     it "can work with recursive definitions and dependency cycles" $ do
-      map (ieType . defExpr) . progDefs <$> testP program10
+      map (teType . defExpr) . progDefs <$> testP program10
         `shouldBe` Right
           [ mkn $ funt (GenericType 1) (GenericType 1),
             mkn $ funt (GenericType 1) (funt (GenericType 1) (GenericType 1))

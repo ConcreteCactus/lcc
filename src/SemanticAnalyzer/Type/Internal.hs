@@ -4,6 +4,7 @@ module SemanticAnalyzer.Type.Internal where
 
 import Control.Monad
 import Data.Bifunctor
+import Debug.Trace
 import Errors
 import qualified Lexer as L
 import qualified SyntacticAnalyzer as Y
@@ -200,7 +201,10 @@ reconcileTypesS typ (GenericType genericId) = do
 reconcileTypesS (AtomicType atomicType) (AtomicType atomicType') =
   if atomicType == atomicType'
     then return $ Right (AtomicType atomicType)
-    else return $ Left $ STAtomicTypeMismatch (show atomicType) (show atomicType')
+    else
+      return $
+        Left $
+          STAtomicTypeMismatch (show atomicType) (show atomicType')
 reconcileTypesS
   (FunctionType paramType returnType)
   (FunctionType paramType' returnType') = do
@@ -213,35 +217,53 @@ reconcileTypesS
       (_, Left e) -> return $ Left e
       (Right reconciledParam', Right reconciledReturn') ->
         return $ Right (FunctionType reconciledParam' reconciledReturn')
-reconcileTypesS typ typ' = return $ Left $ STTypeMismatch (show typ) (show typ')
+reconcileTypesS typ typ' =
+  return $
+    Left $
+      STTypeMismatch (show typ) (show typ')
 
 checkTypeS :: Int -> Type -> Type -> State ReconcileEnv (Either STypeError ())
 checkTypeS _ (GenericType genericId) (GenericType genericId')
   | genericId == genericId' = return $ Right ()
 checkTypeS hi typ (GenericType genericId)
-  | genericId > hi = return $ Left $ STTypeMismatch (show (GenericType genericId)) $ show typ
-checkTypeS _ typ (GenericType genericId) = do
-  added <- addNewSubstitution genericId typ
-  case added of
-    Left _ -> return $ Left $ STTypeMismatch (show (GenericType genericId)) $ show typ
-    Right _ -> return $ Right ()
+  | genericId > trace (show hi) hi =
+      trace (show typ ++ " " ++ show genericId) $
+        return $
+          Left $
+            STCheckError (show (GenericType genericId)) $
+              show typ
+checkTypeS _ typ (GenericType genericId) =
+  trace (show typ ++ " " ++ show genericId) $ do
+    addedE <- addNewSubstitution genericId typ
+    case addedE of
+      Left e ->
+        trace (show e) $
+          return $
+            Left $
+              STCheckError (show (GenericType genericId)) $
+                show typ
+      Right _ -> return $ Right ()
 checkTypeS _ (GenericType genericId) typ =
   return $
     Left $
-      STTypeMismatch (show typ) (show $ GenericType genericId)
+      STCheckError (show typ) (show $ GenericType genericId)
 checkTypeS _ (AtomicType atomicType) (AtomicType atomicType') =
   if atomicType == atomicType'
     then return $ Right ()
-    else return $ Left $ STAtomicTypeMismatch (show atomicType) (show atomicType')
-checkTypeS hi (FunctionType paramType returnType) (FunctionType paramType' returnType') = do
-  checkedParam <- checkTypeS hi paramType paramType'
-  updatedReturn' <- updateWithSubstitutions returnType'
-  checkedReturn <- checkTypeS hi returnType updatedReturn'
-  case (checkedParam, checkedReturn) of
-    (Left e, _) -> return $ Left e
-    (_, Left e) -> return $ Left e
-    (Right _, Right _) -> return $ Right ()
-checkTypeS _ typ typ' = return $ Left $ STTypeMismatch (show typ) (show typ')
+    else return $ Left $ STCheckError (show atomicType) (show atomicType')
+checkTypeS
+  hi
+  (FunctionType paramType returnType)
+  (FunctionType paramType' returnType') = do
+    checkedParam <- checkTypeS hi paramType paramType'
+    updatedReturn' <- updateWithSubstitutions returnType'
+    checkedReturn <- checkTypeS hi returnType updatedReturn'
+    case (checkedParam, checkedReturn) of
+      (Left e, _) -> return $ Left e
+      (_, Left e) -> return $ Left e
+      (Right _, Right _) -> return $ Right ()
+checkTypeS _ typ typ' = trace (show typ ++ " " ++ show typ') 
+    $ return $ Left $ STCheckError (show typ) (show typ')
 
 reconcileTypesIS :: Type -> Type -> State InferEnv (Either STypeError Type)
 reconcileTypesIS t1 t2 = do

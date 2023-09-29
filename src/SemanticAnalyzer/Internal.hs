@@ -1,9 +1,10 @@
 {-# LANGUAGE LambdaCase #-}
-{-# OPTIONS_GHC -Wno-missing-export-lists #-}
 {-# LANGUAGE TupleSections #-}
+{-# OPTIONS_GHC -Wno-missing-export-lists #-}
 
 module SemanticAnalyzer.Internal where
 
+import Control.Monad
 import Data.Bifunctor
 import Data.Foldable
 import Errors
@@ -30,12 +31,12 @@ data InfExpr = InfExpr
 instance Show InfExpr where
   show expr = show (ieExpr expr) ++ " : " ++ show (ieType expr)
 
-data TypedExpr = InfTyExpr InfExpr | WishTyExpr InfExpr NormType
+data TypedExpr = InfTyExpr InfExpr | WishTyExpr Expression NormType
   deriving (Eq)
 
 instance Show TypedExpr where
   show (InfTyExpr infExpr) = show infExpr
-  show (WishTyExpr infExpr typ) = show (ieExpr infExpr) ++ " : " ++ show typ
+  show (WishTyExpr expr typ) = show expr ++ " : " ++ show typ
 
 data Definition = Definition
   { defName :: L.Ident,
@@ -62,7 +63,7 @@ type SourceCode = String
 
 teExpr :: TypedExpr -> Expression
 teExpr (InfTyExpr infExpr) = ieExpr infExpr
-teExpr (WishTyExpr infExpr _) = ieExpr infExpr
+teExpr (WishTyExpr expr _) = expr
 
 teType :: TypedExpr -> NormType
 teType (InfTyExpr infExpr) = ieType infExpr
@@ -202,7 +203,7 @@ mkProgram (ProgInfDeps uprog dgraphs) =
     helperCycle uprog' as (Right prevDeps) =
       (++ prevDeps)
         <$> ( zipWith Definition as
-                <$> mkInfExprCycle prevDeps (lookupUDefUnsafe uprog' <$> as)
+                <$> mkTyExprCycle prevDeps (lookupUDefUnsafe uprog' <$> as)
             )
     lookupUDefUnsafe :: UninfProg -> L.Ident -> UninfDefinition
     lookupUDefUnsafe (UninfProg udefs) sname =
@@ -212,13 +213,13 @@ mkProgram (ProgInfDeps uprog dgraphs) =
 
 mkInfExprTree :: [Definition] -> UninfDefinition -> Either STypeError TypedExpr
 mkInfExprTree defs udef =
-  execState (mkInfExprTreeS defs udef) (InferEnv 1 (ReconcileEnv []) [])
+  execState (mkTyExprTreeS defs udef) (InferEnv 1 (ReconcileEnv []) [])
 
-mkInfExprTreeS ::
+mkTyExprTreeS ::
   [Definition] ->
   UninfDefinition ->
   State InferEnv (Either STypeError TypedExpr)
-mkInfExprTreeS defs udef = do
+mkTyExprTreeS defs udef = do
   itypE <- infFromExprS defs (udefExpr udef)
   case itypE of
     Left e -> return $ Left e
@@ -238,14 +239,14 @@ mkInfExprTreeS defs udef = do
               return $ addWish udef infExpr
   where
     addWish :: UninfDefinition -> InfExpr -> Either STypeError TypedExpr
-    addWish udef' infExpr@(InfExpr _ ityp) = case udefWish udef' of
+    addWish udef' infExpr@(InfExpr _ _) = case udefWish udef' of
       Nothing -> Right $ mkTypedExprInf infExpr
       Just wish -> mkTypedExprWish infExpr wish
 
-mkInfExprCycle ::
+mkTyExprCycle ::
   [Definition] -> [UninfDefinition] -> Either STypeError [TypedExpr]
-mkInfExprCycle defs udefs =
-  execState (mkInfExprCycleS defs udefs) (InferEnv 1 (ReconcileEnv []) [])
+mkTyExprCycle defs udefs =
+  execState (mkTyExprCycleS defs udefs) (InferEnv 1 (ReconcileEnv []) [])
 
 mkTyExprCycleS :: [Definition] -> [UninfDefinition] -> State InferEnv (Either STypeError [TypedExpr])
 mkTyExprCycleS defs udefs = do
@@ -253,29 +254,35 @@ mkTyExprCycleS defs udefs = do
   case defTypDictE of
     Left e -> return $ Left e
     Right defTypDict -> do
-        helpedTypesE <- sequence <$> mapM helper defTypDict
-        case helpedTypesE of
-          Left e -> return $ Left e
-          Right helpedTypes -> do
-            updatedTypes <- mapM 
-              (\(ty, isW) -> (,isW) <$> updateWithSubstitutionsI ty) helpedTypes
-            return $ Right $ map 
+      helpedTypesE <- sequence <$> mapM helper defTypDict
+      case helpedTypesE of
+        Left e -> return $ Left e
+        Right helpedTypes -> do
+          updatedTypes <-
+            mapM
+              (\(ty, isW) -> (,isW) <$> updateWithSubstitutionsI ty)
+              helpedTypes
+          return $ zipWithM (curry makeIntoTyExpr) udefs updatedTypes
   where
-  helper :: (UninfDefinition, Type) -> State InferEnv (Either STypeError (Type, Bool))
-  helper (udef, infTyp) = do
-    infTyp' <- updateWithSubstitutionsI infTyp
-    case udefWish udef of
-      Nothing -> return $ Right (infTyp', False)
-      Just wTyp -> do
-        case checkType (mkMutExcTy2 wTyp (mkNormType infTyp')) of
-          Left e -> return $ Left e
-          Right _ -> do
-            wTyp' <- shiftNewIds wTyp
-            recTypE <- reconcileTypesIS wTyp' infTyp'
-            case recTypE of
-              Left e -> error $ "Reconcile after check failed" ++ show e
-              Right _ -> return $ Right (wTyp', True)
-  make
+    helper :: (UninfDefinition, Type) -> State InferEnv (Either STypeError (Type, Bool))
+    helper (udef, infTyp) = do
+      infTyp' <- updateWithSubstitutionsI infTyp
+      case udefWish udef of
+        Nothing -> return $ Right (infTyp', False)
+        Just wTyp -> do
+          case checkType (mkMutExcTy2 wTyp (mkNormType infTyp')) of
+            Left e -> return $ Left e
+            Right _ -> do
+              wTyp' <- shiftNewIds wTyp
+              recTypE <- reconcileTypesIS wTyp' infTyp'
+              case recTypE of
+                Left e -> error $ "Reconcile after check failed" ++ show e
+                Right _ -> return $ Right (wTyp', True)
+    makeIntoTyExpr :: (UninfDefinition, (Type, Bool)) -> Either STypeError TypedExpr
+    makeIntoTyExpr (udef, (typ, isWish)) =
+      if isWish
+        then Right $ mkTypedExprInf (InfExpr (udefExpr udef) (mkNormType typ))
+        else mkTypedExprWish (InfExpr (udefExpr udef) (mkNormType typ)) (mkNormType typ)
 
 inferTypeExprCycleS ::
   [Definition] ->
@@ -361,7 +368,10 @@ lookupRefType parts refName =
     ( \(Definition name _) -> name == refName
     )
     parts
-    >>= \(Definition _ (InfExpr _ typ)) -> Just typ
+    >>= ( \case
+            (Definition _ (WishTyExpr _ wtyp)) -> Just wtyp
+            (Definition _ (InfTyExpr infExpr)) -> Just (ieType infExpr)
+        )
 
 mkProgramFromSyn :: Y.Program -> Either CompilerError Program
 mkProgramFromSyn syn =
@@ -373,4 +383,4 @@ mkTypedExprInf :: InfExpr -> TypedExpr
 mkTypedExprInf = InfTyExpr
 
 mkTypedExprWish :: InfExpr -> NormType -> Either STypeError TypedExpr
-mkTypedExprWish infExpr typ = WishTyExpr infExpr typ <$ checkType (mkMutExcTy2 (ieType infExpr) typ)
+mkTypedExprWish infExpr typ = WishTyExpr (ieExpr infExpr) typ <$ checkType (mkMutExcTy2 (ieType infExpr) typ)

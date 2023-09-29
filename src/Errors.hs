@@ -18,7 +18,14 @@ data CompilerError
 
 data LexicalError = UnexpectedEndOfFile | LambdaExpressionExpected | InvalidLambdaExpression | EndOfFileExpected | OtherError | CaseError deriving (Show, Eq) -- Todo: remove OtherError
 
-data STypeError = STOtherError | STReferenceNotFound | STSelfReferenceFound Int String | STAtomicTypeMismatch String String | STTypeMismatch String String | STApplyingToANonFunction String deriving (Show, Eq)
+data STypeError = 
+    STOtherError 
+    | STReferenceNotFound 
+    | STSelfReferenceFound Int String
+    | STAtomicTypeMismatch String String 
+    | STTypeMismatch String String 
+    | STCheckError String String
+    | STApplyingToANonFunction String deriving (Show, Eq)
 
 data SemanticError = ValueRedefinition | SUndefinedVariable String | TypeRedeclaration | STypeError STypeError deriving (Show, Eq)
 
