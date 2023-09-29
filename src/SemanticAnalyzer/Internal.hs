@@ -282,7 +282,8 @@ mkTyExprCycleS defs udefs = do
     makeIntoTyExpr (udef, (typ, isWish)) =
       if isWish
         then Right $ mkTypedExprInf (InfExpr (udefExpr udef) (mkNormType typ))
-        else mkTypedExprWish (InfExpr (udefExpr udef) (mkNormType typ)) (mkNormType typ)
+        else mkTypedExprWish 
+            (InfExpr (udefExpr udef) (mkNormType typ)) (mkNormType typ)
 
 inferTypeExprCycleS ::
   [Definition] ->
@@ -294,15 +295,24 @@ inferTypeExprCycleS defs (udef : udefs) = do
   case infTypE of
     Left e -> return $ Left e
     Right (ityp, _) -> do
-      nextsE <- inferTypeExprCycleS defs udefs
-      case nextsE of
+      selfTyp <- getTypeOfGlobal (udefName udef)
+      selfRecE <- reconcileTypesIS ityp selfTyp
+      case selfRecE of
         Left e -> return $ Left e
-        Right infexprs -> do
-          ityp' <- updateWithSubstitutionsI ityp
-          return $ Right $ (udef, ityp') : infexprs
+        Right ityp' -> do
+          nextsE <- inferTypeExprCycleS defs udefs
+          case nextsE of
+            Left e -> return $ Left e
+            Right nexts -> do
+              ityp'' <- updateWithSubstitutionsI ityp'
+              return $ Right $ (udef, ityp'') : nexts
 
-infFromExprS :: [Definition] -> Expression -> State InferEnv (Either STypeError (Type, [Type]))
-infFromExprS _ (Lit (Y.IntegerLiteral _)) = return $ Right (AtomicType AInt, [])
+infFromExprS ::
+  [Definition] ->
+  Expression ->
+  State InferEnv (Either STypeError (Type, [Type]))
+infFromExprS _ (Lit (Y.IntegerLiteral _)) =
+  return $ Right (AtomicType AInt, [])
 infFromExprS _ (Ident ident') = do
   (generics, lastGeneric) <- createGenericList ident'
   return $ Right (lastGeneric, generics)
