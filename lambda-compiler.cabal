@@ -32,6 +32,8 @@ library
       SemanticAnalyzer
       SemanticAnalyzer.DependencyGraph
       SemanticAnalyzer.DependencyGraph.Internal
+      SemanticAnalyzer.DependencyList
+      SemanticAnalyzer.DependencyList.Internal
       SemanticAnalyzer.Expression
       SemanticAnalyzer.Expression.Internal
       SemanticAnalyzer.Internal
@@ -66,6 +68,7 @@ test-suite lambda-compiler-test
   main-is: Spec.hs
   other-modules:
       LambdaCompilerTests.SemanticAnalyzer.DependencyGraphTest
+      LambdaCompilerTests.SemanticAnalyzer.DependencyListTests
       LambdaCompilerTests.SemanticAnalyzer.ExpressionTests
       LambdaCompilerTests.SemanticAnalyzer.TypeTest
       LambdaCompilerTests.SemanticAnalyzerTests

@@ -70,7 +70,8 @@ spec = do
           ]
     it
       ( "can work with recursive definitions and dependency cycles"
-          ++ " with a type wish")
+          ++ " with a type wish"
+      )
       $ do
         map (teType . defExpr) . progDefs <$> testP program11
           `shouldBe` Right
@@ -79,13 +80,27 @@ spec = do
             ]
     it
       ( "can work with recursive definitions and dependency cycles"
-          ++ " with a different type wish")
+          ++ " with a different type wish"
+      )
       $ do
         map (teType . defExpr) . progDefs <$> testP program12
           `shouldBe` Right
             [ mkn $ funt nai nai,
               mkn $ funt nai (funt nai nai)
             ]
+    it "can adapt to type wishes in dependency cycles" $ do
+      map (teType . defExpr) . progDefs <$> testP program13
+        `shouldBe` Right
+          [ mkn $ funt nai nai,
+            mkn $ funt nai (funt nai nai)
+          ]
+    it "can work with type wishes in dependency trees" $ do
+      map (teType . defExpr) . progDefs <$> testP program14
+        `shouldBe` Right
+          [ mkn $ funt nai nai,
+            mkn $ funt nai (funt nai nai)
+          ]
+        
 
 isRight :: Either a b -> Bool
 isRight (Right _) = True
@@ -117,28 +132,6 @@ mkn = mkNormType
 
 ident :: String -> L.Ident
 ident = L.Ident
-
--- defi :: String -> Expression -> Definition
--- defi s = Definition (ident s)
-
--- semanticAnalyzerTests :: [Bool]
--- semanticAnalyzerTests =
---   [ test "\\a.a" == Right (lam "a" (Ident 1)),
---     test "\\a.\\b.a b" == Right (lam "a" (lam "b" (Application (Ident 2) (Ident 1)))),
---     test "(\\a.a) x" == Left (SemanticError $ SUndefinedVariable "x"),
---     testT "int" == Right (mkn nai),
---     testT "int -> int" == Right (mkn $ funt nai nai),
---     testT "(int -> int) -> int" == Right (mkn $ funt (funt nai nai) nai)
---     -- testP program1 == Right program1ShouldBe,
---     -- testP program2 == Right program2ShouldBe,
---     -- testP program3 == Left (SemanticError $ SUndefinedVariable "notE")
---     -- parseAndCreateProgram program1 == Right program1ShouldBe,
---     -- parseAndCreateProgram program2 == Right program2ShouldBe,
---     -- (parseAndCreateProgram program1 >>= (`parseAndCreateExpressionWithProgram` "true")) == Right (Ref $ ident "true"),
---     -- parseAndCreateProgram program4 == Right program4ShouldBe,
---     -- parseAndCreateProgram program5 == Right program5ShouldBe,
---     -- parseAndCreateProgram program6 == Right program6ShouldBe
---   ]
 
 program1 :: SourceCode
 program1 =
@@ -215,50 +208,14 @@ program12 =
     ++ "b : Int -> Int -> Int\n"
     ++ "b := \\x.\\y.a (b x y)\n"
 
---
--- program1ShouldBe :: Program
--- program1ShouldBe =
---   Program
---     [ident "true", ident "false"]
---     [ Definition "true" (lam "a" (lam "b" (Ident 2))) (mkn $ funt (GenericType 1) (funt (GenericType 2) (GenericType 1))),
---       Definition "false" (lam "a" (lam "b" (Ident 1))) (mkn $ funt (GenericType 1) (funt (GenericType 2) (GenericType 2)))
---     ]
---
---
--- program2ShouldBe :: Program
--- program2ShouldBe =
---   Program
---     [ident "true", ident "false", ident "and", ident "or", ident "not", ident "xor"]
---     [ Definition (ident "true") (lam "a" (lam "b" (Ident 2))) (funt (GenericType 1) (funt (GenericType 2) (GenericType 1))),
---       Definition "false" (lam "a" (lam "b" (Ident 1))) (funt (GenericType 1) (funt (GenericType 2) (GenericType 2))),
---       Definition "and" (lam "a" (lam "b" (Application (Application (Ident 2) (Ident 1)) (Ref "false")))) (funt (funt (GenericType 1) (funt (funt (GenericType 2) (funt (GenericType 3) (GenericType 3))) (GenericType 4))) (funt (GenericType 1) (GenericType 4))),
---       Definition "or" (lam "a" (lam "b" (Application (Application (Ident 2) (Ref "true")) (Ident 1)))) (funt (funt (funt (GenericType 1) (funt (GenericType 2) (GenericType 1))) (funt (GenericType 3) (GenericType 4))) (funt (GenericType 3) (GenericType 4))),
---       Definition "not" (lam "a" (Application (Application (Ident 1) (Ref "false")) (Ref "true"))) (funt (funt (funt (GenericType 1) (funt (GenericType 2) (GenericType 2))) (funt (funt (GenericType 3) (funt (GenericType 4) (GenericType 3))) (GenericType 5))) (GenericType 5)),
---       Definition "xor" (lam "a" (lam "b" (Application (Application (Ident 2) (Application (Ref "not") (Ident 1))) (Ident 1)))) (funt (funt (GenericType 1) (funt (funt (funt (GenericType 2) (funt (GenericType 3) (GenericType 3))) (funt (funt (GenericType 4) (funt (GenericType 5) (GenericType 4))) (GenericType 1))) (GenericType 6))) (funt (funt (funt (GenericType 2) (funt (GenericType 3) (GenericType 3))) (funt (funt (GenericType 4) (funt (GenericType 5) (GenericType 4))) (GenericType 1))) (GenericType 6)))
---     ]
---
--- program4ShouldBe :: Program
--- program4ShouldBe =
---   Program
---     ["te"]
---     [Definition "te" (lam "a" (lam "b" (Application (Ident 2) (Ident 1)))) (funt (funt (GenericType 1) (GenericType 2)) (funt (GenericType 1) (GenericType 2)))]
---
--- program5ShouldBe :: Program
--- program5ShouldBe =
---   Program
---     ["zero", "succ", "one", "two", "three"]
---     [ Definition "zero" (lam "f" (lam "z" (Ident 1))) (funt (GenericType 1) (funt (GenericType 2) (GenericType 2))),
---       Definition "succ" (lam "n" (lam "f" (lam "z" (Application (Ident 2) (Application (Application (Ident 3) (Ident 2)) (Ident 1)))))) (funt (funt (funt (GenericType 1) (GenericType 2)) (funt (GenericType 3) (GenericType 1))) (funt (funt (GenericType 1) (GenericType 2)) (funt (GenericType 3) (GenericType 2)))),
---       Definition "one" (Application (Ref "succ") (Ref "zero")) (funt (funt (GenericType 1) (GenericType 2)) (funt (GenericType 1) (GenericType 2))),
---       Definition "two" (Application (Ref "succ") (Ref "one")) (funt (funt (GenericType 1) (GenericType 1)) (funt (GenericType 1) (GenericType 1))),
---       Definition "three" (Application (Ref "succ") (Ref "two")) (funt (funt (GenericType 1) (GenericType 1)) (funt (GenericType 1) (GenericType 1)))
---     ]
---
--- program6ShouldBe :: Program
--- program6ShouldBe =
---   Program
---     ["true", "false"]
---     [ Definition "true" (lam "a" (lam "b" (Ident 2))) (funt (GenericType 1) (funt (GenericType 1) (GenericType 1))),
---       Definition "false" (lam "a" (lam "b" (Ident 1))) (funt (GenericType 1) (funt (GenericType 1) (GenericType 1)))
---     ]
---
+program13 :: SourceCode
+program13 =
+  "a : Int -> Int \n"
+    ++ "a := \\x.b x x\n"
+    ++ "b := \\x.\\y.a (b x y)\n"
+
+program14 :: SourceCode
+program14 =
+  "a : Int -> Int \n"
+    ++ "a := \\x. x\n"
+    ++ "b := \\x.\\y.a y\n"

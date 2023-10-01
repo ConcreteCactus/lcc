@@ -14,6 +14,7 @@ import SemanticAnalyzer.Expression
 import SemanticAnalyzer.Type
 import qualified SyntacticAnalyzer as Y
 import Util
+import Debug.Trace
 
 data UninfDefinition = UninfDefinition
   { udefName :: L.Ident,
