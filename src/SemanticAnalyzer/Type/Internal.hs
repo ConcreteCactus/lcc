@@ -40,12 +40,12 @@ data MutExcTy2 = MutExcTy2
   }
   deriving (Show)
 
-data InferEnv = InferEnv Int ReconcileEnv [(L.Ident, Int)]
+data InferEnv = InferEnv Int ReconcileEnv [(L.Ident, Int)] deriving (Show)
 
 -- Laws
 --   1. forall (a, _) in RE : forall (_, b) in RE : forall genericId in b : a != genericId
 --   2. forall (a, b), (a', b') in RE : b != b' => a != a'
-newtype ReconcileEnv = ReconcileEnv [(Int, Type)]
+newtype ReconcileEnv = ReconcileEnv [(Int, Type)] deriving (Show)
 
 data ConvertEnv a = ConvertEnv
   { ceNextId :: Int,
@@ -225,7 +225,7 @@ reconcileTypesS typ typ' =
       STTypeMismatch (show typ) (show typ')
 
 reconcileTypesIS :: Type -> Type -> State InferEnv (Either STypeError Type)
-reconcileTypesIS t1 t2 = do
+reconcileTypesIS t1 t2 = trace (show t1 ++ " <> " ++ show t2) $ do
   InferEnv count renv glob <- get
   let (newREnv, reconciledM) = runState (reconcileTypesS t1 t2) renv
   case reconciledM of

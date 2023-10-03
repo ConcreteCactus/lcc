@@ -9,7 +9,7 @@ import Data.Bifunctor
 import Data.Foldable
 import Errors
 import qualified Lexer as L
-import SemanticAnalyzer.DependencyGraph
+import SemanticAnalyzer.DependencyList
 import SemanticAnalyzer.Expression
 import SemanticAnalyzer.Type
 import qualified SyntacticAnalyzer as Y
@@ -52,7 +52,7 @@ newtype UninfProg = UninfProg [UninfDefinition] deriving (Show)
 
 data ProgInfDeps = ProgInfDeps
   { pidUninfProg :: UninfProg,
-    pidDepGraph :: [DependencyGraph L.Ident]
+    pidDepGraph :: DependencyList L.Ident
   }
 
 newtype Program = Program
@@ -146,7 +146,7 @@ mkProgInfDeps uiprog@(UninfProg uiDefs) = case checkDeps uiprog of
   Nothing ->
     Right $
       ProgInfDeps uiprog $
-        mkDependencyGraph (map udefName uiDefs) (getDeps uiprog)
+        mkDependencyList (map udefName uiDefs) (getDeps uiprog)
   where
     checkDeps :: UninfProg -> Maybe SemanticError
     checkDeps (UninfProg uiDefs') =
@@ -173,24 +173,23 @@ mkProgInfDeps uiprog@(UninfProg uiDefs) = case checkDeps uiprog of
       getAllRefs expr1 +-+ getAllRefs expr2
 
 mkProgram :: ProgInfDeps -> Either STypeError Program
-mkProgram (ProgInfDeps uprog dgraphs) =
-  Program <$> foldr (helperList uprog) (Right []) dgraphs
+mkProgram (ProgInfDeps uprog (DependencyList dList)) = trace (show dList) $
+  Program
+    <$> foldl
+      ( \acc item -> case item of
+          DepListSingle a -> helperTree uprog a acc
+          DepListCycle as -> helperCycle uprog as acc
+      )
+      (Right [])
+      dList
   where
-    helperList ::
-      UninfProg ->
-      DependencyGraph L.Ident ->
-      Either STypeError [Definition] ->
-      Either STypeError [Definition]
-    helperList _ _ (Left e) = Left e
-    helperList uprog' dgraph (Right defs) =
-      dgFoldr (helperCycle uprog') (helperTree uprog') (Right defs) dgraph
     helperTree ::
       UninfProg ->
       L.Ident ->
       Either STypeError [Definition] ->
       Either STypeError [Definition]
     helperTree _ _ (Left e) = Left e
-    helperTree uprog' a (Right prevDeps) =
+    helperTree uprog' a (Right prevDeps) = trace (show prevDeps) $
       (: prevDeps)
         <$> ( Definition a
                 <$> mkInfExprTree prevDeps (lookupUDefUnsafe uprog' a)
@@ -357,18 +356,19 @@ infFromExprS parts (Application expr1 expr2) = do
       case newGenericsM of
         Left e -> return $ Left e
         Right newGenerics -> do
-          updatedGenerics <- mapM updateWithSubstitutionsI newGenerics
           updatedExpr1Type <- updateWithSubstitutionsI expr1Type
           case updatedExpr1Type of
             FunctionType paramType returnType -> do
               updatedExpr2Type <- updateWithSubstitutionsI expr2Type
               updatedParam <- updateWithSubstitutionsI paramType
-              reconciledParamM <-
+              reconciledParamM <- 
                 reconcileTypesIS updatedParam updatedExpr2Type
               case reconciledParamM of
                 Left e -> return $ Left e
                 Right _ -> do
-                  updatedReturn <- updateWithSubstitutionsI returnType
+                  env <- get
+                  updatedReturn <- trace (show env) $ updateWithSubstitutionsI returnType
+                  updatedGenerics <- mapM updateWithSubstitutionsI newGenerics
                   return $ Right (updatedReturn, updatedGenerics)
             GenericType genericId -> do
               updatedExpr2Type <- updateWithSubstitutionsI expr2Type
@@ -380,9 +380,8 @@ infFromExprS parts (Application expr1 expr2) = do
               case addingWorked of
                 Left e -> return $ Left e
                 Right _ -> do
-                  updatedGenerics' <-
-                    mapM updateWithSubstitutionsI updatedGenerics
-                  return $ Right (GenericType newReturnId, updatedGenerics')
+                  updatedGenerics <- mapM updateWithSubstitutionsI newGenerics
+                  return $ Right (GenericType newReturnId, updatedGenerics)
             typ -> return $ Left $ STApplyingToANonFunction $ show typ
 
 lookupRefType :: [Definition] -> L.Ident -> Maybe NormType

@@ -97,8 +97,8 @@ spec = do
     it "can work with type wishes in dependency trees" $ do
       map (teType . defExpr) . progDefs <$> testP program14
         `shouldBe` Right
-          [ mkn $ funt nai nai,
-            mkn $ funt nai (funt nai nai)
+          [  mkn $ funt (GenericType 1) (funt nai nai),
+             mkn $ funt nai nai
           ]
         
 

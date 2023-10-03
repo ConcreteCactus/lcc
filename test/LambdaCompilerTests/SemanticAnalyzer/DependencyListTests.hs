@@ -34,8 +34,12 @@ spec = do
 data ArbList = ArbList (DependencyList Int) Int (Int -> [Int])
 
 instance Show ArbList where
-  show (ArbList dpList size depf) = show dpList ++ " > " ++ show size ++ "\n"
-    ++ showdepf depf size
+  show (ArbList dpList size depf) =
+    show dpList
+      ++ " > "
+      ++ show size
+      ++ "\n"
+      ++ showdepf depf size
 
 showdepf :: (Int -> [Int]) -> Int -> String
 showdepf depf size =
