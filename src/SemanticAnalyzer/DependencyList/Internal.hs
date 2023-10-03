@@ -13,13 +13,19 @@ data DependencyListItem a
 newtype DependencyList a = DependencyList [DependencyListItem a] deriving Show
 
 mkDependencyList :: (Eq a) => [a] -> (a -> [a]) -> DependencyList a
-mkDependencyList vals depf = DependencyList $ foldr helper [] vals
+mkDependencyList vals depf = DependencyList 
+    $ foldr (helper' [] . DepListSingle) [] vals
   where
-    helper a [] = [DepListSingle a]
+    helper a [] = [a]
     helper a (b : bs)
-      | not (b `dependsOn` DepListSingle a) = b : helper a bs
-      | DepListSingle a `dependsOn` b = itMerge (DepListSingle a) b : bs
-      | otherwise = DepListSingle a : (b : bs)
+      | not (b `dependsOn` a) = b : helper a bs
+      | a `dependsOn` b = a `itMerge` b : bs
+      | otherwise = a : (b : bs)
+    helper' aft a [] = a : reverse aft
+    helper' aft a (b : bs)
+      | not (b `dependsOn` a) = b : helper' aft a bs
+      | a `dependsOn` b = helper' aft (a `itMerge` b) bs
+      | otherwise = helper' (b : aft) a bs
     dependsOn = dependsFn depf
 
 dependsFn ::
@@ -40,7 +46,7 @@ itMerge ::
   DependencyListItem a ->
   DependencyListItem a ->
   DependencyListItem a
-itMerge (DepListSingle a) (DepListSingle b) = 
+itMerge (DepListSingle a) (DepListSingle b) =
     if a /= b then DepListCycle [a, b] else DepListSingle a
 itMerge (DepListCycle as) (DepListSingle b) =
     if b `notElem` as then DepListCycle (b : as) else DepListCycle as
