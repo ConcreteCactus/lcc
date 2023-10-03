@@ -14,7 +14,6 @@ import SemanticAnalyzer.Expression
 import SemanticAnalyzer.Type
 import qualified SyntacticAnalyzer as Y
 import Util
-import Debug.Trace
 
 data UninfDefinition = UninfDefinition
   { udefName :: L.Ident,
@@ -173,7 +172,7 @@ mkProgInfDeps uiprog@(UninfProg uiDefs) = case checkDeps uiprog of
       getAllRefs expr1 +-+ getAllRefs expr2
 
 mkProgram :: ProgInfDeps -> Either STypeError Program
-mkProgram (ProgInfDeps uprog (DependencyList dList)) = trace (show dList) $
+mkProgram (ProgInfDeps uprog (DependencyList dList)) =
   Program
     <$> foldl
       ( \acc item -> case item of
@@ -189,8 +188,8 @@ mkProgram (ProgInfDeps uprog (DependencyList dList)) = trace (show dList) $
       Either STypeError [Definition] ->
       Either STypeError [Definition]
     helperTree _ _ (Left e) = Left e
-    helperTree uprog' a (Right prevDeps) = trace (show prevDeps) $
-      (: prevDeps)
+    helperTree uprog' a (Right prevDeps) = 
+        (: prevDeps)
         <$> ( Definition a
                 <$> mkInfExprTree prevDeps (lookupUDefUnsafe uprog' a)
             )
@@ -366,8 +365,7 @@ infFromExprS parts (Application expr1 expr2) = do
               case reconciledParamM of
                 Left e -> return $ Left e
                 Right _ -> do
-                  env <- get
-                  updatedReturn <- trace (show env) $ updateWithSubstitutionsI returnType
+                  updatedReturn <- updateWithSubstitutionsI returnType
                   updatedGenerics <- mapM updateWithSubstitutionsI newGenerics
                   return $ Right (updatedReturn, updatedGenerics)
             GenericType genericId -> do
