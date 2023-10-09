@@ -1,6 +1,8 @@
 module SemanticAnalyzer
   ( Program (..),
     Definition (..),
+    teExpr,
+    teType
     -- createSemanticProgram,
     -- parseAndCreateProgram,
     -- parseAndCreateExpressionWithProgram,
