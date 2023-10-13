@@ -7,42 +7,57 @@ import qualified Lexer as L
 import qualified SemanticAnalyzer as S
 import qualified SemanticAnalyzer.Expression as SE
 import qualified SemanticAnalyzer.Type as ST
+import qualified SyntacticAnalyzer as Y
 import Util
 
 type CCode = String
 
+type ClosureId = (L.Ident, Int)
+
+type ClosureTable = [(ClosureId, Closure)]
+
+data Expression
+  = ClosureRef ClosureId
+  | CaptureRef Int
+  | Application Expression Expression
+  | Literal Y.Literal
+
 data Closure = Closure
-  { clParamType :: ST.Type,
-    clReturnType :: ST.Type,
-    clCaptureType :: [ST.Type],
-    clExpression :: SE.Expression,
-    clId :: (L.Ident, Int)
+  { clCaptureCount :: Int,
+    clExpression :: Expression
   }
 
 compile :: S.Program -> CCode
 compile program = _
 
-extractClosuresFromDef :: S.Definition -> [Closure]
-extractClosuresFromDef def = execState (extractHelperS name (typ, expr)) 1
-  where
-    name = S.defName def
-    typ = ST.ntType $ S.teType $ S.defExpr def
-    expr = S.teExpr $ S.defExpr def
+mkExpression :: S.Definition -> (Expression, ClosureTable)
+mkExpression def = _
 
-extractHelperS ::
+mkExpressionS ::
   L.Ident ->
-  [ST.Type] ->
-  (ST.Type, SE.Expression) ->
-  State Int (Ne.NonEmpty Closure)
-extractHelperS ident captures (ST.FunctionType parT retT, SE.Lambda _ expr) =
-  do
-    ind <- incState
-    let newId = (ident, ind)
-    let newParamType = parT
-    let newRetType = retT
-    let newExpression = expr
-    _
-extractHelperS _ _ _ = error "This is not implemented yet!"
+  SE.Expression ->
+  State Int (Expression, ClosureTable, [Int])
+mkExpressionS _ (SE.Ident n) = return (CaptureRef n, [], [n])
+mkExpressionS _ (SE.Ref n) = return (ClosureRef (n, 0), [], [])
+mkExpressionS _ (SE.Lit l) = return (Literal l, [], [])
+mkExpressionS ident (SE.Lambda _ expr) = do
+  (closure, cltbl) <- mkClosure ident expr
+  clid <- incState
+  return (ClosureRef (ident, clid), ((ident, clid), closure) : cltbl, [])
+mkExpressionS ident (SE.Application expr1 expr2) = do
+  (expr1', cltbl1, cptrs1) <- mkExpressionS ident expr1
+  (expr2', cltbl2, cptrs2) <- mkExpressionS ident expr2
+  return (Application expr1' expr2', cltbl1 ++ cltbl2, cptrs1 +-+ cptrs2)
+
+mkClosure :: L.Ident -> SE.Expression -> State Int (Closure, ClosureTable)
+mkClosure ident expr = do
+  (expr', cltbl, cptrs) <- mkExpressionS ident expr
+  let closure =
+        Closure
+          { clCaptureCount = length cptrs,
+            clExpression = expr'
+          }
+  return (closure, cltbl)
 
 incState :: State Int Int
 incState = do
