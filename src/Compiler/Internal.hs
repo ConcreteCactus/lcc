@@ -7,7 +7,7 @@ import qualified SemanticAnalyzer as S
 import qualified SemanticAnalyzer.Expression as SE
 import qualified SyntacticAnalyzer as Y
 import Util
-import Data.List
+import qualified Data.List as Li
 
 type CCode = String
 
@@ -30,7 +30,7 @@ data Closure = Closure
   }
 
 compile :: S.Program -> CCode
-compile program = intercalate "\n" $ map buildClosure cltbl
+compile program = Li.intercalate "\n" $ map buildClosure cltbl
   where
   exprs = map mkExpression (S.progDefs program)
   cltbl = concatMap snd exprs
@@ -45,10 +45,10 @@ instance Show Expression where
 buildClosure :: (ClosureId, Closure) -> CCode
 buildClosure (clid, Closure cc cexpr) = "typedef struct {\n" ++
   "void* clfunc;" ++
-  intercalate "\n" ["void* p" ++ show n | n <- [1..cc]] ++
+  Li.intercalate "\n" ["void* p" ++ show n | n <- [1..cc]] ++
   "} " ++ show clid ++ ";" ++
-  "void* " ++ show clid ++ "_clfunc(void* param){" ++
-  show cexpr ++
+  "void* " ++ show clid ++ "_clfunc(void* param){\n" ++
+  show cexpr ++ ";\n" ++
   "}"
 
 mkExpression :: S.Definition -> (Expression, ClosureTable)
