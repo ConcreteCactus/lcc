@@ -1,14 +1,10 @@
 module SemanticAnalyzer
   ( Program (..),
     Definition (..),
+    SourceCode,
+    mkProgramFromSyn,
     teExpr,
     teType
-    -- createSemanticProgram,
-    -- parseAndCreateProgram,
-    -- parseAndCreateExpressionWithProgram,
-    -- emptyProgram,
-    -- lookupRefExp,
-    -- semanticAnalyzerTests,
   )
 where
 

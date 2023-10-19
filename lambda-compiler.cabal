@@ -25,6 +25,7 @@ source-repository head
 
 library
   exposed-modules:
+      Compiler
       Compiler.Internal
       Errors
       Interpreter
@@ -68,6 +69,7 @@ test-suite lambda-compiler-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
+      LambdaCompilerTests.Compiler.CompilerTests
       LambdaCompilerTests.SemanticAnalyzer.DependencyGraphTest
       LambdaCompilerTests.SemanticAnalyzer.DependencyListTests
       LambdaCompilerTests.SemanticAnalyzer.ExpressionTests

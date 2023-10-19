@@ -1,6 +1,5 @@
 module LambdaCompilerTests.SemanticAnalyzerTests (spec) where
 
-import Debug.Trace
 import Errors
 import qualified Lexer as L
 import SemanticAnalyzer.Expression
