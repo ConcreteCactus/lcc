@@ -9,7 +9,6 @@ import System.Exit
 import Test.Hspec
 import System.IO.Temp
 import System.IO
-import Debug.Trace
 
 spec :: Spec
 spec = do
@@ -32,13 +31,17 @@ isCompilableByGCC src = do
   let csrcE = testCompile src
   case csrcE of
     Left _ -> return False
-    Right csrc -> trace csrc $ do
+    Right csrc -> do
       withSystemTempDirectory "lctmp" (\dirPath -> do
         (srcPath, srcHandle) <- openTempFile dirPath "src.c"
         hPutStr srcHandle csrc
+        hClose srcHandle
         let cp = shell $ "gcc -Wall " ++ srcPath
         (code, _, err) <- readCreateProcessWithExitCode cp ""
         case code of
-          ExitSuccess -> trace err $ return True
-          _ -> return False
+          ExitSuccess -> return True
+          _ -> do
+            putStrLn $ "\n" ++ csrc
+            putStrLn $ "\n" ++ err
+            return False
         )

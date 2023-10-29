@@ -36,7 +36,10 @@ data Closure = Closure
   deriving (Show)
 
 compile :: S.Program -> CCode
-compile program = runtime ++ unlines (map helper $ S.progDefs program)
+compile program =
+  runtime
+    ++ unlines (map helper $ S.progDefs program)
+    ++ mainfn
   where
     helper def@(S.Definition gname _) = genFunction gname $ mkExpression def
 
@@ -57,7 +60,14 @@ showExpressionS gname (ClosureExpr closure) = addClosure gname closure
 showExpressionS gname (Application expr1 expr2) = do
   expr1' <- showExpressionS gname expr1
   expr2' <- showExpressionS gname expr2
-  return $ expr1' ++ "(" ++ expr2' ++ ")"
+  return $
+    "(gen_closure*)("
+      ++ expr1'
+      ++ ").clfunc("
+      ++ expr1'
+      ++ ", "
+      ++ expr2'
+      ++ ")"
 
 genFunction :: L.Ident -> Expression -> CCode
 genFunction name expr =
@@ -216,3 +226,12 @@ runtime =
     ++ "void* new_closure(size_t size) {\n"
     ++ "\treturn malloc(size);\n"
     ++ "}\n\n"
+    ++ "typedef struct {\n"
+    ++ "\tvoid* clfunc;\n"
+    ++ "} gen_closure;\n\n"
+
+mainfn :: CCode
+mainfn =
+  "int main(void) {\n"
+    ++ "\treturn 0;\n"
+    ++ "}\n"
