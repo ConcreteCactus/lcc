@@ -225,7 +225,7 @@ reconcileTypesS typ typ' =
       STTypeMismatch (show typ) (show typ')
 
 reconcileTypesIS :: Type -> Type -> State InferEnv (Either STypeError Type)
-reconcileTypesIS t1 t2 = trace (show t1 ++ " <> " ++ show t2) $ do
+reconcileTypesIS t1 t2 = do
   InferEnv count renv glob <- get
   let (newREnv, reconciledM) = runState (reconcileTypesS t1 t2) renv
   case reconciledM of

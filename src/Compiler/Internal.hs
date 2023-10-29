@@ -3,6 +3,7 @@
 module Compiler.Internal where
 
 import qualified Data.List as Li
+import Data.Maybe
 import Errors
 import qualified Lexer as L
 import SemanticAnalyzer
@@ -37,11 +38,25 @@ data Closure = Closure
 
 compile :: S.Program -> CCode
 compile program =
-  runtime
-    ++ unlines (map helper $ S.progDefs program)
-    ++ mainfn
+  includes
+    ++ constPredefs
+    ++ unlines (map predefHelper $ S.progDefs program)
+    ++ runtime
+    ++ unlines (map genHelper $ S.progDefs program)
+    ++ if mainfnHelper then mainfn else mainfnEmpty
   where
-    helper def@(S.Definition gname _) = genFunction gname $ mkExpression def
+    genHelper def@(S.Definition gname _) = genFunction gname $ mkExpression def
+    predefHelper (S.Definition gname _) =
+      "void* "
+        ++ show gname
+        ++ "_func(void);"
+    mainfnHelper =
+      isJust $
+        Li.find
+          ( \(S.Definition gname _) ->
+              show gname == "main"
+          )
+          (S.progDefs program)
 
 showExpression :: L.Ident -> Expression -> (CCode, CCode)
 showExpression gname expr =
@@ -55,15 +70,16 @@ showExpressionS :: L.Ident -> Expression -> State ExpressionBuilder CCode
 showExpressionS _ ParamRef = return "param"
 showExpressionS _ (Literal lit) = return $ show lit
 showExpressionS _ (CaptureRef n) = return $ "self->capture_" ++ show n
-showExpressionS _ (FunctionRef func) = return $ show func ++ "()"
+showExpressionS _ (FunctionRef func) = do
+  return $ show func ++ "_func()"
 showExpressionS gname (ClosureExpr closure) = addClosure gname closure
 showExpressionS gname (Application expr1 expr2) = do
   expr1' <- showExpressionS gname expr1
   expr2' <- showExpressionS gname expr2
   return $
-    "(gen_closure*)("
+    "((gen_closure*)("
       ++ expr1'
-      ++ ").clfunc("
+      ++ "))->clfunc("
       ++ expr1'
       ++ ", "
       ++ expr2'
@@ -220,18 +236,30 @@ compileFull sc = do
   scs <- S.mkProgramFromSyn scy
   return $ compile scs
 
+includes :: CCode
+includes = "#include <stdlib.h>\n\n"
+
 runtime :: CCode
 runtime =
-  "#include <stdlib.h>\n\n"
-    ++ "void* new_closure(size_t size) {\n"
+  "void* new_closure(size_t size) {\n"
     ++ "\treturn malloc(size);\n"
     ++ "}\n\n"
+
+constPredefs :: CCode
+constPredefs =
+  "typedef void* gen_closure_clfunc(void*, void*);\n\n"
     ++ "typedef struct {\n"
-    ++ "\tvoid* clfunc;\n"
+    ++ "\tgen_closure_clfunc* clfunc;\n"
     ++ "} gen_closure;\n\n"
 
 mainfn :: CCode
 mainfn =
+  "int main(void) {\n"
+    ++ "\treturn (size_t)(main_func());\n"
+    ++ "}\n"
+
+mainfnEmpty :: CCode
+mainfnEmpty =
   "int main(void) {\n"
     ++ "\treturn 0;\n"
     ++ "}\n"

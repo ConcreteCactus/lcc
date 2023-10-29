@@ -20,7 +20,10 @@ import qualified Data.List.NonEmpty as Ne
 import Errors
 import Lexer
 
-newtype Literal = IntegerLiteral Integer deriving (Show, Eq)
+newtype Literal = IntegerLiteral Integer deriving (Eq)
+
+instance Show Literal where
+  show (IntegerLiteral n) = show n
 
 data Expression
   = Id Ident
