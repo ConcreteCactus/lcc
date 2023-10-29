@@ -58,7 +58,10 @@ instance Alternative Parser where
 instance Monad Parser where
   (Parser a) >>= f = Parser (a >=> (\(b, sb) -> runParser (f b) sb))
 
-newtype Ident = Ident String deriving (Show, Eq)
+newtype Ident = Ident String deriving (Eq)
+
+instance Show Ident where
+  show (Ident a) = a
 
 unIdent :: Ident -> String
 unIdent (Ident s) = s

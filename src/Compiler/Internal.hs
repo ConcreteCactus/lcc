@@ -3,7 +3,9 @@
 module Compiler.Internal where
 
 import qualified Data.List as Li
+import Errors
 import qualified Lexer as L
+import SemanticAnalyzer
 import qualified SemanticAnalyzer as S
 import qualified SemanticAnalyzer.Expression as SE
 import qualified SyntacticAnalyzer as Y
@@ -24,42 +26,101 @@ data Expression
   | ParamRef
   | Application Expression Expression
   | Literal Y.Literal
+  deriving (Show)
 
 data Closure = Closure
   { clCaptures :: [Int],
     clExpression :: Expression,
     clName :: CCode
   }
+  deriving (Show)
 
 compile :: S.Program -> CCode
-compile program = _
+compile program = runtime ++ unlines (map helper $ S.progDefs program)
+  where
+    helper def@(S.Definition gname _) = genFunction gname $ mkExpression def
 
-instance Show Expression where
-  show (ClosureExpr (Closure _ _ name)) = name
-  show (FunctionRef ident) = show ident
-  show (CaptureRef capid) = "self->p" ++ show capid
-  show ParamRef = "param"
-  show (Literal lit) = show lit
-  show (Application exp1 exp2) = show exp1 ++ "(" ++ show exp2 ++ ")"
+showExpression :: L.Ident -> Expression -> (CCode, CCode)
+showExpression gname expr =
+  let (ExprBuildr statms gstatms _, expr') =
+        runState (showExpressionS gname expr) (ExprBuildr [] [] 1)
+   in ( unlines (map ("\t" ++) statms ++ ["\treturn " ++ expr' ++ ";"]),
+        unlines gstatms
+      )
 
-showExpressionS :: Expression -> State ExpressionBuilder CCode
-showExpressionS ParamRef = return "param"
-showExpressionS (Literal lit) = return $ show lit
-showExpressionS (Application expr1 expr2) = do
-  expr1' <- showExpressionS expr1
-  expr2' <- showExpressionS expr2
+showExpressionS :: L.Ident -> Expression -> State ExpressionBuilder CCode
+showExpressionS _ ParamRef = return "param"
+showExpressionS _ (Literal lit) = return $ show lit
+showExpressionS _ (CaptureRef n) = return $ "self->capture_" ++ show n
+showExpressionS _ (FunctionRef func) = return $ show func ++ "()"
+showExpressionS gname (ClosureExpr closure) = addClosure gname closure
+showExpressionS gname (Application expr1 expr2) = do
+  expr1' <- showExpressionS gname expr1
+  expr2' <- showExpressionS gname expr2
   return $ expr1' ++ "(" ++ expr2' ++ ")"
-showExpressionS (CaptureRef n) = return $ "self->capture_" ++ show n
-showExpressionS (FunctionRef func) = return $ show func ++ "()"
-showExpressionS (ClosureExpr closure) = addClosure closure
 
-addClosure :: Closure -> State ExpressionBuilder CCode
-addClosure (Closure cptrs expr name) = do
-  ind <- incClosureIndex
-  addStatement $ name ++ "* c" ++ show ind ++ ";\n"
+genFunction :: L.Ident -> Expression -> CCode
+genFunction name expr =
+  gcode
+    ++ "\n"
+    ++ "void* "
+    ++ show name
+    ++ "_func(void) {\n"
+    ++ expr'
+    ++ "}\n"
+  where
+    (expr', gcode) = showExpression name expr
+
+addClosureFunction ::
+  L.Ident ->
+  CCode ->
+  Expression ->
+  State ExpressionBuilder CCode
+addClosureFunction gname structName expr = do
+  ind <- incBuilderIndex
+  expr' <- separateBuilder $ showExpressionS gname expr
+  let fnname = "clfunc_" ++ show gname ++ "_" ++ show ind
+  let fncode =
+        "void* "
+          ++ fnname
+          ++ "("
+          ++ structName
+          ++ "* self, void* param) {\n"
+          ++ expr'
+          ++ "\n}\n"
+  addGlobalStatement fncode
+  return fnname
+
+addClosureStruct :: L.Ident -> [Int] -> State ExpressionBuilder CCode
+addClosureStruct gname cptrs = do
+  ind <- incBuilderIndex
+  let structName = "clstruct_" ++ show gname ++ "_" ++ show ind
+  let structCode =
+        "typedef struct {\n"
+          ++ "\tvoid* clfunc;\n"
+          ++ concatMap ((++ ";\n") . ("\tvoid* capture_" ++) . show) cptrs
+          ++ "} "
+          ++ structName
+          ++ ";\n"
+  addGlobalStatement structCode
+  return structName
+
+addClosure :: L.Ident -> Closure -> State ExpressionBuilder CCode
+addClosure gname (Closure cptrs expr _) = do
+  ind <- incBuilderIndex
+  clstruct <- addClosureStruct gname cptrs
+  clfunc <- addClosureFunction gname clstruct expr
+  addStatement $
+    clstruct
+      ++ "* c"
+      ++ show ind
+      ++ " = ("
+      ++ clstruct
+      ++ "*)new_closure(sizeof("
+      ++ clstruct
+      ++ "));"
   mapM_ (addStatement . assignHelper ind) cptrs
-  -- also add clfunction and call showExpressionS on the body
-  -- also add struct
+  addStatement $ "c" ++ show ind ++ "->clfunc = " ++ clfunc ++ ";"
   return $ "c" ++ show ind
   where
     assignHelper ind n =
@@ -68,10 +129,11 @@ addClosure (Closure cptrs expr name) = do
         ++ "->capture_"
         ++ show n
         ++ " = "
-        ++ (if n > 1 then "self->capture_" ++ show (n - 1) else "param")
+        ++ (if n > 2 then "self->capture_" ++ show (n - 1) else "param")
+        ++ ";"
 
-incClosureIndex :: State ExpressionBuilder Int
-incClosureIndex = do
+incBuilderIndex :: State ExpressionBuilder Int
+incBuilderIndex = do
   ExprBuildr statms gstatms ind <- get
   put $ ExprBuildr statms gstatms (ind + 1)
   return ind
@@ -86,22 +148,15 @@ addGlobalStatement code = do
   ExprBuildr statms gstatms ind <- get
   put $ ExprBuildr statms (gstatms ++ [code]) ind
 
-buildClosure :: Closure -> CCode
-buildClosure (Closure cptrs expr name) =
-  "typedef struct {\n"
-    ++ "\tvoid* clfunc;"
-    ++ Li.intercalate ";\n\t" (map (("void* capture_" ++) . show) cptrs)
-    ++ ";\n} "
-    ++ name
-    ++ ";"
-    ++ "void* "
-    ++ name
-    ++ "_clfunc("
-    ++ name
-    ++ "* self, void* param){\n"
-    ++ show expr
-    ++ ";\n"
-    ++ "}"
+separateBuilder ::
+  State ExpressionBuilder CCode ->
+  State ExpressionBuilder CCode
+separateBuilder builderS = do
+  ExprBuildr statms gstatms ctr <- get
+  let (ExprBuildr statms' gstatms' ctr', code) =
+        runState builderS (ExprBuildr [] [] ctr)
+  put (ExprBuildr statms (gstatms' ++ gstatms) ctr')
+  return $ unlines (map ("\t" ++) statms') ++ "\treturn " ++ code ++ ";"
 
 mkExpression :: S.Definition -> Expression
 mkExpression def =
@@ -121,7 +176,7 @@ mkExpressionS _ (SE.Ref n) = return (FunctionRef n, [])
 mkExpressionS _ (SE.Lit l) = return (Literal l, [])
 mkExpressionS ident (SE.Lambda _ expr) = do
   (closure, cptrs) <- mkClosure ident expr
-  return (ClosureExpr closure, map (+ (-1)) $ filter (> 1) cptrs)
+  return (ClosureExpr closure, cptrs)
 mkExpressionS ident (SE.Application expr1 expr2) = do
   (expr1', cptrs1) <- mkExpressionS ident expr1
   (expr2', cptrs2) <- mkExpressionS ident expr2
@@ -134,16 +189,30 @@ mkClosure ::
 mkClosure ident expr = do
   (expr', cptrs) <- mkExpressionS ident expr
   clId <- incState
+  let cptrs' = filter (> 1) cptrs
   let closure =
         Closure
-          { clCaptures = cptrs,
+          { clCaptures = cptrs',
             clExpression = expr',
             clName = show ident ++ "_c_" ++ show clId
           }
-  return (closure, cptrs)
+  return (closure, map (+ (-1)) cptrs')
 
 incState :: State Int Int
 incState = do
   state <- get
   put $ state + 1
   return state
+
+compileFull :: SourceCode -> Either CompilerError CCode
+compileFull sc = do
+  scy <- Y.parseProgramSingleError sc
+  scs <- S.mkProgramFromSyn scy
+  return $ compile scs
+
+runtime :: CCode
+runtime =
+  "#include <stdlib.h>\n\n"
+    ++ "void* new_closure(size_t size) {\n"
+    ++ "\treturn malloc(size);\n"
+    ++ "}\n\n"

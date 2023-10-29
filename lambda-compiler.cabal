@@ -83,5 +83,8 @@ test-suite lambda-compiler-test
       QuickCheck
     , base >=4.7 && <5
     , hspec
+    , hspec-expectations
     , lambda-compiler
+    , process
+    , temporary
   default-language: Haskell2010

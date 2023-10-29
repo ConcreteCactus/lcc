@@ -1,3 +1,3 @@
-module Compiler() where
+module Compiler(compileFull) where
 
 import Compiler.Internal
