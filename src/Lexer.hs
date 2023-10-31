@@ -1,32 +1,11 @@
 {-# OPTIONS_GHC -Wincomplete-patterns #-}
 
-module Lexer
-  ( CompilerError (..),
-    Parser (..),
-    Ident (..),
-    whiteSpace,
-    whiteSpaceO,
-    lambda,
-    dot,
-    openParen,
-    closeParen,
-    identifier,
-    arrow,
-    colon,
-    colonEquals,
-    sepBy1,
-    sepBy,
-    endOfLine,
-    endOfLineO,
-    integer,
-    block,
-    eof,
-    capIdentifier,
-    anyCapIdentifier,
-    (<|>),
-    unIdent,
-  )
-where
+module Lexer where
+
+-- Separate to blocks (check)
+-- Syntactically analyze each block (check)
+-- OK, how do we propagate line numbers (in the parser)
+-- Runparser takes a starting line number in the text
 
 import Control.Applicative
 import Control.Monad
@@ -36,27 +15,49 @@ import Data.Functor
 import Errors
 import Text.Read (readMaybe)
 
-newtype Parser t = Parser {runParser :: String -> Either CompilerError (t, String)}
+newtype Parser t = Parser
+  { runParser :: (TextPos, String) -> Either LexicalError (t, TextPos, String)
+  }
 
 instance Functor Parser where
-  fmap f (Parser a) = Parser $ fmap (first f) . a
+  fmap f (Parser a) =
+    Parser
+      ( \(pos, str) ->
+          case a (pos, str) of
+            Left e -> Left e
+            Right (b, pos', str') -> Right (f b, pos', str')
+      )
+
+instance Monad Parser where
+  (Parser a) >>= f =
+    Parser
+      ( \(pos, str) ->
+          case a (pos, str) of
+            Left e -> Left e
+            Right (b, pos', str') ->
+              let Parser g = f b in g (pos', str')
+      )
 
 instance Applicative Parser where
-  pure a = Parser (\s -> Right (a, s))
+  pure a = Parser (\(pos, str) -> Right (a, pos, str))
   f <*> a = do
     x <- f
     x <$> a
 
 instance Alternative Parser where
-  empty = Parser $ const $ Left CompilerError
+  empty =
+    Parser $
+      const $
+        Left $
+          mkLexErr (0, 0) [LeEndOfStatement]
   (Parser a) <|> (Parser b) = Parser (\s -> a s `or'` b s)
     where
-      or' :: Either CompilerError a -> Either CompilerError a -> Either CompilerError a
+      or' ::
+        Either LexicalError a ->
+        Either LexicalError a ->
+        Either LexicalError a
       or' (Right v) _ = Right v
       or' (Left _) e = e
-
-instance Monad Parser where
-  (Parser a) >>= f = Parser (a >=> (\(b, sb) -> runParser (f b) sb))
 
 newtype Ident = Ident String deriving (Eq)
 
@@ -66,18 +67,63 @@ instance Show Ident where
 unIdent :: Ident -> String
 unIdent (Ident s) = s
 
-satisfyE :: CompilerError -> (Char -> Bool) -> Parser Char
-satisfyE e p = Parser parse
+satisfy :: LexicalElement -> (Char -> Bool) -> Parser Char
+satisfy e p = Parser parse
   where
-    parse :: String -> Either CompilerError (Char, String)
-    parse [] = Left $ LexicalError UnexpectedEndOfFile
-    parse (c : cs) = if p c then Right (c, cs) else Left e
+    parse (pos, []) = Left $ mkLexErr pos [e]
+    parse (pos, c : cs) =
+      if p c
+        then Right (c, incTextPos pos c, cs)
+        else Left $ mkLexErr pos [e]
 
-charE :: CompilerError -> Char -> Parser Char
-charE e c = satisfyE e (== c)
+parseString :: String -> (TextPos, String) -> Maybe (String, TextPos, String)
+parseString [] (pos, inp) = Just ([], pos, inp)
+parseString _ (_, []) = Nothing
+parseString (x : xs) (pos, x' : xs') =
+  if x == x'
+    then
+      ( \(str', pos', rem') ->
+          (x : str', pos', rem')
+      )
+        <$> parseString xs (incTextPos pos x', xs')
+    else Nothing
 
-stringE :: CompilerError -> String -> Parser String
-stringE e = mapM (charE e)
+char :: Char -> Parser Char
+char c = Parser parseChar
+  where
+    parseChar (pos, []) = Left $ mkLexErr pos [LeChar c]
+    parseChar (pos, x : xs) =
+      if x == c
+        then Right (x, incTextPos pos x, xs)
+        else Left $ mkLexErr pos [LeChar c]
+
+word :: String -> Parser String
+word str = Parser (parseString' str)
+  where
+    -- parseString whatWeWant whatWeHave
+    parseString' w (p, h) = case parseString w (p, h) of
+      Just a -> Right a
+      Nothing -> Left $ mkLexErr p [LeWord str]
+
+operator :: String -> Parser String
+operator str = Parser (parseString' str)
+  where
+    -- parseString whatWeWant whatWeHave
+    parseString' w (p, h) = case parseString w (p, h) of
+      Just a -> Right a
+      Nothing -> Left $ mkLexErr p [LeOperator str]
+
+eof :: Parser ()
+eof =
+  Parser
+    ( \(pos, str) ->
+        if null str
+          then Right ((), pos, [])
+          else Left (mkLexErr pos [LeEndOfStatement])
+    )
+
+lexerr :: [LexicalElement] -> Parser a
+lexerr ele = Parser (\(pos, _) -> Left $ mkLexErr pos ele)
 
 sepBy1 :: Parser () -> Parser a -> Parser [a]
 sepBy1 separator token = (:) <$> token <*> many (separator *> token)
@@ -90,70 +136,72 @@ isSimpleSpace '\n' = False
 isSimpleSpace s = isSpace s
 
 whiteSpace :: Parser ()
-whiteSpace = void $ some $ satisfyE CompilerError isSpace
+whiteSpace = void $ some $ satisfy LeWhiteSpace isSpace
 
 whiteSpaceO :: Parser ()
 whiteSpaceO = whiteSpace <|> nothing
 
 nothing :: Parser ()
-nothing = Parser (\s -> Right ((), s))
-
-eof :: Parser ()
-eof = Parser (\s -> if s == "" then Right ((), "") else Left (LexicalError EndOfFileExpected))
+nothing = Parser (\(pos, str) -> Right ((), pos, str))
 
 endOfLine :: Parser ()
-endOfLine = void (charE CompilerError '\n') <|> void (stringE CompilerError "\r\n")
+endOfLine = void (char '\n') <|> void (word "\r\n") <|> lexerr [LeEndOfLine]
 
 endOfLineO :: Parser ()
 endOfLineO = endOfLine <|> nothing
 
 lambda :: Parser ()
-lambda = void $ charE (LexicalError LambdaExpressionExpected) '\\'
+lambda = void $ operator "\\"
 
 dot :: Parser ()
-dot = void $ charE (LexicalError InvalidLambdaExpression) '.'
+dot = void $ operator "."
 
 openParen :: Parser ()
-openParen = void $ charE CompilerError '('
+openParen = void $ char '('
 
 closeParen :: Parser ()
-closeParen = void $ charE CompilerError ')'
+closeParen = void $ char ')'
 
 identifier :: Parser Ident
-identifier = Ident <$> ((:) <$> satisfyE (LexicalError CaseError) isLower <*> many (satisfyE CompilerError isAlphaNum))
+identifier =
+  Ident
+    <$> ( (:)
+            <$> satisfy LeLowercaseCharacter isLower
+            <*> many (satisfy LeLowercaseCharacter isAlphaNum)
+        )
 
 capIdentifier :: Parser String
 capIdentifier =
   (:)
-    <$> satisfyE (LexicalError CaseError) isUpper
-    <*> many (satisfyE CompilerError isAlphaNum)
+    <$> satisfy LeUppercaseCharacter isUpper
+    <*> many (satisfy LeUppercaseCharacter isAlphaNum)
 
 anyCapIdentifier :: Parser String
 anyCapIdentifier =
   (:)
-    <$> satisfyE (LexicalError OtherError) isAlpha
-    <*> many (satisfyE CompilerError isAlphaNum)
+    <$> satisfy LeAlphabeticalCharacter isAlpha
+    <*> many (satisfy LeAlphanumericCharacter isAlphaNum)
 
 arrow :: Parser ()
-arrow = void $ stringE CompilerError "->"
+arrow = void $ operator "->"
 
 colon :: Parser ()
-colon = void $ charE CompilerError ':'
+colon = void $ operator ":"
 
 colonEquals :: Parser ()
-colonEquals = void $ stringE CompilerError ":="
+colonEquals = void $ operator ":="
 
 collapseMaybe :: Parser (Maybe a) -> Parser a
 collapseMaybe (Parser fMa) =
   Parser
     ( \s1 -> case fMa s1 of
         Left err -> Left err
-        Right (Nothing, _) -> Left CompilerError
-        Right (Just a, s2) -> Right (a, s2)
+        Right (Nothing, pos, _) -> Left $ mkLexErr pos [LeNumber]
+        Right (Just a, pos, s2) -> Right (a, pos, s2)
     )
 
 b10Integer :: Parser Integer
-b10Integer = collapseMaybe $ readMaybe <$> some (satisfyE CompilerError isDigit)
+b10Integer = collapseMaybe $ readMaybe <$> some (satisfy LeNumber isDigit)
 
 readb16Integer :: String -> Integer
 readb16Integer s = foldr (\(c, n) sm -> toDigit c * (16 ^ n) + sm) 0 (zip s [(length s - 1), (length s - 2) ..])
@@ -181,11 +229,11 @@ b16Integer :: Parser Integer
 b16Integer =
   readb16Integer
     <$> ( void
-            ( stringE CompilerError "0x" <|> stringE CompilerError "0X"
+            ( word "0x" <|> word "0X"
             )
             *> some
-              ( satisfyE
-                  CompilerError
+              ( satisfy
+                  LeHexDigit
                   ( \a -> isDigit a || a `elem` "abcdefABCDEF"
                   )
               )
@@ -195,10 +243,10 @@ integer :: Parser Integer
 integer = b16Integer <|> b10Integer
 
 whiteSpaceS :: Parser String
-whiteSpaceS = some $ satisfyE CompilerError isSimpleSpace
+whiteSpaceS = some $ satisfy LeWhiteSpace isSimpleSpace
 
 whiteSpaceSO :: Parser String
-whiteSpaceSO = many $ satisfyE CompilerError isSimpleSpace
+whiteSpaceSO = many $ satisfy LeWhiteSpace isSimpleSpace
 
 stripLine :: String -> String
 stripLine line = reverse $ dropWhile isSpace $ reverse starting
@@ -207,60 +255,49 @@ stripLine line = reverse $ dropWhile isSpace $ reverse starting
     starting = dropWhile isSpace line
 
 emptyLine :: Parser ()
-emptyLine = void $ whiteSpaceSO *> charE CompilerError '\n'
+emptyLine = void $ whiteSpaceSO *> char '\n'
 
-replaceParsed :: Parser a -> String -> String -> String
-replaceParsed parser replacement [] = case runParser parser [] of
-  Left _ -> []
-  Right _ -> replacement
-replaceParsed parser replacement (r : replacee) = case runParser parser (r : replacee) of
-  Left _ -> r : replaceParsed parser replacement replacee
-  Right (_, remaining) -> replacement ++ replaceParsed parser replacement remaining
-
-block :: Parser String
-block = do
-  _ <- many emptyLine
-  indent <- whiteSpaceSO
-  line <- some $ satisfyE CompilerError (/= '\n')
-  remLines <-
-    sepBy
-      ( void $
-          ( some emptyLine *> stringE CompilerError indent
-          )
-            *> whiteSpaceS
+statement :: Parser String
+statement = do
+  _ <-
+    many $
+      many (satisfy LeWhiteSpace isSimpleSpace)
+        <* satisfy LeEndOfLine (== '\n')
+  sc <- satisfy LeNotWhiteSpace (not . isSpace)
+  lc <- many $ satisfy LeNotNewLine (/= '\n')
+  llc <-
+    many
+      ( do
+          _ <- many $ satisfy LeEndOfLine (== '\n')
+          sp <- some $ satisfy LeWhiteSpace isSimpleSpace
+          lc' <- many $ satisfy LeNotNewLine (/= '\n')
+          return $ sp ++ lc'
       )
-      $ many
-      $ satisfyE CompilerError (/= '\n')
-  return $
-    unwords $
-      map (replaceParsed whiteSpace " ") $
-        filter (not . null) $
-          map stripLine $
-            line : remLines
+  return $ sc : lc ++ concat llc
 
--- Unit tests
-
-tests :: [Bool]
-tests =
-  [ runParser whiteSpace " " == Right ((), ""),
-    runParser whiteSpace "  " == Right ((), ""),
-    runParser whiteSpace "\t \ta" == Right ((), "a"),
-    runParser whiteSpace "  a" == Right ((), "a"),
-    runParser whiteSpace "  \t\n hello" == Right ((), "hello"),
-    runParser whiteSpace " \t \n" == Right ((), ""),
-    runParser whiteSpace " \t \nhello" == Right ((), "hello"),
-    runParser b10Integer "34249840" == Right (34249840, ""),
-    runParser b16Integer "0x20A9C70" == Right (34249840, ""),
-    runParser block "a : b -> c \na := \\b.c" == Right ("a : b -> c", "\na := \\b.c"),
-    runParser block "a := \\b.\n c" == Right ("a := \\b. c", ""),
-    runParser block "a : b -> c \na := \\b.c" == Right ("a : b -> c", "\na := \\b.c"),
-    runParser block "a : b ->\n c \r\na := \\b.c" == Right ("a : b -> c", "\na := \\b.c"),
-    runParser block "a : b -> c \r\na := \\b.c" == Right ("a : b -> c", "\na := \\b.c"),
-    runParser block "a\n :\n b\n ->\n c \r\na := \\b.c" == Right ("a : b -> c", "\na := \\b.c"),
-    runParser identifier "a" == Right (Ident "a", ""),
-    runParser identifier "a1" == Right (Ident "a1", ""),
-    runParser identifier "A1b" == Left (LexicalError CaseError),
-    runParser capIdentifier "A" == Right ("A", ""),
-    runParser capIdentifier "A1" == Right ("A1", ""),
-    runParser capIdentifier "a1" == Left (LexicalError CaseError)
-  ]
+-- -- -- Unit tests
+-- --
+-- -- tests :: [Bool]
+-- -- tests =
+-- --   [ runParser whiteSpace " " == Right ((), ""),
+-- --     runParser whiteSpace "  " == Right ((), ""),
+-- --     runParser whiteSpace "\t \ta" == Right ((), "a"),
+-- --     runParser whiteSpace "  a" == Right ((), "a"),
+-- --     runParser whiteSpace "  \t\n hello" == Right ((), "hello"),
+-- --     runParser whiteSpace " \t \n" == Right ((), ""),
+-- --     runParser whiteSpace " \t \nhello" == Right ((), "hello"),
+-- --     runParser b10Integer "34249840" == Right (34249840, ""),
+-- --     runParser b16Integer "0x20A9C70" == Right (34249840, ""),
+-- --     runParser block "a : b -> c \na := \\b.c" == Right ("a : b -> c", "\na := \\b.c"),
+-- --     runParser block "a := \\b.\n c" == Right ("a := \\b. c", ""),
+-- --     runParser block "a : b -> c \na := \\b.c" == Right ("a : b -> c", "\na := \\b.c"),
+-- --     runParser block "a : b ->\n c \r\na := \\b.c" == Right ("a : b -> c", "\na := \\b.c"),
+-- --     runParser block "a : b -> c \r\na := \\b.c" == Right ("a : b -> c", "\na := \\b.c"),
+-- --     runParser block "a\n :\n b\n ->\n c \r\na := \\b.c" == Right ("a : b -> c", "\na := \\b.c"),
+-- --     runParser identifier "a" == Right (Ident "a", ""),
+-- --     runParser identifier "a1" == Right (Ident "a1", ""),
+-- --     runParser identifier "A1b" == Left (LexicalError CaseError),
+-- --     runParser capIdentifier "A" == Right ("A", ""),
+-- --     runParser capIdentifier "A1" == Right ("A1", ""),
+-- --     runParser capIdentifier "a1" == Left (LexicalError CaseError)
+-- --   ]
