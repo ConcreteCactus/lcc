@@ -1,5 +1,6 @@
 module LambdaCompilerTests.LexerTests (spec) where
 
+import Control.Applicative
 import Control.Monad
 import Lexer.Internal
 import Test.Hspec
@@ -10,14 +11,17 @@ spec = do
   describe "block" $ do
     it "can parse the same number of blocks" $ do
       property
-        ( \(LexicallySaneCode src' blockCount') ->
-            length (runParser (many block) src') == blockCount'
+        ( \(Lsc src blockCount) ->
+            case runParser (many statement) ((0, 0), src) of
+              Left _ -> False
+              Right (statms, _, _) -> length statms == blockCount
         )
 
 data LexicallySaneCode = Lsc
-  { src :: String,
-    blockCount :: Int
+  { lscSrc :: String
+  , lscBlockCount :: Int
   }
+  deriving (Show)
 
 instance Arbitrary LexicallySaneCode where
   arbitrary = do
@@ -44,10 +48,10 @@ instance Arbitrary LexicallySaneCode where
         Positive lineLength <- arbitrary
         let line = replicate lineLength 'a'
         return $ spaces' ++ line
-      return $
-        spacingBefore'
-          ++ firstLine
-          ++ "\n"
-          ++ unlines followingLines
-          ++ spacingAfter
+      return
+        $ spacingBefore'
+        ++ firstLine
+        ++ "\n"
+        ++ unlines followingLines
+        ++ spacingAfter
     return $ Lsc (concat statements) blockCount'

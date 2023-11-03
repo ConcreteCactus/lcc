@@ -7,6 +7,7 @@ import SemanticAnalyzer.Internal
 import SemanticAnalyzer.Type
 import qualified SyntacticAnalyzer as Y
 import Test.Hspec
+import Util
 
 spec :: Spec
 spec = do
@@ -52,9 +53,9 @@ spec = do
     it "can work with dependency cycles" $ do
       map (teType . defExpr) . progDefs <$> testP program7
         `shouldBe` Right
-          [ mkn $ funt (GenericType 1) (GenericType 2),
-            mkn $ funt (GenericType 1) (GenericType 2),
-            mkn $ funt (GenericType 1) (GenericType 2)
+          [ mkn $ funt (GenericType 1) (GenericType 2)
+          , mkn $ funt (GenericType 1) (GenericType 2)
+          , mkn $ funt (GenericType 1) (GenericType 2)
           ]
     it "can reconcile recursive variables with themselves" $ do
       isRight (testP program8)
@@ -64,8 +65,8 @@ spec = do
     it "can work with recursive definitions and dependency cycles" $ do
       map (teType . defExpr) . progDefs <$> testP program10
         `shouldBe` Right
-          [ mkn $ funt (GenericType 1) (GenericType 1),
-            mkn $ funt (GenericType 1) (funt (GenericType 1) (GenericType 1))
+          [ mkn $ funt (GenericType 1) (GenericType 1)
+          , mkn $ funt (GenericType 1) (funt (GenericType 1) (GenericType 1))
           ]
     it
       ( "can work with recursive definitions and dependency cycles"
@@ -74,8 +75,8 @@ spec = do
       $ do
         map (teType . defExpr) . progDefs <$> testP program11
           `shouldBe` Right
-            [ mkn $ funt (GenericType 1) (GenericType 1),
-              mkn $ funt (GenericType 1) (funt (GenericType 1) (GenericType 1))
+            [ mkn $ funt (GenericType 1) (GenericType 1)
+            , mkn $ funt (GenericType 1) (funt (GenericType 1) (GenericType 1))
             ]
     it
       ( "can work with recursive definitions and dependency cycles"
@@ -84,35 +85,36 @@ spec = do
       $ do
         map (teType . defExpr) . progDefs <$> testP program12
           `shouldBe` Right
-            [ mkn $ funt nai nai,
-              mkn $ funt nai (funt nai nai)
+            [ mkn $ funt nai nai
+            , mkn $ funt nai (funt nai nai)
             ]
     it "can adapt to type wishes in dependency cycles" $ do
       map (teType . defExpr) . progDefs <$> testP program13
         `shouldBe` Right
-          [ mkn $ funt nai nai,
-            mkn $ funt nai (funt nai nai)
+          [ mkn $ funt nai nai
+          , mkn $ funt nai (funt nai nai)
           ]
     it "can work with type wishes in dependency trees" $ do
       map (teType . defExpr) . progDefs <$> testP program14
         `shouldBe` Right
-          [  mkn $ funt (GenericType 1) (funt nai nai),
-             mkn $ funt nai nai
+          [ mkn $ funt (GenericType 1) (funt nai nai)
+          , mkn $ funt nai nai
           ]
-        
 
 isRight :: Either a b -> Bool
 isRight (Right _) = True
 isRight _ = False
 
-test :: SourceCode -> Either CompilerError Expression
+test :: SourceCode -> Either LexicalError Expression
 test s = convertExpression <$> Y.parseExpression s
 
-testT :: SourceCode -> Either CompilerError NormType
-testT s = convertType <$> Y.parseType s
+testT :: SourceCode -> Either LexicalError NormType
+testT s = convertType <$> Y.parseType ((0, 0), s)
 
 testP :: SourceCode -> Either CompilerError Program
-testP s = Y.parseProgramSingleError s >>= mkProgramFromSyn
+testP s =
+  leftMap mkCompErrLex (Y.parseProgramSingleError s)
+    >>= mkProgramFromSyn
 
 nai :: Type
 nai = AtomicType AInt

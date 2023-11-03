@@ -9,6 +9,7 @@ import System.IO
 import System.IO.Temp
 import System.Process
 import Test.Hspec
+import Util
 
 spec :: Spec
 spec = do
@@ -42,7 +43,7 @@ program3 =
 
 testCompile :: SourceCode -> Either CompilerError CCode
 testCompile sc = do
-  scy <- Y.parseProgramSingleError sc
+  scy <- leftMap mkCompErrLex $ Y.parseProgramSingleError sc
   scs <- S.mkProgramFromSyn scy
   return $ compile scs
 

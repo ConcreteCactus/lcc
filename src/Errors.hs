@@ -29,7 +29,7 @@ type ColNum = Int
 
 type TextPos = (LineNum, ColNum)
 
-data ProgramError e = ProgramError e TextPos deriving (Show)
+data ProgramError e = ProgramError e TextPos deriving (Show, Eq)
 
 type LexicalError = ProgramError LexicalErrorType
 
