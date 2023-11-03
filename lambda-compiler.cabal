@@ -30,6 +30,7 @@ library
       Errors
       Interpreter
       Lexer
+      Lexer.Internal
       Repl
       SemanticAnalyzer
       SemanticAnalyzer.DependencyGraph
@@ -70,6 +71,7 @@ test-suite lambda-compiler-test
   main-is: Spec.hs
   other-modules:
       LambdaCompilerTests.Compiler.CompilerTests
+      LambdaCompilerTests.LexerTests
       LambdaCompilerTests.SemanticAnalyzer.DependencyGraphTest
       LambdaCompilerTests.SemanticAnalyzer.DependencyListTests
       LambdaCompilerTests.SemanticAnalyzer.ExpressionTests
