@@ -18,6 +18,7 @@ module Util
     (<<$>>),
     fstMap,
     sndMap,
+    leftMap,
   )
 where
 
@@ -123,3 +124,7 @@ fstMap f (a, c) = (f a, c)
 
 sndMap :: (a -> b) -> (c, a) -> (c, b)
 sndMap f (c, a) = (c, f a)
+
+leftMap :: (a -> b) ->  Either a c -> Either b c
+leftMap f (Right a) = Right a
+leftMap f (Left a) = Left (f a)

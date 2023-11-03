@@ -3,7 +3,14 @@
 # For more information, please see the documentation at:
 #   https://docs.haskellstack.org/en/stable/lock_files
 
-packages: []
+packages:
+- completed:
+    hackage: hls-fourmolu-plugin-2.4.0.0@sha256:0a3e03d8e0d08cc48189c1a0e2b6801eff2ba2cd501fe45263eba6929758cecd,2222
+    pantry-tree:
+      sha256: 9c52f02d99f783df12092d5c1df577b4ad475ad05dd3f19f68f3ba04fd0b4e3f
+      size: 518
+  original:
+    hackage: hls-fourmolu-plugin-2.4.0.0
 snapshots:
 - completed:
     sha256: e019cd29e3f7f9dbad500225829a3f7a50f73c674614f2f452e21bb8bf5d99ea

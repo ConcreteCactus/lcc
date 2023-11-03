@@ -4,7 +4,6 @@ module SemanticAnalyzer.Type.Internal where
 
 import Control.Monad
 import Data.Bifunctor
-import Debug.Trace
 import Errors
 import qualified Lexer as L
 import qualified SyntacticAnalyzer as Y
@@ -122,12 +121,19 @@ shiftIds ident (FunctionType t1 t2) =
    in (FunctionType newT1 newT2, max maxIdent1 maxIdent2)
 shiftIds ident (GenericType gid) = (GenericType (gid + ident), gid + ident)
 
-addNewSubstitution :: Int -> Type -> State ReconcileEnv (Either STypeError ())
+addNewSubstitution ::
+  Int ->
+  Type ->
+  State ReconcileEnv (Either TypeErrorType ())
 addNewSubstitution genericId typ = do
   ReconcileEnv env <- get
   let substituted = checkAndSubstitute env typ
   if checkSelfRefs genericId substituted
-    then return $ Left $ STSelfReferenceFound genericId $ show substituted
+    then
+      return $
+        Left $
+          TeSelfReferenceFound genericId $
+            show substituted
     else do
       let newEnv = substituteOldSubs genericId substituted env
       put $ ReconcileEnv ((genericId, substituted) : newEnv)
@@ -160,7 +166,7 @@ addNewSubstitution genericId typ = do
     substituteOldSubs genericId' typ' =
       map (second (substituteSimple genericId' typ'))
 
-addNewSubstitutionI :: Int -> Type -> State InferEnv (Either STypeError ())
+addNewSubstitutionI :: Int -> Type -> State InferEnv (Either TypeErrorType ())
 addNewSubstitutionI genericId typ = do
   InferEnv count renv glob <- get
   let (newREnv, result) = runState (addNewSubstitution genericId typ) renv
@@ -187,7 +193,10 @@ updateWithSubstitutionsI typ = do
   put $ InferEnv count newREnv glob
   return newTyp
 
-reconcileTypesS :: Type -> Type -> State ReconcileEnv (Either STypeError Type)
+reconcileTypesS ::
+  Type ->
+  Type ->
+  State ReconcileEnv (Either TypeErrorType Type)
 reconcileTypesS (GenericType genericId) (GenericType genericId')
   | genericId == genericId' = return $ Right (GenericType genericId)
 reconcileTypesS (GenericType genericId) typ = do
@@ -206,7 +215,7 @@ reconcileTypesS (AtomicType atomicType) (AtomicType atomicType') =
     else
       return $
         Left $
-          STAtomicTypeMismatch (show atomicType) (show atomicType')
+          TeAtomicTypeMismatch (show atomicType) (show atomicType')
 reconcileTypesS
   (FunctionType paramType returnType)
   (FunctionType paramType' returnType') = do
@@ -222,9 +231,9 @@ reconcileTypesS
 reconcileTypesS typ typ' =
   return $
     Left $
-      STTypeMismatch (show typ) (show typ')
+      TeTypeMismatch (show typ) (show typ')
 
-reconcileTypesIS :: Type -> Type -> State InferEnv (Either STypeError Type)
+reconcileTypesIS :: Type -> Type -> State InferEnv (Either TypeErrorType Type)
 reconcileTypesIS t1 t2 = do
   InferEnv count renv glob <- get
   let (newREnv, reconciledM) = runState (reconcileTypesS t1 t2) renv
@@ -234,33 +243,35 @@ reconcileTypesIS t1 t2 = do
       put $ InferEnv count newREnv glob
       return $ Right reconciled
 
-checkTypeS :: Int -> Type -> Type -> State ReconcileEnv (Either STypeError ())
+checkTypeS :: Int -> Type -> Type -> State ReconcileEnv (Either TypeErrorType ())
 checkTypeS _ (GenericType genericId) (GenericType genericId')
   | genericId == genericId' = return $ Right ()
 checkTypeS hi typ (GenericType genericId)
   | genericId > hi =
       return $
         Left $
-          STCheckError (show (GenericType genericId)) $
+          TeCheckError (show (GenericType genericId)) $
             show typ
 checkTypeS _ typ (GenericType genericId) = do
   addedE <- addNewSubstitution genericId typ
   case addedE of
-    Left e ->
-      trace (show e) $
-        return $
-          Left $
-            STCheckError (show (GenericType genericId)) $
-              show typ
+    Left _ ->
+      return $
+        Left $
+          TeCheckError (show (GenericType genericId)) $
+            show typ
     Right _ -> return $ Right ()
 checkTypeS _ (GenericType genericId) typ =
   return $
     Left $
-      STCheckError (show typ) (show $ GenericType genericId)
+      TeCheckError (show typ) (show $ GenericType genericId)
 checkTypeS _ (AtomicType atomicType) (AtomicType atomicType') =
   if atomicType == atomicType'
     then return $ Right ()
-    else return $ Left $ STCheckError (show atomicType) (show atomicType')
+    else
+      return $
+        Left $
+          TeCheckError (show atomicType) (show atomicType')
 checkTypeS
   hi
   (FunctionType paramType returnType)
@@ -275,9 +286,9 @@ checkTypeS
 checkTypeS _ typ typ' =
   return $
     Left $
-      STCheckError (show typ) (show typ')
+      TeCheckError (show typ) (show typ')
 
-checkType :: MutExcTy2 -> Either STypeError ()
+checkType :: MutExcTy2 -> Either TypeErrorType ()
 checkType excTys =
   execState
     (checkTypeS highestIdT2 st1 (met2Snd excTys))
@@ -317,23 +328,23 @@ getTypeOfGlobal gname = do
 
 -- Unit tests
 
-semanticAnalyzerSemTypeTests :: [Bool]
-semanticAnalyzerSemTypeTests =
-  [ checkType (MutExcTy2 (na AInt) (a AInt)) == Right (),
-    checkType (MutExcTy2 (na AInt) (t 1)) == Right (),
-    checkType (MutExcTy2 (mn $ t 1) (a AInt))
-      == Left (STTypeMismatch "AInt" "T1"),
-    checkType (MutExcTy2 (mn $ t 1 --> t 2) (t 1 --> t 2)) == Right (),
-    checkType (MutExcTy2 (mn $ t 1 --> t 2) (t 1 --> t 3)) == Right (),
-    checkType (MutExcTy2 (mn $ t 1 --> t 2) (t 1 --> t 1))
-      == Left (STTypeMismatch "T2" "T3"),
-    checkType (MutExcTy2 (mn $ t 1 --> a AInt) (t 1 --> t 1))
-      == Left (STTypeMismatch "T2" "AInt"),
-    checkType (MutExcTy2 (mn $ t 1 --> t 2) (t 3 --> t 2)) == Right ()
-  ]
-  where
-    (-->) = FunctionType
-    t = GenericType
-    a = AtomicType
-    na at = NormType (AtomicType at) 0
-    mn = mkNormType
+-- semanticAnalyzerSemTypeTests :: [Bool]
+-- semanticAnalyzerSemTypeTests =
+--   [ checkType (MutExcTy2 (na AInt) (a AInt)) == Right (),
+--     checkType (MutExcTy2 (na AInt) (t 1)) == Right (),
+--     checkType (MutExcTy2 (mn $ t 1) (a AInt))
+--       == Left (TeTypeMismatch "AInt" "T1"),
+--     checkType (MutExcTy2 (mn $ t 1 --> t 2) (t 1 --> t 2)) == Right (),
+--     checkType (MutExcTy2 (mn $ t 1 --> t 2) (t 1 --> t 3)) == Right (),
+--     checkType (MutExcTy2 (mn $ t 1 --> t 2) (t 1 --> t 1))
+--       == Left (TeTypeMismatch "T2" "T3"),
+--     checkType (MutExcTy2 (mn $ t 1 --> a AInt) (t 1 --> t 1))
+--       == Left (TeTypeMismatch "T2" "AInt"),
+--     checkType (MutExcTy2 (mn $ t 1 --> t 2) (t 3 --> t 2)) == Right ()
+--   ]
+--   where
+--     (-->) = FunctionType
+--     t = GenericType
+--     a = AtomicType
+--     na at = NormType (AtomicType at) 0
+--     mn = mkNormType

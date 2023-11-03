@@ -41,8 +41,8 @@ data Type
   deriving (Show, Eq)
 
 data ProgramPart
-  = Definition Ident Expression
-  | Declaration Ident Type
+  = Definition TextPos Ident Expression
+  | Declaration TextPos Ident Type
   deriving (Eq, Show)
 
 type Program = [ProgramPart]
@@ -66,7 +66,9 @@ lambdaParser =
     <*> expressionParser
 
 applicationsParser :: Parser Expression
-applicationsParser = foldl1 Application <$> sepBy1 whiteSpace parseExpressionWithoutApplication
+applicationsParser =
+  foldl1 Application
+    <$> sepBy1 whiteSpace parseExpressionWithoutApplication
 
 parseExpressionWithoutApplication :: Parser Expression
 parseExpressionWithoutApplication =
@@ -89,7 +91,8 @@ expressionParser =
         )
 
 parseExpression :: String -> Either LexicalError Expression
-parseExpression s = fst <$> runParser expressionParser s
+parseExpression s =
+  (\(x, _, _) -> x) <$> runParser expressionParser ((0, 0), s)
 
 typeIdParser :: Parser Type
 typeIdParser = TypeId <$> identifier
@@ -132,13 +135,25 @@ parseType :: (TextPos, String) -> Either LexicalError Type
 parseType s = (\(x, _, _) -> x) <$> runParser typeParser s
 
 declarationParser :: Parser ProgramPart
-declarationParser = Declaration <$> identifier <*> (whiteSpaceO *> colon *> whiteSpaceO *> typeParser)
+declarationParser =
+  Declaration
+    <$> getPos
+    <*> identifier
+    <*> (whiteSpaceO *> colon *> whiteSpaceO *> typeParser)
 
 definitionParser :: Parser ProgramPart
-definitionParser = Definition <$> identifier <*> (whiteSpaceO *> colonEquals *> whiteSpaceO *> expressionParser)
+definitionParser =
+  Definition
+    <$> getPos
+    <*> identifier
+    <*> (whiteSpaceO *> colonEquals *> whiteSpaceO *> expressionParser)
 
 blocksParser :: Parser [(TextPos, String)]
-blocksParser = filter (not . null) <$> sepBy endOfLine statement <* whiteSpaceO <* eof
+blocksParser =
+  filter (not . null)
+    <$> sepBy endOfLine statement
+    <* whiteSpaceO
+    <* eof
 
 partParser :: Parser ProgramPart
 partParser = definitionParser <|> declarationParser
@@ -146,7 +161,10 @@ partParser = definitionParser <|> declarationParser
 parseProgram :: String -> Either (Ne.NonEmpty LexicalError) Program
 parseProgram s = do
   blocks <- arrayifyError blocksE
-  let parsedBlocks = fmap (fmap (\(x, _, _) -> x) . runParser partParser) blocks
+  let parsedBlocks =
+        fmap
+          (fmap (\(x, _, _) -> x) . runParser partParser)
+          blocks
   foldr
     ( \b acc -> case (b, acc) of
         (Left e, Left eacc) -> Left $ e `Ne.cons` eacc
@@ -158,7 +176,7 @@ parseProgram s = do
     parsedBlocks
   where
     blocksE :: Either LexicalError [(TextPos, String)]
-    blocksE = (\(x, _, _) -> x) <$> runParser blocksParser ((0,0), s)
+    blocksE = (\(x, _, _) -> x) <$> runParser blocksParser ((0, 0), s)
     arrayifyError :: Either e a -> Either (Ne.NonEmpty e) a
     arrayifyError (Left e) = Left $ Ne.singleton e
     arrayifyError (Right a) = Right a

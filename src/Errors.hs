@@ -6,12 +6,17 @@ module Errors
     LexicalErrorType(..),
     SemanticErrorType(..),
     TypeErrorType(..),
+    CompilerErrorType(..),
+    CompilerError,
     LineNum,
     ColNum,
     TextPos,
     mkLexErr,
     mkSemErr,
     mkTypErr,
+    mkCompErrLex,
+    mkCompErrSem,
+    mkCompErrTyp,
     incTextPos
   )
 where
@@ -24,13 +29,15 @@ type ColNum = Int
 
 type TextPos = (LineNum, ColNum)
 
-data ProgramError e = ProgramError e TextPos
+data ProgramError e = ProgramError e TextPos deriving (Show)
 
 type LexicalError = ProgramError LexicalErrorType
 
 type SemanticError = ProgramError SemanticErrorType
 
 type TypeError = ProgramError TypeErrorType
+
+type CompilerError = ProgramError CompilerErrorType
 
 data CompilerErrorType
   = CeLexicalErrorType LexicalErrorType
@@ -105,6 +112,13 @@ mkSemErr pos typ = ProgramError typ pos
 
 mkTypErr :: TextPos -> TypeErrorType -> TypeError
 mkTypErr pos typ = ProgramError typ pos
+
+mkCompErrLex :: LexicalError -> CompilerError
+mkCompErrLex (ProgramError et pos) = ProgramError (CeLexicalErrorType et) pos
+mkCompErrSem :: SemanticError -> CompilerError
+mkCompErrSem (ProgramError et pos) = ProgramError (CeSemanticErrorType et) pos
+mkCompErrTyp :: TypeError -> CompilerError
+mkCompErrTyp (ProgramError et pos) = ProgramError (CeTypeErrorType et) pos
 
 incTextPos :: TextPos -> Char -> TextPos
 incTextPos (line, col) c =

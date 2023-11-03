@@ -20,6 +20,8 @@ module Lexer
     endOfLine,
     statement,
     eof,
+    getPos,
+    unIdent,
   )
 where
 

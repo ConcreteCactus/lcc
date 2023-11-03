@@ -232,7 +232,7 @@ incState = do
 
 compileFull :: SourceCode -> Either CompilerError CCode
 compileFull sc = do
-  scy <- Y.parseProgramSingleError sc
+  scy <- leftMap mkCompErrLex $ Y.parseProgramSingleError sc
   scs <- S.mkProgramFromSyn scy
   return $ compile scs
 

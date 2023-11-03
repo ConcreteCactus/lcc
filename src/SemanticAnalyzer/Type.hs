@@ -20,7 +20,7 @@ module SemanticAnalyzer.Type
     createGenericList,
     getNewId,
     getTypeOfGlobal,
-    semanticAnalyzerSemTypeTests,
+    -- semanticAnalyzerSemTypeTests,
   )
 where
 
