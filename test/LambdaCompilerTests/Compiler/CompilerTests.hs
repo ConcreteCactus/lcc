@@ -61,7 +61,8 @@ gccCompile src = do
             (srcPath, srcHandle) <- openTempFile dirPath "src.c"
             hPutStr srcHandle csrc
             hClose srcHandle
-            let cp = shell $ "gcc -Wall " ++ srcPath
+            let outfile = dirPath ++ "/a.out"
+            let cp = shell $ "gcc -Wall -o " ++ outfile ++ " " ++ srcPath
             readCreateProcessWithExitCode cp ""
         )
 
