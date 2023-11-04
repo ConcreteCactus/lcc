@@ -12,6 +12,7 @@ module Errors
     ColNum,
     TextPos,
     mkLexErr,
+    mkLexErr',
     mkSemErr,
     mkTypErr,
     mkCompErrLex,
@@ -85,6 +86,7 @@ data LexicalElement
   | LeDigit
   | LeHexDigit
   | LeNotNewLine
+  | LeTypeName
   deriving (Eq)
 
 instance Show LexicalElement where
@@ -103,9 +105,13 @@ instance Show LexicalElement where
   show LeHexDigit = "hexadecimal digit (0-9,a-f,A-F)"
   show LeNotNewLine = "anything but a linefeed"
   show LeNotWhiteSpace = "anything but whitespace"
+  show LeTypeName = "type name"
 
 mkLexErr :: TextPos -> [LexicalElement] -> LexicalError
 mkLexErr pos expect = ProgramError (LeUnexpectedLexicalElement expect) pos
+
+mkLexErr' :: TextPos -> LexicalErrorType -> LexicalError
+mkLexErr' pos typ = ProgramError typ pos
 
 mkSemErr :: TextPos -> SemanticErrorType -> SemanticError
 mkSemErr pos typ = ProgramError typ pos

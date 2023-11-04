@@ -1,18 +1,19 @@
 {-# OPTIONS_GHC -Wincomplete-patterns #-}
 {-# OPTIONS_GHC -Wno-partial-fields #-}
 
-module SyntacticAnalyzer
-  ( Expression (..),
-    Type (..),
-    ProgramPart (..),
-    Literal (..),
-    Program,
-    parseExpression,
-    parseType,
-    parseProgram,
-    parseProgramSingleError,
-    -- syntacticAnalyzerTests,
-  )
+module SyntacticAnalyzer (
+  Expression (..),
+  Type (..),
+  ProgramPart (..),
+  Literal (..),
+  AtomicType (..),
+  Program,
+  parseExpression,
+  parseType,
+  parseProgram,
+  parseProgramSingleError,
+  -- syntacticAnalyzerTests,
+)
 where
 
 import Control.Applicative
@@ -32,7 +33,13 @@ data Expression
   | Application Expression Expression
   deriving (Show, Eq)
 
-data AtomicType = AInt deriving (Show, Eq)
+{- FOURMOLU_DISABLE -}
+data AtomicType
+  = AI8 | AI16 | AI32 | AI64 | AI128 | AISize
+  | AU8 | AU16 | AU32 | AU64 | AU128 | AUSize
+  | AF32 | AF64 | AChar
+  deriving (Show, Eq)
+{- FOURMOLU_ENABLE -}
 
 data Type
   = TypeId Ident
@@ -46,6 +53,25 @@ data ProgramPart
   deriving (Eq, Show)
 
 type Program = [ProgramPart]
+
+typeNameValidator :: String -> Either LexicalErrorType AtomicType
+typeNameValidator str
+  | str == "I8" = Right AI8
+  | str == "I16" = Right AI16
+  | str == "I32" = Right AI32
+  | str == "I64" = Right AI64
+  | str == "I128" = Right AI128
+  | str == "ISize" = Right AISize
+  | str == "U8" = Right AU8
+  | str == "U16" = Right AU16
+  | str == "U32" = Right AU32
+  | str == "U64" = Right AU64
+  | str == "U128" = Right AU128
+  | str == "USize" = Right AUSize
+  | str == "F32" = Right AF32
+  | str == "F64" = Right AF64
+  | str == "Char" = Right AChar
+  | otherwise = Left $ LeUnexpectedLexicalElement [LeTypeName]
 
 idParser :: Parser Expression
 idParser = Id <$> identifier
@@ -85,8 +111,8 @@ expressionParser =
     <|> lambdaParser
     <|> ( whiteSpaceO
             *> ( openParen
-                   *> (whiteSpaceO *> expressionParser <* whiteSpaceO)
-                   <* closeParen
+                  *> (whiteSpaceO *> expressionParser <* whiteSpaceO)
+                  <* closeParen
                )
         )
 
@@ -98,7 +124,7 @@ typeIdParser :: Parser Type
 typeIdParser = TypeId <$> identifier
 
 typeNameParser :: Parser Type
-typeNameParser = TypeName AInt <$ capIdentifier
+typeNameParser = TypeName <$> mapWithError typeNameValidator capIdentifier
 
 functionParser :: Parser Type
 functionParser =
@@ -112,8 +138,8 @@ typeParserWithoutFunction =
     <|> typeNameParser
     <|> ( whiteSpaceO
             *> ( openParen
-                   *> (whiteSpaceO *> typeParser <* whiteSpaceO)
-                   <* closeParen
+                  *> (whiteSpaceO *> typeParser <* whiteSpaceO)
+                  <* closeParen
                )
             <* whiteSpaceO
         )
@@ -125,8 +151,8 @@ typeParser =
     <|> typeNameParser
     <|> ( whiteSpaceO
             *> ( openParen
-                   *> (whiteSpaceO *> typeParser <* whiteSpaceO)
-                   <* closeParen
+                  *> (whiteSpaceO *> typeParser <* whiteSpaceO)
+                  <* closeParen
                )
             <* whiteSpaceO
         )
@@ -174,12 +200,12 @@ parseProgram s = do
     )
     (Right [])
     parsedBlocks
-  where
-    blocksE :: Either LexicalError [(TextPos, String)]
-    blocksE = (\(x, _, _) -> x) <$> runParser blocksParser ((0, 0), s)
-    arrayifyError :: Either e a -> Either (Ne.NonEmpty e) a
-    arrayifyError (Left e) = Left $ Ne.singleton e
-    arrayifyError (Right a) = Right a
+ where
+  blocksE :: Either LexicalError [(TextPos, String)]
+  blocksE = (\(x, _, _) -> x) <$> runParser blocksParser ((0, 0), s)
+  arrayifyError :: Either e a -> Either (Ne.NonEmpty e) a
+  arrayifyError (Left e) = Left $ Ne.singleton e
+  arrayifyError (Right a) = Right a
 
 parseProgramSingleError :: String -> Either LexicalError Program
 parseProgramSingleError s = case parseProgram s of

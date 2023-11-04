@@ -1,10 +1,6 @@
 {-# OPTIONS_GHC -Wno-missing-export-lists #-}
-module Lexer.Internal where
 
--- Separate to blocks (check)
--- Syntactically analyze each block (check)
--- OK, how do we propagate line numbers (in the parser)
--- Runparser takes a starting line number in the text
+module Lexer.Internal where
 
 import Control.Applicative
 import Control.Monad
@@ -44,18 +40,18 @@ instance Applicative Parser where
 
 instance Alternative Parser where
   empty =
-    Parser $
-      const $
-        Left $
-          mkLexErr (0, 0) [LeEndOfStatement]
+    Parser
+      $ const
+      $ Left
+      $ mkLexErr (0, 0) [LeEndOfStatement]
   (Parser a) <|> (Parser b) = Parser (\s -> a s `or'` b s)
-    where
-      or' ::
-        Either LexicalError a ->
-        Either LexicalError a ->
-        Either LexicalError a
-      or' (Right v) _ = Right v
-      or' (Left _) e = e
+   where
+    or' ::
+      Either LexicalError a ->
+      Either LexicalError a ->
+      Either LexicalError a
+    or' (Right v) _ = Right v
+    or' (Left _) e = e
 
 newtype Ident = Ident String deriving (Eq)
 
@@ -68,14 +64,24 @@ unIdent (Ident s) = s
 getPos :: Parser TextPos
 getPos = Parser (\(pos, str) -> Right (pos, pos, str))
 
+mapWithError :: (a -> Either LexicalErrorType b) -> Parser a -> Parser b
+mapWithError f (Parser pf) =
+  Parser
+    ( \(pos, str) -> case pf (pos, str) of
+      Left e -> Left e
+      Right (a, pos', str') -> case f a of
+        Left e -> Left $ mkLexErr' pos' e
+        Right b -> Right (b, pos', str')
+    )
+
 satisfy :: LexicalElement -> (Char -> Bool) -> Parser Char
 satisfy e p = Parser parse
-  where
-    parse (pos, []) = Left $ mkLexErr pos [e]
-    parse (pos, c : cs) =
-      if p c
-        then Right (c, incTextPos pos c, cs)
-        else Left $ mkLexErr pos [e]
+ where
+  parse (pos, []) = Left $ mkLexErr pos [e]
+  parse (pos, c : cs) =
+    if p c
+      then Right (c, incTextPos pos c, cs)
+      else Left $ mkLexErr pos [e]
 
 parseString :: String -> (TextPos, String) -> Maybe (String, TextPos, String)
 parseString [] (pos, inp) = Just ([], pos, inp)
@@ -91,28 +97,28 @@ parseString (x : xs) (pos, x' : xs') =
 
 char :: Char -> Parser Char
 char c = Parser parseChar
-  where
-    parseChar (pos, []) = Left $ mkLexErr pos [LeChar c]
-    parseChar (pos, x : xs) =
-      if x == c
-        then Right (x, incTextPos pos x, xs)
-        else Left $ mkLexErr pos [LeChar c]
+ where
+  parseChar (pos, []) = Left $ mkLexErr pos [LeChar c]
+  parseChar (pos, x : xs) =
+    if x == c
+      then Right (x, incTextPos pos x, xs)
+      else Left $ mkLexErr pos [LeChar c]
 
 word :: String -> Parser String
 word str = Parser (parseString' str)
-  where
-    -- parseString whatWeWant whatWeHave
-    parseString' w (p, h) = case parseString w (p, h) of
-      Just a -> Right a
-      Nothing -> Left $ mkLexErr p [LeWord str]
+ where
+  -- parseString whatWeWant whatWeHave
+  parseString' w (p, h) = case parseString w (p, h) of
+    Just a -> Right a
+    Nothing -> Left $ mkLexErr p [LeWord str]
 
 operator :: String -> Parser String
 operator str = Parser (parseString' str)
-  where
-    -- parseString whatWeWant whatWeHave
-    parseString' w (p, h) = case parseString w (p, h) of
-      Just a -> Right a
-      Nothing -> Left $ mkLexErr p [LeOperator str]
+ where
+  -- parseString whatWeWant whatWeHave
+  parseString' w (p, h) = case parseString w (p, h) of
+    Just a -> Right a
+    Nothing -> Left $ mkLexErr p [LeOperator str]
 
 eof :: Parser ()
 eof =
@@ -205,26 +211,30 @@ b10Integer :: Parser Integer
 b10Integer = collapseMaybe $ readMaybe <$> some (satisfy LeNumber isDigit)
 
 readb16Integer :: String -> Integer
-readb16Integer s = foldr (\(c, n) sm -> toDigit c * (16 ^ n) + sm) 0 (zip s [(length s - 1), (length s - 2) ..])
-  where
-    toDigit :: Char -> Integer
-    toDigit c
-      | c0 <= cc && cc <= c9 = cc - c0
-      | ca <= cc && cc <= cf = cc - ca + 10
-      | otherwise = cc - cA + 10
-      where
-        cc :: Integer
-        cc = fromIntegral $ ord c
-        c0 :: Integer
-        c0 = fromIntegral $ ord '0'
-        c9 :: Integer
-        c9 = fromIntegral $ ord '9'
-        ca :: Integer
-        ca = fromIntegral $ ord 'a'
-        cf :: Integer
-        cf = fromIntegral $ ord 'f'
-        cA :: Integer
-        cA = fromIntegral $ ord 'A'
+readb16Integer s =
+  foldr
+    (\(c, n) sm -> toDigit c * (16 ^ n) + sm)
+    0
+    (zip s [(length s - 1), (length s - 2) ..])
+ where
+  toDigit :: Char -> Integer
+  toDigit c
+    | c0 <= cc && cc <= c9 = cc - c0
+    | ca <= cc && cc <= cf = cc - ca + 10
+    | otherwise = cc - cA + 10
+   where
+    cc :: Integer
+    cc = fromIntegral $ ord c
+    c0 :: Integer
+    c0 = fromIntegral $ ord '0'
+    c9 :: Integer
+    c9 = fromIntegral $ ord '9'
+    ca :: Integer
+    ca = fromIntegral $ ord 'a'
+    cf :: Integer
+    cf = fromIntegral $ ord 'f'
+    cA :: Integer
+    cA = fromIntegral $ ord 'A'
 
 b16Integer :: Parser Integer
 b16Integer =
@@ -251,9 +261,9 @@ whiteSpaceSO = many $ satisfy LeWhiteSpace isSimpleSpace
 
 stripLine :: String -> String
 stripLine line = reverse $ dropWhile isSpace $ reverse starting
-  where
-    starting :: String
-    starting = dropWhile isSpace line
+ where
+  starting :: String
+  starting = dropWhile isSpace line
 
 emptyLine :: Parser ()
 emptyLine = void $ whiteSpaceSO *> char '\n'
@@ -261,9 +271,9 @@ emptyLine = void $ whiteSpaceSO *> char '\n'
 statement :: Parser (TextPos, String)
 statement = do
   _ <-
-    many $
-      many (satisfy LeWhiteSpace isSimpleSpace)
-        <* satisfy LeEndOfLine (== '\n')
+    many
+      $ many (satisfy LeWhiteSpace isSimpleSpace)
+      <* satisfy LeEndOfLine (== '\n')
   startPos <- getPos
   sc <- satisfy LeNotWhiteSpace (not . isSpace)
   lc <- many $ satisfy LeNotNewLine (/= '\n')

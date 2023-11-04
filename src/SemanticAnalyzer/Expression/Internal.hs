@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wno-missing-export-lists #-}
 module SemanticAnalyzer.Expression.Internal where
 
 import Data.Foldable
@@ -15,9 +16,9 @@ data Expression
   deriving (Eq)
 
 data ConvertEnv = ConvertEnv
-  { globals :: [L.Ident],
-    scope :: [L.Ident],
-    decls :: [(L.Ident, NormType)]
+  { ceGlobals :: [L.Ident],
+    ceScope :: [L.Ident],
+    ceDecls :: [(L.Ident, NormType)]
   }
   deriving (Eq, Show)
 
@@ -76,22 +77,22 @@ convertExpressionS (Y.Lit l) = return $ Lit l
 addGlobal :: L.Ident -> State ConvertEnv ()
 addGlobal newGlobal = do
   env <- get
-  put $ env {globals = newGlobal : globals env}
+  put $ env {ceGlobals = newGlobal : ceGlobals env}
 
 addVar :: L.Ident -> State ConvertEnv ()
 addVar newVar = do
   env <- get
-  put $ env {scope = newVar : scope env}
+  put $ env {ceScope = newVar : ceScope env}
 
 popVar :: State ConvertEnv ()
 popVar = do
   env <- get
-  put $ env {scope = tail $ scope env}
+  put $ env {ceScope = tail $ ceScope env}
 
 findVar :: L.Ident -> State ConvertEnv (Maybe Int)
 findVar idName = do
   env <- get
-  let scopeVars = scope env
+  let scopeVars = ceScope env
   let (foundNameM, count) =
         foldr
           ( \name (found, n) ->
@@ -108,15 +109,15 @@ findVar idName = do
 findGlobal :: L.Ident -> State ConvertEnv (Maybe L.Ident)
 findGlobal idName = do
   env <- get
-  let globalVars = globals env
+  let globalVars = ceGlobals env
   let foundNameM = find (== idName) globalVars
   return foundNameM
 
 findDecl :: L.Ident -> State ConvertEnv (Maybe NormType)
 findDecl idName =
-  lookup idName . decls <$> get
+  lookup idName . ceDecls <$> get
 
 addDecl :: L.Ident -> NormType -> State ConvertEnv ()
 addDecl name typ = do
   env <- get
-  put $ env {decls = (name, typ) : decls env}
+  put $ env {ceDecls = (name, typ) : ceDecls env}

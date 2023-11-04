@@ -22,6 +22,7 @@ module Lexer
     eof,
     getPos,
     unIdent,
+    mapWithError,
   )
 where
 

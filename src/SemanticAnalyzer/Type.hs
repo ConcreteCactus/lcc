@@ -1,7 +1,6 @@
 module SemanticAnalyzer.Type
   ( Type (..),
     NormType,
-    AtomicType (..),
     InferEnv (..),
     ReconcileEnv (..),
     ntType,

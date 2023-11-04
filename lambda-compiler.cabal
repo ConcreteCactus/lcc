@@ -42,6 +42,7 @@ library
       SemanticAnalyzer.Internal
       SemanticAnalyzer.Type
       SemanticAnalyzer.Type.Internal
+      StandardLibrary
       SyntacticAnalyzer
       Util
       Util.Limited

@@ -74,8 +74,16 @@ teType :: TypedExpr -> NormType
 teType (InfTyExpr infExpr) = ieType infExpr
 teType (WishTyExpr _ typ) = typ
 
+stConvertEnv :: ConvertEnv
+stConvertEnv =
+  ConvertEnv
+    { ceScope = []
+    , ceGlobals = []
+    , ceDecls = []
+    }
+
 mkUninfProg :: Y.Program -> Either SemanticError UninfProg
-mkUninfProg synProg = execState (mkUninfProgS synProg) (ConvertEnv [] [] [])
+mkUninfProg synProg = execState (mkUninfProgS synProg) stConvertEnv
 
 mkUninfProgS :: Y.Program -> State ConvertEnv (Either SemanticError UninfProg)
 mkUninfProgS synProg = do
@@ -95,7 +103,10 @@ mkUninfProgS synProg = do
         )
         errors of
         Just (Just e) -> return $ Left e
-        Just Nothing -> error "I've got hit by a lightning bolt."
+        Just Nothing ->
+          error
+            $ "The computer has been struck by a lightning bolt.\n"
+            ++ "Please move away from the computer as fast as possible."
         Nothing -> return $ Right $ UninfProg udefs'
  where
   foldEitherM ::
@@ -332,7 +343,8 @@ infFromExprS ::
   [Definition] ->
   Expression ->
   State InferEnv (Either TypeErrorType (Type, [Type]))
-infFromExprS _ (Lit (Y.IntegerLiteral _)) = return $ Right (AtomicType AInt, [])
+infFromExprS _ (Lit (Y.IntegerLiteral _)) =
+  return $ Right (AtomicType Y.AI32, [])
 infFromExprS _ (Ident ident') = do
   (generics, lastGeneric) <- createGenericList ident'
   return $ Right (lastGeneric, generics)
