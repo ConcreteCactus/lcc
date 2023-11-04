@@ -2,24 +2,37 @@ module LambdaCompilerTests.LexerTests (spec) where
 
 import Control.Applicative
 import Control.Monad
+import Data.Char
 import Lexer.Internal
 import Test.Hspec
 import Test.QuickCheck
 
 spec :: Spec
 spec = do
-  describe "block" $ do
+  describe "statement" $ do
     it "can parse the same number of blocks" $ do
       property
-        ( \(Lsc src blockCount) ->
+        ( \(Lsc src blocks) ->
             case runParser (many statement) ((0, 0), src) of
               Left _ -> False
-              Right (statms, _, _) -> length statms == blockCount
+              Right (statms, _, _) -> length statms == length blocks
         )
+    it "parses the same number of non-whitespace characters" $ do
+      property
+        ( \(Lsc src blocks) ->
+            case runParser (many statement) ((0, 0), src) of
+                  Left _ -> False
+                  Right (statms, _, _) ->
+                    countNonWhitespaceChars (map snd statms)
+                      == countNonWhitespaceChars blocks
+        )
+
+countNonWhitespaceChars :: [String] -> Int
+countNonWhitespaceChars str = sum $ map (length . filter (not . isSpace)) str
 
 data LexicallySaneCode = Lsc
   { lscSrc :: String
-  , lscBlockCount :: Int
+  , lscBlocks :: [String]
   }
   deriving (Show)
 
@@ -48,10 +61,6 @@ instance Arbitrary LexicallySaneCode where
         Positive lineLength <- arbitrary
         let line = replicate lineLength 'a'
         return $ spaces' ++ line
-      return
-        $ spacingBefore'
-        ++ firstLine
-        ++ "\n"
-        ++ unlines followingLines
-        ++ spacingAfter
-    return $ Lsc (concat statements) blockCount'
+      let statement' = firstLine ++ "\n" ++ unlines followingLines
+      return (spacingBefore' ++ statement' ++ spacingAfter, statement')
+    return $ Lsc (concatMap fst statements) $ map snd statements
