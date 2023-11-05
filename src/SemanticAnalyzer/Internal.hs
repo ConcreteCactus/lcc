@@ -12,6 +12,7 @@ import qualified Lexer as L
 import SemanticAnalyzer.DependencyList
 import SemanticAnalyzer.Expression
 import SemanticAnalyzer.Type
+import StandardLibrary
 import qualified SyntacticAnalyzer as Y
 import Util
 
@@ -78,8 +79,8 @@ stConvertEnv :: ConvertEnv
 stConvertEnv =
   ConvertEnv
     { ceScope = []
-    , ceGlobals = []
-    , ceDecls = []
+    , ceGlobals = map fst standardLibrary
+    , ceDecls = standardLibrary
     }
 
 mkUninfProg :: Y.Program -> Either SemanticError UninfProg
@@ -169,14 +170,20 @@ mkProgInfDeps uiprog@(UninfProg uiDefs) =
   checkDeps (UninfProg uiDefs') =
     foldr
       ( \udef acc ->
-          ( if all (`elem` map udefName uiDefs') (getAllRefs (udefExpr udef))
-              then acc
-              else
+          ( case find
+              ( \d ->
+                  d
+                    `notElem` map udefName uiDefs'
+                    && d
+                    `notElem` map fst standardLibrary
+              )
+              (getAllRefs (udefExpr udef)) of
+              Just e ->
                 Just
                   $ mkSemErr (udefPos udef)
                   $ SeUndefinedVariable
-                  $ L.unIdent
-                  $ udefName udef
+                  $ L.unIdent e
+              Nothing -> acc
           )
       )
       Nothing

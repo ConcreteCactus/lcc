@@ -1,17 +1,17 @@
-module StandardLibrary (library) where
+module StandardLibrary (standardLibrary) where
 
 import Data.Bifunctor
 import qualified Lexer as L
 import qualified SemanticAnalyzer.Type as T
 import SyntacticAnalyzer
 
-library :: [(L.Ident, T.NormType)]
-library = map (bimap L.Ident T.mkNormType) library'
+standardLibrary :: [(L.Ident, T.NormType)]
+standardLibrary = map (bimap L.Ident T.mkNormType) library'
 
 library' :: [(String, T.Type)]
 library' =
-  [ ("add_i8", a AI8 `to` a AI8 `to` a AI8)
-  , ("print_i8", a AI8 `to` g 1 `to` g 1)
+  [ ("add_i32", a AI32 `to` a AI32 `to` a AI32)
+  , ("print_i32", a AI32 `to` g 1 `to` g 1)
   ]
 
 to :: T.Type -> T.Type -> T.Type

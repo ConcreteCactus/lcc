@@ -9,9 +9,9 @@ import Test.Hspec
 main :: IO ()
 main = do
   hspec $ do
+    LTest.spec
     SmATest.spec
     DGTest.spec
     DLTest.spec
     TyTest.spec
     CTest.spec
-    LTest.spec

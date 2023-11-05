@@ -2,6 +2,7 @@ module LambdaCompilerTests.SemanticAnalyzer.TypeTest (spec) where
 
 import SemanticAnalyzer.Type.Internal
 import Test.Hspec
+import qualified SyntacticAnalyzer as Y
 
 spec :: Spec
 spec = do
@@ -42,7 +43,7 @@ gt :: Int -> Type
 gt = GenericType
 
 at :: Type
-at = AtomicType AInt
+at = AtomicType Y.AI32
 
 ft :: Type -> Type -> Type
 ft = FunctionType

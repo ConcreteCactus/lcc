@@ -79,6 +79,8 @@ data LexicalElement
   | LeEndOfStatement
   | LeEndOfLine
   | LeLowercaseCharacter
+  | LeIdentFirstCharacter
+  | LeIdentCharacter
   | LeUppercaseCharacter
   | LeAlphabeticalCharacter
   | LeAlphanumericCharacter
@@ -97,6 +99,8 @@ instance Show LexicalElement where
   show LeEndOfLine = "end of line"
   show LeEndOfStatement = "end of statement"
   show LeLowercaseCharacter = "lowercase character"
+  show LeIdentFirstCharacter = "lowercase character or '_'"
+  show LeIdentCharacter = "alpanumeric character or '_'"
   show LeUppercaseCharacter = "uppercase character"
   show LeAlphabeticalCharacter = "alphabetic character"
   show LeAlphanumericCharacter = "alphanumeric character"
@@ -129,5 +133,5 @@ mkCompErrTyp (ProgramError et pos) = ProgramError (CeTypeErrorType et) pos
 incTextPos :: TextPos -> Char -> TextPos
 incTextPos (line, col) c =
   if c == '\n' 
-  then (line+1, 1)
+  then (line+1, 0)
   else (line, col+1)

@@ -22,6 +22,8 @@ spec = do
       isCompilableByGCCWoWarning program2 `shouldReturn` True
     it "can compile with main fn" $ do
       isCompilableByGCCWoWarning program3 `shouldReturn` True
+    it "can compile with main fn and call to stdlib" $ do
+      isCompilableByGCCWoWarning program4 `shouldReturn` True
 
 program1 :: SourceCode
 program1 =
@@ -40,6 +42,11 @@ program3 =
     ++ "false := \\a.\\b.b\n"
     ++ "and := \\a.\\b.a b false\n"
     ++ "main := and true false\n"
+
+program4 :: SourceCode
+program4 =
+  "one := 1"
+    ++ "main := add_i32 1 one"
 
 testCompile :: SourceCode -> Either CompilerError CCode
 testCompile sc = do

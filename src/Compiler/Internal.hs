@@ -15,9 +15,9 @@ import Util
 type CCode = String
 
 data ExpressionBuilder = ExprBuildr
-  { ebStatms :: [CCode],
-    ebGStatms :: [CCode],
-    ebCounter :: Int
+  { ebStatms :: [CCode]
+  , ebGStatms :: [CCode]
+  , ebCounter :: Int
   }
 
 data Expression
@@ -30,9 +30,9 @@ data Expression
   deriving (Show)
 
 data Closure = Closure
-  { clCaptures :: [Int],
-    clExpression :: Expression,
-    clName :: CCode
+  { clCaptures :: [Int]
+  , clExpression :: Expression
+  , clName :: CCode
   }
   deriving (Show)
 
@@ -44,26 +44,26 @@ compile program =
     ++ runtime
     ++ unlines (map genHelper $ S.progDefs program)
     ++ if mainfnHelper then mainfn else mainfnEmpty
-  where
-    genHelper def@(S.Definition gname _) = genFunction gname $ mkExpression def
-    predefHelper (S.Definition gname _) =
-      "void* "
-        ++ show gname
-        ++ "_func(void);"
-    mainfnHelper =
-      isJust $
-        Li.find
-          ( \(S.Definition gname _) ->
-              show gname == "main"
-          )
-          (S.progDefs program)
+ where
+  genHelper def@(S.Definition gname _) = genFunction gname $ mkExpression def
+  predefHelper (S.Definition gname _) =
+    "void* "
+      ++ show gname
+      ++ "_func(void);"
+  mainfnHelper =
+    isJust
+      $ Li.find
+        ( \(S.Definition gname _) ->
+            show gname == "main"
+        )
+        (S.progDefs program)
 
 showExpression :: L.Ident -> Expression -> (CCode, CCode)
 showExpression gname expr =
   let (ExprBuildr statms gstatms _, expr') =
         runState (showExpressionS gname expr) (ExprBuildr [] [] 1)
-   in ( unlines (map ("\t" ++) statms ++ ["\treturn " ++ expr' ++ ";"]),
-        unlines gstatms
+   in ( unlines (map ("\t" ++) statms ++ ["\treturn " ++ expr' ++ ";"])
+      , unlines gstatms
       )
 
 showExpressionS :: L.Ident -> Expression -> State ExpressionBuilder CCode
@@ -73,17 +73,24 @@ showExpressionS _ (CaptureRef n) = return $ "self->capture_" ++ show n
 showExpressionS _ (FunctionRef func) = do
   return $ show func ++ "_func()"
 showExpressionS gname (ClosureExpr closure) = addClosure gname closure
+showExpressionS gname (Application expr1@(FunctionRef _) expr2) = do
+  expr1' <- showExpressionS gname expr1
+  expr2' <- showExpressionS gname expr2
+  indx <- incBuilderIndex
+  let icl = "icl" ++ show indx
+  addStatement $ "gen_closure* " ++ icl ++ " = " ++ expr1' ++ ";"
+  return $ icl ++ "->clfunc(" ++ icl ++ ", " ++ expr2' ++ ")"
 showExpressionS gname (Application expr1 expr2) = do
   expr1' <- showExpressionS gname expr1
   expr2' <- showExpressionS gname expr2
-  return $
-    "((gen_closure*)("
-      ++ expr1'
-      ++ "))->clfunc("
-      ++ expr1'
-      ++ ", "
-      ++ expr2'
-      ++ ")"
+  return
+    $ "((gen_closure*)("
+    ++ expr1'
+    ++ "))->clfunc("
+    ++ expr1'
+    ++ ", "
+    ++ expr2'
+    ++ ")"
 
 genFunction :: L.Ident -> Expression -> CCode
 genFunction name expr =
@@ -94,8 +101,8 @@ genFunction name expr =
     ++ "_func(void) {\n"
     ++ expr'
     ++ "}\n"
-  where
-    (expr', gcode) = showExpression name expr
+ where
+  (expr', gcode) = showExpression name expr
 
 addClosureFunction ::
   L.Ident ->
@@ -136,27 +143,27 @@ addClosure gname (Closure cptrs expr _) = do
   ind <- incBuilderIndex
   clstruct <- addClosureStruct gname cptrs
   clfunc <- addClosureFunction gname clstruct expr
-  addStatement $
-    clstruct
-      ++ "* c"
-      ++ show ind
-      ++ " = ("
-      ++ clstruct
-      ++ "*)new_closure(sizeof("
-      ++ clstruct
-      ++ "));"
+  addStatement
+    $ clstruct
+    ++ "* c"
+    ++ show ind
+    ++ " = ("
+    ++ clstruct
+    ++ "*)new_closure(sizeof("
+    ++ clstruct
+    ++ "));"
   mapM_ (addStatement . assignHelper ind) cptrs
   addStatement $ "c" ++ show ind ++ "->clfunc = " ++ clfunc ++ ";"
   return $ "c" ++ show ind
-  where
-    assignHelper ind n =
-      "c"
-        ++ show ind
-        ++ "->capture_"
-        ++ show n
-        ++ " = "
-        ++ (if n > 2 then "self->capture_" ++ show (n - 1) else "param")
-        ++ ";"
+ where
+  assignHelper ind n =
+    "c"
+      ++ show ind
+      ++ "->capture_"
+      ++ show n
+      ++ " = "
+      ++ (if n > 2 then "self->capture_" ++ show (n - 1) else "param")
+      ++ ";"
 
 incBuilderIndex :: State ExpressionBuilder Int
 incBuilderIndex = do
@@ -218,9 +225,9 @@ mkClosure ident expr = do
   let cptrs' = filter (> 1) cptrs
   let closure =
         Closure
-          { clCaptures = cptrs',
-            clExpression = expr',
-            clName = show ident ++ "_c_" ++ show clId
+          { clCaptures = cptrs'
+          , clExpression = expr'
+          , clName = show ident ++ "_c_" ++ show clId
           }
   return (closure, map (+ (-1)) cptrs')
 

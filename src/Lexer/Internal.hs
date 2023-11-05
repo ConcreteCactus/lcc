@@ -169,12 +169,18 @@ openParen = void $ char '('
 closeParen :: Parser ()
 closeParen = void $ char ')'
 
+isFirstIdentChar :: Char -> Bool
+isFirstIdentChar c = isLower c || c == '_'
+
+isIdentChar :: Char -> Bool
+isIdentChar c = isAlphaNum c || c == '_'
+
 identifier :: Parser Ident
 identifier =
   Ident
     <$> ( (:)
-            <$> satisfy LeLowercaseCharacter isLower
-            <*> many (satisfy LeLowercaseCharacter isAlphaNum)
+            <$> satisfy LeIdentFirstCharacter isLower
+            <*> many (satisfy LeIdentCharacter isIdentChar)
         )
 
 capIdentifier :: Parser String

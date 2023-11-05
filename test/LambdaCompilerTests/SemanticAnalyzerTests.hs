@@ -117,7 +117,7 @@ testP s =
     >>= mkProgramFromSyn
 
 nai :: Type
-nai = AtomicType AInt
+nai = AtomicType Y.AI32
 
 lam :: String -> Expression -> Expression
 lam s = Lambda (L.Ident s)
@@ -131,8 +131,8 @@ funt = FunctionType
 mkn :: Type -> NormType
 mkn = mkNormType
 
-ident :: String -> L.Ident
-ident = L.Ident
+-- ident :: String -> L.Ident
+-- ident = L.Ident
 
 program1 :: SourceCode
 program1 =
@@ -204,19 +204,19 @@ program11 =
 
 program12 :: SourceCode
 program12 =
-  "a : Int -> Int \n"
+  "a : I32 -> I32 \n"
     ++ "a := \\x.b x x\n"
-    ++ "b : Int -> Int -> Int\n"
+    ++ "b : I32 -> I32 -> I32\n"
     ++ "b := \\x.\\y.a (b x y)\n"
 
 program13 :: SourceCode
 program13 =
-  "a : Int -> Int \n"
+  "a : I32 -> I32 \n"
     ++ "a := \\x.b x x\n"
     ++ "b := \\x.\\y.a (b x y)\n"
 
 program14 :: SourceCode
 program14 =
-  "a : Int -> Int \n"
+  "a : I32 -> I32 \n"
     ++ "a := \\x. x\n"
     ++ "b := \\x.\\y.a y\n"
