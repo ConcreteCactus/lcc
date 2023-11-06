@@ -73,24 +73,13 @@ showExpressionS _ (CaptureRef n) = return $ "self->capture_" ++ show n
 showExpressionS _ (FunctionRef func) = do
   return $ show func ++ "_func()"
 showExpressionS gname (ClosureExpr closure) = addClosure gname closure
-showExpressionS gname (Application expr1@(FunctionRef _) expr2) = do
+showExpressionS gname (Application expr1 expr2) = do
   expr1' <- showExpressionS gname expr1
   expr2' <- showExpressionS gname expr2
   indx <- incBuilderIndex
   let icl = "icl" ++ show indx
   addStatement $ "gen_closure* " ++ icl ++ " = " ++ expr1' ++ ";"
   return $ icl ++ "->clfunc(" ++ icl ++ ", " ++ expr2' ++ ")"
-showExpressionS gname (Application expr1 expr2) = do
-  expr1' <- showExpressionS gname expr1
-  expr2' <- showExpressionS gname expr2
-  return
-    $ "((gen_closure*)("
-    ++ expr1'
-    ++ "))->clfunc("
-    ++ expr1'
-    ++ ", "
-    ++ expr2'
-    ++ ")"
 
 genFunction :: L.Ident -> Expression -> CCode
 genFunction name expr =
