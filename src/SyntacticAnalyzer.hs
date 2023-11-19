@@ -21,10 +21,10 @@ import qualified Data.List.NonEmpty as Ne
 import Errors
 import Lexer
 
-newtype Literal = IntegerLiteral Integer deriving (Eq)
+data Literal = Literal AtomicType Integer deriving (Eq)
 
 instance Show Literal where
-  show (IntegerLiteral n) = show n
+  show (Literal _ n) = show n
 
 data Expression
   = Id Ident
@@ -35,7 +35,7 @@ data Expression
 
 {- FOURMOLU_DISABLE -}
 data AtomicType
-  = AI8 | AI16 | AI32 | AI64 | AI128 | AISize
+  = AI8 | AI16 | AI32 | AI64 | AI128
   | AU8 | AU16 | AU32 | AU64 | AU128 | AUSize
   | AF32 | AF64 | AChar
   deriving (Show, Eq)
@@ -61,7 +61,6 @@ typeNameValidator str
   | str == "I32" = Right AI32
   | str == "I64" = Right AI64
   | str == "I128" = Right AI128
-  | str == "ISize" = Right AISize
   | str == "U8" = Right AU8
   | str == "U16" = Right AU16
   | str == "U32" = Right AU32
@@ -77,7 +76,7 @@ idParser :: Parser Expression
 idParser = Id <$> identifier
 
 integerLiteralParser :: Parser Literal
-integerLiteralParser = IntegerLiteral <$> integer
+integerLiteralParser = Literal AI32 <$> integer
 
 literalParser :: Parser Expression
 literalParser = Lit <$> integerLiteralParser

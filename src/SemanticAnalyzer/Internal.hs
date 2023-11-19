@@ -16,6 +16,14 @@ import StandardLibrary
 import qualified SyntacticAnalyzer as Y
 import Util
 
+stdLib ::
+  [( L.Ident
+  , NormType
+  , (Int -> Writer () String) ->
+    Writer () [String]
+  )]
+stdLib = standardLibrary
+
 data UninfDefinition = UninfDefinition
   { udefName :: L.Ident
   , udefPos :: TextPos
@@ -79,8 +87,8 @@ stConvertEnv :: ConvertEnv
 stConvertEnv =
   ConvertEnv
     { ceScope = []
-    , ceGlobals = map fst standardLibrary
-    , ceDecls = standardLibrary
+    , ceGlobals = map (\(a, _, _) -> a) stdLib
+    , ceDecls = map (\(a, b, _) -> (a, b)) stdLib
     }
 
 mkUninfProg :: Y.Program -> Either SemanticError UninfProg
@@ -175,7 +183,7 @@ mkProgInfDeps uiprog@(UninfProg uiDefs) =
                   d
                     `notElem` map udefName uiDefs'
                     && d
-                    `notElem` map fst standardLibrary
+                    `notElem` map (\(a, _, _) -> a) stdLib
               )
               (getAllRefs (udefExpr udef)) of
               Just e ->
@@ -350,7 +358,7 @@ infFromExprS ::
   [Definition] ->
   Expression ->
   State InferEnv (Either TypeErrorType (Type, [Type]))
-infFromExprS _ (Lit (Y.IntegerLiteral _)) =
+infFromExprS _ (Lit (Y.Literal _ _)) =
   return $ Right (AtomicType Y.AI32, [])
 infFromExprS _ (Ident ident') = do
   (generics, lastGeneric) <- createGenericList ident'

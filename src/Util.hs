@@ -1,25 +1,26 @@
-module Util
-  ( sinkL,
-    sinkR,
-    State (..),
-    get,
-    put,
-    Subscript (..),
-    maybeToEither,
-    execState,
-    evalState,
-    trim,
-    (!!!),
-    (+-+),
-    (-:),
-    forgivingZipWith,
-    forgivingZipWithM,
-    forgivingZipWithME,
-    (<<$>>),
-    fstMap,
-    sndMap,
-    leftMap,
-  )
+module Util (
+  sinkL,
+  sinkR,
+  State (..),
+  Writer (..),
+  get,
+  put,
+  Subscript (..),
+  maybeToEither,
+  execState,
+  evalState,
+  trim,
+  (!!!),
+  (+-+),
+  (-:),
+  forgivingZipWith,
+  forgivingZipWithM,
+  forgivingZipWithME,
+  (<<$>>),
+  fstMap,
+  sndMap,
+  leftMap,
+)
 where
 
 import Data.Char
@@ -55,6 +56,24 @@ instance Monad (State s) where
            in let (State sb) = f a in sb s2
       )
 
+newtype Writer w a = Writer {runWriter :: (a, w)}
+
+instance (Semigroup a, Semigroup w) => Semigroup (Writer w a) where
+  (Writer (a1, w1)) <> (Writer (a2, w2)) = Writer (a1 <> a2, w1 <> w2)
+
+instance (Monoid a, Monoid w) => Monoid (Writer w a) where
+  mempty = Writer (mempty, mempty)
+
+instance Functor (Writer w) where
+  fmap f (Writer (a, w)) = Writer (f a, w)
+
+instance (Monoid w) => Applicative (Writer w) where
+  pure a = Writer (a, mempty)
+  (Writer (fa1, w1)) <*> (Writer (a2, w2)) = Writer (fa1 a2, w1 <> w2)
+
+instance (Monoid w) => Monad (Writer w) where
+  (Writer (a1, w1)) >>= f = let Writer (a2, w2) = f a1 in Writer (a2, w1 <> w2)
+
 get :: State s s
 get = State (\s -> (s, s))
 
@@ -66,9 +85,9 @@ newtype Subscript = Subscript {unSubscript :: Integer}
 
 instance Show Subscript where
   show (Subscript i) = show $ foldr (\c s -> chars !! digitToInt c : s) "" $ show i
-    where
-      chars :: [Char]
-      chars = "₀₁₂₃₄₅₆₇₈₉"
+   where
+    chars :: [Char]
+    chars = "₀₁₂₃₄₅₆₇₈₉"
 
 maybeToEither :: Maybe a -> e -> Either e a
 maybeToEither Nothing e = Left e
@@ -96,12 +115,19 @@ forgivingZipWith f (x : xs) (y : ys) = f x y : forgivingZipWith f xs ys
 forgivingZipWithM :: (Applicative m) => (a -> a -> m a) -> [a] -> [a] -> m [a]
 forgivingZipWithM _ [] r = pure r
 forgivingZipWithM _ r [] = pure r
-forgivingZipWithM f (x : xs) (y : ys) = (:) <$> f x y <*> forgivingZipWithM f xs ys
+forgivingZipWithM f (x : xs) (y : ys) =
+  (:)
+    <$> f x y
+    <*> forgivingZipWithM f xs ys
 
-forgivingZipWithME :: (Applicative m) => (a -> a -> m (Either e a)) -> [a] -> [a] -> m [Either e a]
+forgivingZipWithME ::
+  (Applicative m) => (a -> a -> m (Either e a)) -> [a] -> [a] -> m [Either e a]
 forgivingZipWithME _ [] r = pure (Right <$> r)
 forgivingZipWithME _ r [] = pure (Right <$> r)
-forgivingZipWithME f (x : xs) (y : ys) = (:) <$> f x y <*> forgivingZipWithME f xs ys
+forgivingZipWithME f (x : xs) (y : ys) =
+  (:)
+    <$> f x y
+    <*> forgivingZipWithME f xs ys
 
 (+-+) :: (Eq a) => [a] -> [a] -> [a]
 (a : as) +-+ bs
@@ -125,6 +151,6 @@ fstMap f (a, c) = (f a, c)
 sndMap :: (a -> b) -> (c, a) -> (c, b)
 sndMap f (c, a) = (c, f a)
 
-leftMap :: (a -> b) ->  Either a c -> Either b c
-leftMap f (Right a) = Right a
+leftMap :: (a -> b) -> Either a c -> Either b c
+leftMap _ (Right a) = Right a
 leftMap f (Left a) = Left (f a)
