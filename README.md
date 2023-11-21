@@ -1,1 +1,1 @@
-# lambda-compiler
+lc-notes/General Description of the Project.md
