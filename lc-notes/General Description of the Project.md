@@ -5,3 +5,5 @@ This is a proof-of-concept implementation of a more usable form of a simply type
 The language will be statically typed, most similar to a simply typed lambda calculus, with the exception of the support for parametric polymorphism.
 
 The implementation will consist of a compiler that can compile to C code, which can be further compiled to machine code by the compiler of the reader's choice. The language will be garbage collected.
+
+Several parts of the project will be built using test driven development strategies, and the version control tool of our choice is git.
