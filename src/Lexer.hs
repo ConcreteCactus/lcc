@@ -3,6 +3,7 @@
 module Lexer
   ( Ident (..),
     Parser (..),
+    word,
     identifier,
     integer,
     whiteSpace,

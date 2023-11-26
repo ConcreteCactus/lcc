@@ -255,6 +255,7 @@ b16Integer =
                   )
               )
         )
+    <* word "_"
 
 integer :: Parser Integer
 integer = b16Integer <|> b10Integer

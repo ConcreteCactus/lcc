@@ -20,6 +20,7 @@ import Control.Applicative
 import qualified Data.List.NonEmpty as Ne
 import Errors
 import Lexer
+import Data.Functor
 
 data Literal = Literal AtomicType Integer deriving (Eq)
 
@@ -54,6 +55,22 @@ data ProgramPart
 
 type Program = [ProgramPart]
 
+literalTypeParser :: Parser AtomicType
+literalTypeParser =
+  (word "i8" $> AI8) <|>
+  (word "i16" $> AI16) <|>
+  (word "i32" $> AI32) <|>
+  (word "i64" $> AI64) <|>
+  (word "i128" $> AI128) <|>
+  (word "u8" $> AU8) <|>
+  (word "u16" $> AU16) <|>
+  (word "u32" $> AU32) <|>
+  (word "u64" $> AU64) <|>
+  (word "u128" $> AU128) <|>
+  (word "f32" $> AF32) <|>
+  (word "f64" $> AF64) <|>
+  (word "c" $> AChar)
+
 typeNameValidator :: String -> Either LexicalErrorType AtomicType
 typeNameValidator str
   | str == "I8" = Right AI8
@@ -76,7 +93,11 @@ idParser :: Parser Expression
 idParser = Id <$> identifier
 
 integerLiteralParser :: Parser Literal
-integerLiteralParser = Literal AI32 <$> integer
+integerLiteralParser = do
+  int <- integer
+  typ <- literalTypeParser
+  return $ Literal typ int
+
 
 literalParser :: Parser Expression
 literalParser = Lit <$> integerLiteralParser

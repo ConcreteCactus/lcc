@@ -54,6 +54,18 @@
             }
           },
           {
+            "id": "404c35ece023a44d",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Valami.md",
+                "mode": "source",
+                "source": false
+              }
+            }
+          },
+          {
             "id": "d28c28618c66df68",
             "type": "leaf",
             "state": {
@@ -62,7 +74,7 @@
             }
           }
         ],
-        "currentTab": 3
+        "currentTab": 4
       }
     ],
     "direction": "vertical"
@@ -128,7 +140,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "General Description of the Project.md",
+                "file": "Valami.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -145,7 +157,7 @@
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "General Description of the Project.md",
+                "file": "Valami.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               }
@@ -168,7 +180,7 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "General Description of the Project.md"
+                "file": "Valami.md"
               }
             }
           },
@@ -199,9 +211,10 @@
       "command-palette:Open command palette": false
     }
   },
-  "active": "5de1999099f57052",
+  "active": "404c35ece023a44d",
   "lastOpenFiles": [
     "General Description of the Project.md",
+    "Valami.md",
     "De Brujin indices.md",
     "Alpha equivalence is hard.md",
     "Expression-Identifier Invariance Rule.md"

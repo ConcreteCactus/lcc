@@ -358,8 +358,8 @@ infFromExprS ::
   [Definition] ->
   Expression ->
   State InferEnv (Either TypeErrorType (Type, [Type]))
-infFromExprS _ (Lit (Y.Literal _ _)) =
-  return $ Right (AtomicType Y.AI32, [])
+infFromExprS _ (Lit (Y.Literal typ _)) =
+  return $ Right (AtomicType typ, [])
 infFromExprS _ (Ident ident') = do
   (generics, lastGeneric) <- createGenericList ident'
   return $ Right (lastGeneric, generics)
