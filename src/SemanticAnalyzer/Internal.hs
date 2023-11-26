@@ -4,6 +4,7 @@
 
 module SemanticAnalyzer.Internal where
 
+import Control.Applicative
 import Control.Monad
 import Data.Bifunctor
 import Data.Foldable
@@ -17,11 +18,12 @@ import qualified SyntacticAnalyzer as Y
 import Util
 
 stdLib ::
-  [( L.Ident
-  , NormType
-  , (Int -> Writer () String) ->
-    Writer () [String]
-  )]
+  [ ( L.Ident
+    , NormType
+    , (Int -> Writer () String) ->
+      Writer () [String]
+    )
+  ]
 stdLib = standardLibrary
 
 data UninfDefinition = UninfDefinition
@@ -423,11 +425,14 @@ infFromExprS parts (Application expr1 expr2) = do
 
 lookupRefType :: [Definition] -> L.Ident -> Maybe NormType
 lookupRefType parts refName =
-  find (\(Definition name _) -> name == refName) parts
-    >>= ( \case
-            (Definition _ (WishTyExpr _ wtyp)) -> Just wtyp
-            (Definition _ (InfTyExpr infExpr)) -> Just (ieType infExpr)
-        )
+  ( find (\(Definition name _) -> name == refName) parts
+      >>= ( \case
+              (Definition _ (WishTyExpr _ wtyp)) -> Just wtyp
+              (Definition _ (InfTyExpr infExpr)) -> Just (ieType infExpr)
+          )
+  )
+    <|> (\(_, a, _) -> a)
+    <$> find (\(name, _, _) -> name == refName) stdLib
 
 mkProgramFromSyn :: Y.Program -> Either CompilerError Program
 mkProgramFromSyn syn =
