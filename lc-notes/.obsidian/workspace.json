@@ -59,7 +59,7 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Valami.md",
+                "file": "General Description of the Project.md",
                 "mode": "source",
                 "source": false
               }
@@ -140,7 +140,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "Valami.md",
+                "file": "General Description of the Project.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -157,7 +157,7 @@
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "Valami.md",
+                "file": "General Description of the Project.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               }
@@ -180,7 +180,7 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "Valami.md"
+                "file": "General Description of the Project.md"
               }
             }
           },
@@ -213,8 +213,8 @@
   },
   "active": "404c35ece023a44d",
   "lastOpenFiles": [
-    "General Description of the Project.md",
     "Valami.md",
+    "General Description of the Project.md",
     "De Brujin indices.md",
     "Alpha equivalence is hard.md",
     "Expression-Identifier Invariance Rule.md"

@@ -1,9 +1,4 @@
-# General Description of the Project
+# Lambda Calculus Implementation
 
-This is a proof-of-concept implementation of a more usable form of a simply typed lambda calculus. The usual three building blocks of the model (variables, lambdas and abstractions) will be present as well as a fourth one that we call *references*. Most significantly, the structure of the to be compiled program code will be a list of definitions attached to unique names. When we use these names throughout the program code that is when we use a reference. Using references should generally be thought of as using the definition attached to the reference in place of the reference's position with minor differences in the two.
-
-The language will be statically typed, most similar to a simply typed lambda calculus, with the exception of the support for parametric polymorphism.
-
-The implementation will consist of a compiler that can compile to C code, which can be further compiled to machine code by the compiler of the reader's choice. The language will be garbage collected.
-
-Several parts of the project will be built using test driven development strategies, and the version control tool of our choice is git.
+This is a compiler that compiles a more usable form of a simply typed lambda calculus to C. The language is statically typed, it is able to infer the types of expressions, and type checking is also possible. The compiler is written in Haskell, and the compiled language has a lot in common with it. The language is garbage-collected.
+Some parts of the compiler have been written with a more liberal form of test driven development, and most if not all parts of the compiler and the language are tested.
