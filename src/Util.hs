@@ -20,6 +20,7 @@ module Util (
   fstMap,
   sndMap,
   leftMap,
+  except,
 )
 where
 
@@ -154,3 +155,8 @@ sndMap f (c, a) = (c, f a)
 leftMap :: (a -> b) -> Either a c -> Either b c
 leftMap _ (Right a) = Right a
 leftMap f (Left a) = Left (f a)
+
+except :: Eq a => [a] -> [a] -> [a]
+except as bs = filter (`notElem`bs) as
+
+infixl 4 `except`

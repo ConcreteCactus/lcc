@@ -38,7 +38,7 @@ data Expression
 data AtomicType
   = AI8 | AI16 | AI32 | AI64 | AI128
   | AU8 | AU16 | AU32 | AU64 | AU128 | AUSize
-  | AF32 | AF64 | AChar
+  | AF32 | AF64 | AChar | ABool
   deriving (Show, Eq)
 {- FOURMOLU_ENABLE -}
 
@@ -69,7 +69,8 @@ literalTypeParser =
   (word "u128" $> AU128) <|>
   (word "f32" $> AF32) <|>
   (word "f64" $> AF64) <|>
-  (word "c" $> AChar)
+  (word "char" $> AChar) <|>
+  (word "bool" $> AChar)
 
 typeNameValidator :: String -> Either LexicalErrorType AtomicType
 typeNameValidator str
@@ -87,6 +88,7 @@ typeNameValidator str
   | str == "F32" = Right AF32
   | str == "F64" = Right AF64
   | str == "Char" = Right AChar
+  | str == "Bool" = Right ABool
   | otherwise = Left $ LeUnexpectedLexicalElement [LeTypeName]
 
 idParser :: Parser Expression

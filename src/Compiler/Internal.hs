@@ -234,12 +234,14 @@ compileFull sc = do
 
 {- FOURMOLU_DISABLE -}
 includes :: CCode
-includes = "#include <stdlib.h>\n#include <stdio.h>\n\n"
+includes = "#include <stdlib.h>\n#include <stdio.h>\n#include <stdint.h>\n\n"
 {- FOURMOLU_ENABLE -}
 
 {- FOURMOLU_DISABLE -}
 runtime :: CCode
 runtime =
+  "typedef __int128 int128_t;\n" ++
+  "typedef unsigned __int128 uint128_t;\n" ++
   "void* new_closure(size_t size) {\n" ++
       "\treturn malloc(size);\n" ++
   "}\n" ++
