@@ -15,8 +15,10 @@ module Util (
   (-:),
   forgivingZipWith,
   forgivingZipWithM,
+  forgivingZipWithMM,
   forgivingZipWithME,
   (<<$>>),
+  (<<*>>),
   fstMap,
   sndMap,
   leftMap,
@@ -25,6 +27,7 @@ module Util (
 where
 
 import Data.Char
+import Control.Applicative
 
 sinkL :: Either e a -> Either (Either e f) a
 sinkL (Left e) = Left (Left e)
@@ -130,6 +133,16 @@ forgivingZipWithME f (x : xs) (y : ys) =
     <$> f x y
     <*> forgivingZipWithME f xs ys
 
+forgivingZipWithMM ::
+  (Applicative m1, Applicative m2) =>
+  (a -> a -> m1 (m2 a)) ->
+  [a] ->
+  [a] ->
+  m1 (m2 [a])
+forgivingZipWithMM _ [] bs = pure $ pure bs
+forgivingZipWithMM _ as [] = pure $ pure as
+forgivingZipWithMM f (a : as) (b : bs) = (:) <<$>> f a b <<*>> forgivingZipWithMM f as bs
+
 (+-+) :: (Eq a) => [a] -> [a] -> [a]
 (a : as) +-+ bs
   | a `elem` bs = as +-+ bs
@@ -144,7 +157,15 @@ a -: as
 (<<$>>) :: (Functor f, Functor g) => (a -> b) -> f (g a) -> f (g b)
 (<<$>>) = fmap . fmap
 
+(<<*>>) ::
+  (Applicative m1, Applicative m2) =>
+  m1 (m2 (a -> b)) ->
+  m1 (m2 a) ->
+  m1 (m2 b)
+(<<*>>) = liftA2 (<*>)
+
 infixl 4 <<$>>
+infixl 3 <<*>>
 
 fstMap :: (a -> b) -> (a, c) -> (b, c)
 fstMap f (a, c) = (f a, c)
@@ -156,7 +177,7 @@ leftMap :: (a -> b) -> Either a c -> Either b c
 leftMap _ (Right a) = Right a
 leftMap f (Left a) = Left (f a)
 
-except :: Eq a => [a] -> [a] -> [a]
-except as bs = filter (`notElem`bs) as
+except :: (Eq a) => [a] -> [a] -> [a]
+except as bs = filter (`notElem` bs) as
 
 infixl 4 `except`

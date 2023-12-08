@@ -1,4 +1,6 @@
+{-# OPTIONS_GHC -Wincomplete-patterns #-}
 {-# OPTIONS_GHC -Wno-missing-export-lists #-}
+
 module SemanticAnalyzer.Expression.Internal where
 
 import Data.Foldable
@@ -6,6 +8,7 @@ import qualified Lexer as L
 import SemanticAnalyzer.Type
 import qualified SyntacticAnalyzer as Y
 import Util
+import Debug.Trace
 
 data Expression
   = Ident Int
@@ -13,12 +16,13 @@ data Expression
   | Lit Y.Literal
   | Lambda L.Ident Expression
   | Application Expression Expression
+  | IfThenElse Expression Expression Expression
   deriving (Eq)
 
 data ConvertEnv = ConvertEnv
-  { ceGlobals :: [L.Ident],
-    ceScope :: [L.Ident],
-    ceDecls :: [(L.Ident, NormType)]
+  { ceGlobals :: [L.Ident]
+  , ceScope :: [L.Ident]
+  , ceDecls :: [(L.Ident, NormType)]
   }
   deriving (Eq, Show)
 
@@ -45,9 +49,16 @@ showHelper names (Application expr1 expr2@(Application _ _)) =
   showHelper names expr1 ++ " (" ++ showHelper names expr2 ++ ")"
 showHelper names (Application expr1 expr2) =
   showHelper names expr1 ++ " " ++ showHelper names expr2
+showHelper names (IfThenElse cond expr1 expr2) =
+  "if "
+    ++ showHelper names cond
+    ++ " then "
+    ++ showHelper names expr1
+    ++ " else "
+    ++ showHelper names expr2
 
 convertExpression :: Y.Expression -> Expression
-convertExpression expr =
+convertExpression expr = 
   execState (convertExpressionS expr) $ ConvertEnv [] [] []
 
 convertExpressionS ::
@@ -73,21 +84,26 @@ convertExpressionS (Y.Application func arg) = do
   sarg <- convertExpressionS arg
   return $ Application sfunc sarg
 convertExpressionS (Y.Lit l) = return $ Lit l
+convertExpressionS (Y.IfThenElse cond expr1 expr2) = do
+  cond' <- convertExpressionS cond
+  expr1' <- convertExpressionS expr1
+  expr2' <- convertExpressionS expr2
+  return $ IfThenElse cond' expr1' expr2'
 
 addGlobal :: L.Ident -> State ConvertEnv ()
 addGlobal newGlobal = do
   env <- get
-  put $ env {ceGlobals = newGlobal : ceGlobals env}
+  put $ env{ceGlobals = newGlobal : ceGlobals env}
 
 addVar :: L.Ident -> State ConvertEnv ()
 addVar newVar = do
   env <- get
-  put $ env {ceScope = newVar : ceScope env}
+  put $ env{ceScope = newVar : ceScope env}
 
 popVar :: State ConvertEnv ()
 popVar = do
   env <- get
-  put $ env {ceScope = tail $ ceScope env}
+  put $ env{ceScope = tail $ ceScope env}
 
 findVar :: L.Ident -> State ConvertEnv (Maybe Int)
 findVar idName = do
@@ -120,4 +136,4 @@ findDecl idName =
 addDecl :: L.Ident -> NormType -> State ConvertEnv ()
 addDecl name typ = do
   env <- get
-  put $ env {ceDecls = (name, typ) : ceDecls env}
+  put $ env{ceDecls = (name, typ) : ceDecls env}

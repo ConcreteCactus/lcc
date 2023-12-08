@@ -62,6 +62,7 @@ data TypeErrorType
   | TeTypeMismatch String String
   | TeCheckError String String
   | TeApplyingToANonFunction String
+  | TeIfThenElseConditionIsNotBool
   deriving (Show, Eq)
 
 data SemanticErrorType

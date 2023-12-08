@@ -28,6 +28,7 @@ data Expression
   | CaptureRef Int
   | ParamRef
   | Application Expression Expression
+  | IfThenElse Expression Expression Expression
   | Literal Y.Literal
   deriving (Show)
 
@@ -89,6 +90,19 @@ showExpressionS gname (Application expr1 expr2) = do
   let icl = "icl" ++ show indx
   addStatement $ "gen_closure* " ++ icl ++ " = " ++ expr1' ++ ";"
   return $ icl ++ "->clfunc(" ++ icl ++ ", " ++ expr2' ++ ")"
+showExpressionS gname (IfThenElse cond expr1 expr2) = do
+  cond' <- showExpressionS gname cond
+  indx <- incBuilderIndex
+  let ifr = "ifr" ++ show indx
+  addStatement $ "void* " ++ ifr ++ ";"
+  addStatement $ "if(*(char*)(" ++ cond' ++ ")){"
+  expr1' <- showExpressionS gname expr1
+  addStatement $ ifr ++ " = " ++ expr1' ++ ";"
+  addStatement "} else {"
+  expr2' <- showExpressionS gname expr2
+  addStatement $ ifr ++ " = " ++ expr2' ++ ";"
+  addStatement "}"
+  return ifr
 {- FOURMOLU_ENABLE -}
 
 {- FOURMOLU_DISABLE -}
@@ -203,6 +217,15 @@ mkExpressionS ident (SE.Application expr1 expr2) = do
   (expr1', cptrs1) <- mkExpressionS ident expr1
   (expr2', cptrs2) <- mkExpressionS ident expr2
   return (Application expr1' expr2', Li.sort (cptrs1 +-+ cptrs2))
+mkExpressionS ident (SE.IfThenElse cond expr1 expr2) = do
+  (cond', cptrsc) <- mkExpressionS ident cond
+  (expr1', cptrs1) <- mkExpressionS ident expr1
+  (expr2', cptrs2) <- mkExpressionS ident expr2
+  return
+    ( IfThenElse cond' expr1' expr2'
+    , Li.sort
+        (cptrs1 +-+ cptrs2 +-+ cptrsc)
+    )
 
 mkClosure ::
   L.Ident ->

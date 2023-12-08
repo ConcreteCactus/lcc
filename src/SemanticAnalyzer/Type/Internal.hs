@@ -16,8 +16,8 @@ data Type
   deriving (Eq)
 
 data NormType = NormType
-  { ntType :: Type,
-    ntMaxId :: Int
+  { ntType :: Type
+  , ntMaxId :: Int
   }
   deriving (Eq)
 
@@ -32,8 +32,8 @@ instance Show NormType where
 
 -- Mutually exclusive types (they don't share generic ids)
 data MutExcTy2 = MutExcTy2
-  { met2Fst :: NormType,
-    met2Snd :: Type
+  { met2Fst :: NormType
+  , met2Snd :: Type
   }
   deriving (Show)
 
@@ -45,15 +45,15 @@ data InferEnv = InferEnv Int ReconcileEnv [(L.Ident, Int)] deriving (Show)
 newtype ReconcileEnv = ReconcileEnv [(Int, Type)] deriving (Show)
 
 data ConvertEnv a = ConvertEnv
-  { ceNextId :: Int,
-    ceDict :: [(a, Int)]
+  { ceNextId :: Int
+  , ceDict :: [(a, Int)]
   }
 
 convertType :: Y.Type -> NormType
 convertType synType = NormType typ (nextId - 1)
-  where
-    (ConvertEnv nextId _, typ) =
-      runState (convertTypeS synType) (ConvertEnv 1 [])
+ where
+  (ConvertEnv nextId _, typ) =
+    runState (convertTypeS synType) (ConvertEnv 1 [])
 
 convertTypeS :: Y.Type -> State (ConvertEnv L.Ident) Type
 convertTypeS (Y.TypeName t) = return $ AtomicType t
@@ -71,18 +71,18 @@ convertTypeS (Y.FunctionType t1 t2) = do
 
 mkNormType :: Type -> NormType
 mkNormType typ = NormType typ' (maxId - 1)
-  where
-    (ConvertEnv maxId _, typ') = runState (mkNormTypeS typ) (ConvertEnv 1 [])
+ where
+  (ConvertEnv maxId _, typ') = runState (mkNormTypeS typ) (ConvertEnv 1 [])
 
 mkNormTypeS :: Type -> State (ConvertEnv Int) Type
 mkNormTypeS (GenericType ind) = do
   env <- get
   case lookup ind (ceDict env) of
     Nothing -> do
-      put $
-        ConvertEnv
-          { ceNextId = ceNextId env + 1,
-            ceDict = (ind, ceNextId env) : ceDict env
+      put
+        $ ConvertEnv
+          { ceNextId = ceNextId env + 1
+          , ceDict = (ind, ceNextId env) : ceDict env
           }
       return $ GenericType (ceNextId env)
     Just ind' -> return $ GenericType ind'
@@ -94,10 +94,10 @@ mkNormTypeS (FunctionType paramType returnType) = do
 
 mkMutExcTy2 :: NormType -> NormType -> MutExcTy2
 mkMutExcTy2 original shiftCandidate =
-  MutExcTy2 original $
-    fst $
-      shiftIds (ntMaxId original + 1) $
-        ntType shiftCandidate
+  MutExcTy2 original
+    $ fst
+    $ shiftIds (ntMaxId original + 1)
+    $ ntType shiftCandidate
 
 shiftNewIds :: NormType -> State InferEnv Type
 shiftNewIds typ = do
@@ -128,41 +128,45 @@ addNewSubstitution genericId typ = do
   let substituted = checkAndSubstitute env typ
   if checkSelfRefs genericId substituted
     then
-      return $
-        Left $
-          TeSelfReferenceFound genericId $
-            show substituted
+      return
+        $ Left
+        $ TeSelfReferenceFound genericId
+        $ show substituted
     else do
       let newEnv = substituteOldSubs genericId substituted env
       put $ ReconcileEnv ((genericId, substituted) : newEnv)
       return $ Right ()
-  where
-    -- 1. Check for and substitute references in the new substitution
-    checkAndSubstitute :: [(Int, Type)] -> Type -> Type
-    checkAndSubstitute subs (GenericType genericId') = case lookup genericId' subs of
-      Nothing -> GenericType genericId'
-      Just typ' -> typ'
-    checkAndSubstitute _ (AtomicType atomicType) = AtomicType atomicType
-    checkAndSubstitute subs (FunctionType paramType returnType) =
-      FunctionType (checkAndSubstitute subs paramType) (checkAndSubstitute subs returnType)
-    -- 2. Check for self references in the new substitution (fail if found)
-    checkSelfRefs :: Int -> Type -> Bool
-    checkSelfRefs genericId' (GenericType genericId'') = genericId' == genericId''
-    checkSelfRefs _ (AtomicType _) = False
-    checkSelfRefs genericId' (FunctionType paramType returnType) =
-      checkSelfRefs genericId' paramType || checkSelfRefs genericId' returnType
-    -- 3. Check for and substitute references in the old substitutions
-    substituteSimple :: Int -> Type -> Type -> Type
-    substituteSimple genericId' typ' (GenericType genericId'') =
-      if genericId' == genericId''
-        then typ'
-        else GenericType genericId''
-    substituteSimple _ _ (AtomicType atomicType) = AtomicType atomicType
-    substituteSimple genericId' typ' (FunctionType paramType returnType) =
-      FunctionType (substituteSimple genericId' typ' paramType) (substituteSimple genericId' typ' returnType)
-    substituteOldSubs :: Int -> Type -> [(Int, Type)] -> [(Int, Type)]
-    substituteOldSubs genericId' typ' =
-      map (second (substituteSimple genericId' typ'))
+ where
+  -- 1. Check for and substitute references in the new substitution
+  checkAndSubstitute :: [(Int, Type)] -> Type -> Type
+  checkAndSubstitute subs (GenericType genericId') = case lookup genericId' subs of
+    Nothing -> GenericType genericId'
+    Just typ' -> typ'
+  checkAndSubstitute _ (AtomicType atomicType) = AtomicType atomicType
+  checkAndSubstitute subs (FunctionType paramType returnType) =
+    FunctionType
+      (checkAndSubstitute subs paramType)
+      (checkAndSubstitute subs returnType)
+  -- 2. Check for self references in the new substitution (fail if found)
+  checkSelfRefs :: Int -> Type -> Bool
+  checkSelfRefs genericId' (GenericType genericId'') = genericId' == genericId''
+  checkSelfRefs _ (AtomicType _) = False
+  checkSelfRefs genericId' (FunctionType paramType returnType) =
+    checkSelfRefs genericId' paramType || checkSelfRefs genericId' returnType
+  -- 3. Check for and substitute references in the old substitutions
+  substituteSimple :: Int -> Type -> Type -> Type
+  substituteSimple genericId' typ' (GenericType genericId'') =
+    if genericId' == genericId''
+      then typ'
+      else GenericType genericId''
+  substituteSimple _ _ (AtomicType atomicType) = AtomicType atomicType
+  substituteSimple genericId' typ' (FunctionType paramType returnType) =
+    FunctionType
+      (substituteSimple genericId' typ' paramType)
+      (substituteSimple genericId' typ' returnType)
+  substituteOldSubs :: Int -> Type -> [(Int, Type)] -> [(Int, Type)]
+  substituteOldSubs genericId' typ' =
+    map (second (substituteSimple genericId' typ'))
 
 addNewSubstitutionI :: Int -> Type -> State InferEnv (Either TypeErrorType ())
 addNewSubstitutionI genericId typ = do
@@ -175,14 +179,16 @@ updateWithSubstitutions :: Type -> State ReconcileEnv Type
 updateWithSubstitutions typ = do
   ReconcileEnv env <- get
   return $ updateWithSubstitutions' env typ
-  where
-    updateWithSubstitutions' :: [(Int, Type)] -> Type -> Type
-    updateWithSubstitutions' subs (GenericType genericId) = case lookup genericId subs of
-      Nothing -> GenericType genericId
-      Just typ' -> typ'
-    updateWithSubstitutions' _ (AtomicType atomicType) = AtomicType atomicType
-    updateWithSubstitutions' subs (FunctionType paramType returnType) =
-      FunctionType (updateWithSubstitutions' subs paramType) (updateWithSubstitutions' subs returnType)
+ where
+  updateWithSubstitutions' :: [(Int, Type)] -> Type -> Type
+  updateWithSubstitutions' subs (GenericType genericId) = case lookup genericId subs of
+    Nothing -> GenericType genericId
+    Just typ' -> typ'
+  updateWithSubstitutions' _ (AtomicType atomicType) = AtomicType atomicType
+  updateWithSubstitutions' subs (FunctionType paramType returnType) =
+    FunctionType
+      (updateWithSubstitutions' subs paramType)
+      (updateWithSubstitutions' subs returnType)
 
 updateWithSubstitutionsI :: Type -> State InferEnv Type
 updateWithSubstitutionsI typ = do
@@ -211,9 +217,9 @@ reconcileTypesS (AtomicType atomicType) (AtomicType atomicType') =
   if atomicType == atomicType'
     then return $ Right (AtomicType atomicType)
     else
-      return $
-        Left $
-          TeAtomicTypeMismatch (show atomicType) (show atomicType')
+      return
+        $ Left
+        $ TeAtomicTypeMismatch (show atomicType) (show atomicType')
 reconcileTypesS
   (FunctionType paramType returnType)
   (FunctionType paramType' returnType') = do
@@ -227,9 +233,9 @@ reconcileTypesS
       (Right reconciledParam', Right reconciledReturn') ->
         return $ Right (FunctionType reconciledParam' reconciledReturn')
 reconcileTypesS typ typ' =
-  return $
-    Left $
-      TeTypeMismatch (show typ) (show typ')
+  return
+    $ Left
+    $ TeTypeMismatch (show typ) (show typ')
 
 reconcileTypesIS :: Type -> Type -> State InferEnv (Either TypeErrorType Type)
 reconcileTypesIS t1 t2 = do
@@ -241,35 +247,36 @@ reconcileTypesIS t1 t2 = do
       put $ InferEnv count newREnv glob
       return $ Right reconciled
 
-checkTypeS :: Int -> Type -> Type -> State ReconcileEnv (Either TypeErrorType ())
+checkTypeS ::
+  Int -> Type -> Type -> State ReconcileEnv (Either TypeErrorType ())
 checkTypeS _ (GenericType genericId) (GenericType genericId')
   | genericId == genericId' = return $ Right ()
 checkTypeS hi typ (GenericType genericId)
   | genericId > hi =
-      return $
-        Left $
-          TeCheckError (show (GenericType genericId)) $
-            show typ
+      return
+        $ Left
+        $ TeCheckError (show (GenericType genericId))
+        $ show typ
 checkTypeS _ typ (GenericType genericId) = do
   addedE <- addNewSubstitution genericId typ
   case addedE of
     Left _ ->
-      return $
-        Left $
-          TeCheckError (show (GenericType genericId)) $
-            show typ
+      return
+        $ Left
+        $ TeCheckError (show (GenericType genericId))
+        $ show typ
     Right _ -> return $ Right ()
 checkTypeS _ (GenericType genericId) typ =
-  return $
-    Left $
-      TeCheckError (show typ) (show $ GenericType genericId)
+  return
+    $ Left
+    $ TeCheckError (show typ) (show $ GenericType genericId)
 checkTypeS _ (AtomicType atomicType) (AtomicType atomicType') =
   if atomicType == atomicType'
     then return $ Right ()
     else
-      return $
-        Left $
-          TeCheckError (show atomicType) (show atomicType')
+      return
+        $ Left
+        $ TeCheckError (show atomicType) (show atomicType')
 checkTypeS
   hi
   (FunctionType paramType returnType)
@@ -282,18 +289,18 @@ checkTypeS
       (_, Left e) -> return $ Left e
       (Right _, Right _) -> return $ Right ()
 checkTypeS _ typ typ' =
-  return $
-    Left $
-      TeCheckError (show typ) (show typ')
+  return
+    $ Left
+    $ TeCheckError (show typ) (show typ')
 
 checkType :: MutExcTy2 -> Either TypeErrorType ()
 checkType excTys =
   execState
     (checkTypeS highestIdT2 st1 (met2Snd excTys))
     (ReconcileEnv [])
-  where
-    (st1, _) = shiftIds highestIdT2 (ntType $ met2Fst excTys)
-    highestIdT2 = getHighestId (met2Snd excTys)
+ where
+  (st1, _) = shiftIds highestIdT2 (ntType $ met2Fst excTys)
+  highestIdT2 = getHighestId (met2Snd excTys)
 
 -- Also returns the last element of the list
 createGenericList :: Int -> State InferEnv ([Type], Type)
