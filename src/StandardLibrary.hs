@@ -1,4 +1,8 @@
-module StandardLibrary (standardLibrary, cTypeOf) where
+module StandardLibrary (
+  standardLibrary,
+  cTypeOf,
+  StdCompilerDefinition (..),
+) where
 
 import qualified Lexer as L
 import qualified SemanticAnalyzer.Type as T
@@ -39,11 +43,15 @@ typeNameOf AF64 = "f64"
 typeNameOf AChar = "char"
 typeNameOf ABool = "bool"
 
+data StdCompilerDefinition a
+  = ScdSimple ((Int -> Writer a String) -> Writer a [String])
+  | ScdLiteral [String]
+
 standardLibrary ::
   (Monoid a) =>
   [ ( L.Ident
     , T.NormType
-    , (Int -> Writer a String) -> Writer a [String]
+    , StdCompilerDefinition a
     )
   ]
 standardLibrary =
@@ -93,10 +101,10 @@ makeTypedDefs ::
   , AtomicType -> (Int -> Writer a String) -> Writer a [String]
   ) ->
   [AtomicType] ->
-  [(String, T.Type, (Int -> Writer a String) -> Writer a [String])]
+  [(String, T.Type, StdCompilerDefinition a)]
 makeTypedDefs (name, t, d) =
   map
-    (\at -> (name ++ "_" ++ typeNameOf at, t at, d at))
+    (\at -> (name ++ "_" ++ typeNameOf at, t at, ScdSimple $ d at))
 
 printfFormatStringBasedOnType :: AtomicType -> String
 printfFormatStringBasedOnType t
@@ -112,7 +120,7 @@ printfFormatStringBasedOnType t
 
 library' ::
   (Monoid a) =>
-  [(String, T.Type, (Int -> Writer a String) -> Writer a [String])]
+  [(String, T.Type, StdCompilerDefinition a)]
 library' =
   makeTypedDefs
     ( "add"
@@ -154,12 +162,76 @@ library' =
     ++ [
          ( "ifthenelse"
          , a ABool `to` g 1 `to` g 1 `to` g 1
-         , \w ->
-            sequence
-              [ p "char* s1 = " <> w 1
-              , p "void* s2 = " <> w 2
-              , p "void* s3 = " <> w 3
-              , p "(*s1) ? s2 : s3"
-              ]
+         , ScdLiteral 
+            [ "typedef struct {"
+            , "\tgen_closure_clfunc* clfunc;"
+            , "\tchar isLazy;"
+            , "} ifthenelse_closure_true_1_t;"
+            , ""
+            , "typedef struct {"
+            , "\tgen_closure_clfunc* clfunc;"
+            , "\tchar isLazy;"
+            , "\tvoid* capture_2;"
+            , "} ifthenelse_closure_true_2_t;"
+            , ""
+            , "void* ifthenelse_clfunc_true_2(ifthenelse_closure_true_2_t* self, void* param) {"
+            , "\treturn self->capture_2;"
+            , "}"
+            , ""
+            , "void* ifthenelse_clfunc_true_1(ifthenelse_closure_true_1_t* self, void* param) {"
+            , "\tifthenelse_closure_true_2_t* cl1 = new_closure(sizeof(*cl1));"
+            , "\tcl1->isLazy = 1;"
+            , "\tcl1->clfunc = (gen_closure_clfunc*)ifthenelse_clfunc_true_2;"
+            , "\tcl1->capture_2 = param;"
+            , "\treturn cl1;"
+            , "}"
+            , ""
+            , "typedef struct {"
+            , "\tgen_closure_clfunc* clfunc;"
+            , "\tchar isLazy;"
+            , "} ifthenelse_closure_false_1_t;"
+            , ""
+            , "typedef struct {"
+            , "\tgen_closure_clfunc* clfunc;"
+            , "\tchar isLazy;"
+            , "} ifthenelse_closure_false_2_t;"
+            , ""
+            , "void* ifthenelse_clfunc_false_2(ifthenelse_closure_true_2_t* self, void* param) {"
+            , "\treturn param;"
+            , "}"
+            , ""
+            , "void* ifthenelse_clfunc_false_1(ifthenelse_closure_false_1_t* self, void* param) {"
+            , "\tifthenelse_closure_false_2_t* cl1 = new_closure(sizeof(*cl1));"
+            , "\tcl1->isLazy = 0;"
+            , "\tcl1->clfunc = (gen_closure_clfunc*)ifthenelse_clfunc_false_2;"
+            , "\treturn cl1;"
+            , "}"
+            , ""
+            , "typedef struct {"
+            , "\tgen_closure_clfunc* clfunc;"
+            , "\tchar isLazy;"
+            , "} ifthenelse_closure_def_t;"
+            , ""
+            , "void* ifthenelse_clfunc_1(ifthenelse_closure_def_t* self, void* param) {"
+            , "\tif(*((char*)param)){"
+            , "\t\tifthenelse_closure_true_1_t* cl1 = new_closure(sizeof(*cl1));"
+            , "\t\tcl1->clfunc = (gen_closure_clfunc*)ifthenelse_clfunc_true_1;"
+            , "\t\tcl1->isLazy = 0;"
+            , "\t\treturn cl1;"
+            , "\t} else {"
+            , "\t\tifthenelse_closure_false_1_t* cl1 = new_closure(sizeof(*cl1));"
+            , "\t\tcl1->clfunc = (gen_closure_clfunc*)ifthenelse_clfunc_false_1;"
+            , "\t\tcl1->isLazy = 1;"
+            , "\t\treturn cl1;"
+            , "\t}"
+            , "}"
+            , ""
+            , "void* ifthenelse_func(void) {"
+            , "\tifthenelse_closure_def_t* cl1 = new_closure(sizeof(*cl1));"
+            , "\tcl1->clfunc = (gen_closure_clfunc*)ifthenelse_clfunc_1;"
+            , "\tcl1->isLazy = 0;"
+            , "\treturn cl1;"
+            , "}"
+            ]
          )
        ]

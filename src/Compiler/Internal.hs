@@ -1,4 +1,5 @@
 {-# LANGUAGE ImpredicativeTypes #-}
+{-# LANGUAGE LambdaCase #-}
 {-# OPTIONS_GHC -Wno-missing-export-lists #-}
 
 module Compiler.Internal where
@@ -299,29 +300,38 @@ mainfnEmpty =
 {- FOURMOLU_ENABLE -}
 
 stdDefinitions :: CCode
-stdDefinitions = Li.intercalate "\n" (map genStdDefinitionCode rawDefs)
+stdDefinitions =
+  Li.intercalate
+    "\n"
+    ( map
+        ( \case
+            Left strs -> Li.intercalate "\n" strs
+            Right a -> genStdDefinitionCode a
+        )
+        rawDefs
+    )
  where
   rawDefs =
     map
       ( \lib@(name, _, _) ->
-          let (cs, n) =
-                genStdRawDefinition lib
-           in (name, cs, n)
+          case genStdRawDefinition lib of
+            Left strs -> Left strs
+            Right (strs, cnt) -> Right (name, strs, cnt)
       )
       standardLibrary
 
 genStdRawDefinition ::
   ( L.Ident
   , a
-  , (Int -> Writer [Int] CCode) ->
-    Writer [Int] [CCode]
+  , StdCompilerDefinition [Int]
   ) ->
-  ([CCode], Int)
-genStdRawDefinition (_, _, f) = (code, maximum ns)
+  Either [CCode] ([CCode], Int)
+genStdRawDefinition (_, _, ScdSimple f) = Right (code, maximum ns)
  where
   ff :: Int -> Writer [Int] CCode
   ff n = Writer ("std_var_" ++ show n, [n])
   (code, ns) = runWriter $ f ff
+genStdRawDefinition (_, _, ScdLiteral strs) = Left strs
 
 genStdDefinitionCode :: (L.Ident, [CCode], Int) -> CCode
 genStdDefinitionCode rawDef =

@@ -20,11 +20,18 @@ import Util
 stdLib ::
   [ ( L.Ident
     , NormType
-    , (Int -> Writer () String) ->
-      Writer () [String]
     )
   ]
-stdLib = standardLibrary
+stdLib =
+  map
+    (\(a, b, _) -> (a, b))
+    ( standardLibrary ::
+        [ ( L.Ident
+          , NormType
+          , StdCompilerDefinition [Int]
+          )
+        ]
+    )
 
 data UninfDefinition = UninfDefinition
   { udefName :: L.Ident
@@ -89,8 +96,8 @@ stConvertEnv :: ConvertEnv
 stConvertEnv =
   ConvertEnv
     { ceScope = []
-    , ceGlobals = map (\(a, _, _) -> a) stdLib
-    , ceDecls = map (\(a, b, _) -> (a, b)) stdLib
+    , ceGlobals = map fst stdLib
+    , ceDecls = stdLib
     }
 
 mkUninfProg :: Y.Program -> Either SemanticError UninfProg
@@ -185,7 +192,7 @@ mkProgInfDeps uiprog@(UninfProg uiDefs) =
                   d
                     `notElem` map udefName uiDefs'
                     && d
-                    `notElem` map (\(a, _, _) -> a) stdLib
+                    `notElem` map fst stdLib
               )
               (getAllRefs (udefExpr udef)) of
               Just e ->
@@ -431,8 +438,8 @@ lookupRefType parts refName =
               (Definition _ (InfTyExpr infExpr)) -> Just (ieType infExpr)
           )
   )
-    <|> (\(_, a, _) -> a)
-    <$> find (\(name, _, _) -> name == refName) stdLib
+    <|> snd
+    <$> find (\(name, _) -> name == refName) stdLib
 
 mkProgramFromSyn :: Y.Program -> Either CompilerError Program
 mkProgramFromSyn syn =
