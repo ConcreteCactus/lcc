@@ -1,6 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TupleSections #-}
-{-# OPTIONS_GHC -Wincomplete-patterns #-}
 {-# OPTIONS_GHC -Wno-missing-export-lists #-}
 
 module SemanticAnalyzer.Internal where
@@ -17,7 +16,6 @@ import SemanticAnalyzer.Type
 import StandardLibrary
 import qualified SyntacticAnalyzer as Y
 import Util
-import Debug.Trace
 
 stdLib ::
   [ ( L.Ident
@@ -140,7 +138,7 @@ mkUninfProgS synProg = do
     return $ Right parts
   helper parts (Y.Definition pos name expr) = do
     semExpr <- convertExpressionS expr
-    trace (show semExpr) $ addGlobal name
+    addGlobal name
     return $ Right $ parts ++ [UninfDefinition name pos semExpr Nothing]
   checkUndefinedReferencesS ::
     TextPos -> Expression -> State ConvertEnv (Maybe SemanticError)
@@ -160,15 +158,6 @@ mkUninfProgS synProg = do
     case (c1, c2) of
       (Just e, _) -> return $ Just e
       (_, Just e) -> return $ Just e
-      _ -> return Nothing
-  checkUndefinedReferencesS pos (IfThenElse cond expr1 expr2) = do
-    cond' <- checkUndefinedReferencesS pos cond
-    expr1' <- checkUndefinedReferencesS pos expr1
-    expr2' <- checkUndefinedReferencesS pos expr2
-    case (cond', expr1', expr2') of
-      (Just e, _, _) -> return $ Just e
-      (_, Just e, _) -> return $ Just e
-      (_, _, Just e) -> return $ Just e
       _ -> return Nothing
   addWish :: UninfDefinition -> State ConvertEnv UninfDefinition
   addWish udef = do
@@ -220,8 +209,6 @@ mkProgInfDeps uiprog@(UninfProg uiDefs) =
   getAllRefs (Ref name) = [name]
   getAllRefs (Lambda _ expr) = getAllRefs expr
   getAllRefs (Application expr1 expr2) = getAllRefs expr1 +-+ getAllRefs expr2
-  getAllRefs (IfThenElse cond expr1 expr2) =
-    getAllRefs cond +-+ getAllRefs expr1 +-+ getAllRefs expr2
 
 mkProgram :: ProgInfDeps -> Either TypeError Program
 mkProgram (ProgInfDeps uprog (DependencyList dList)) =
@@ -435,47 +422,6 @@ infFromExprS parts (Application expr1 expr2) = do
                   updatedGenerics <- mapM updateWithSubstitutionsI newGenerics
                   return $ Right (GenericType newReturnId, updatedGenerics)
             typ -> return $ Left $ TeApplyingToANonFunction $ show typ
-infFromExprS parts (IfThenElse cond expr1 expr2) = do
-  inferredCond <- infFromExprS parts cond
-  inferred1 <- infFromExprS parts expr1
-  inferred2 <- infFromExprS parts expr2
-  case (inferredCond, inferred1, inferred2) of
-    (Left e, _, _) -> return $ Left e
-    (_, Left e, _) -> return $ Left e
-    (_, _, Left e) -> return $ Left e
-    ( Right (condType, condGenerics)
-      , Right (expr1Type, expr1Generics)
-      , Right (expr2Type, expr2Generics)
-      ) -> do
-        genericsE <- do
-          newGenerics1E <-
-            forgivingZipWithMM
-              reconcileTypesIS
-              condGenerics
-              expr1Generics
-          case newGenerics1E of
-            Left e -> return $ Left e
-            Right newGenerics1 ->
-              forgivingZipWithMM
-                reconcileTypesIS
-                expr2Generics
-                newGenerics1
-        updatedCondType <- updateWithSubstitutionsI condType
-        updatedExpr1Type <- updateWithSubstitutionsI expr1Type
-        updatedExpr2Type <- updateWithSubstitutionsI expr2Type
-        condWorked <- case updatedCondType of
-          GenericType genericId ->
-            addNewSubstitutionI genericId $ AtomicType Y.ABool
-          AtomicType Y.ABool -> return $ Right ()
-          _ -> return $ Left TeIfThenElseConditionIsNotBool
-        reconciledE <- reconcileTypesIS updatedExpr1Type updatedExpr2Type
-        case (genericsE, condWorked, reconciledE) of
-          (Left e, _, _) -> return $ Left e
-          (_, Left e, _) -> return $ Left e
-          (_, _, Left e) -> return $ Left e
-          (Right generics, Right (), Right reconciled) ->
-            return
-              $ Right (reconciled, generics)
 
 lookupRefType :: [Definition] -> L.Ident -> Maybe NormType
 lookupRefType parts refName =

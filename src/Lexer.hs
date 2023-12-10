@@ -4,7 +4,6 @@ module Lexer
   ( Ident (..),
     Parser (..),
     word,
-    operator,
     identifier,
     integer,
     whiteSpace,

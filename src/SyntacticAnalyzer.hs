@@ -17,10 +17,10 @@ module SyntacticAnalyzer (
 where
 
 import Control.Applicative
-import Data.Functor
 import qualified Data.List.NonEmpty as Ne
 import Errors
 import Lexer
+import Data.Functor
 
 data Literal = Literal AtomicType Integer deriving (Eq)
 
@@ -32,7 +32,6 @@ data Expression
   | Lit Literal
   | Lambda Ident Expression
   | Application Expression Expression
-  | IfThenElse Expression Expression Expression
   deriving (Show, Eq)
 
 {- FOURMOLU_DISABLE -}
@@ -58,20 +57,20 @@ type Program = [ProgramPart]
 
 literalTypeParser :: Parser AtomicType
 literalTypeParser =
-  (word "i8" $> AI8)
-    <|> (word "i16" $> AI16)
-    <|> (word "i32" $> AI32)
-    <|> (word "i64" $> AI64)
-    <|> (word "i128" $> AI128)
-    <|> (word "u8" $> AU8)
-    <|> (word "u16" $> AU16)
-    <|> (word "u32" $> AU32)
-    <|> (word "u64" $> AU64)
-    <|> (word "u128" $> AU128)
-    <|> (word "f32" $> AF32)
-    <|> (word "f64" $> AF64)
-    <|> (word "char" $> AChar)
-    <|> (word "bool" $> AChar)
+  (word "i8" $> AI8) <|>
+  (word "i16" $> AI16) <|>
+  (word "i32" $> AI32) <|>
+  (word "i64" $> AI64) <|>
+  (word "i128" $> AI128) <|>
+  (word "u8" $> AU8) <|>
+  (word "u16" $> AU16) <|>
+  (word "u32" $> AU32) <|>
+  (word "u64" $> AU64) <|>
+  (word "u128" $> AU128) <|>
+  (word "f32" $> AF32) <|>
+  (word "f64" $> AF64) <|>
+  (word "char" $> AChar) <|>
+  (word "bool" $> AChar)
 
 typeNameValidator :: String -> Either LexicalErrorType AtomicType
 typeNameValidator str
@@ -101,6 +100,7 @@ integerLiteralParser = do
   typ <- literalTypeParser
   return $ Literal typ int
 
+
 literalParser :: Parser Expression
 literalParser = Lit <$> integerLiteralParser
 
@@ -113,21 +113,22 @@ lambdaParser =
         )
     <*> expressionParser
 
-ifThenElseParser :: Parser Expression
-ifThenElseParser =
-  IfThenElse
-    <$> parseExpressionWithoutIfThenElse
-    <*> (whiteSpaceO *> operator "?" *> expressionParser)
-    <*> (whiteSpaceO *> operator ":" *> expressionParser)
-
 applicationsParser :: Parser Expression
 applicationsParser =
   foldl1 Application
     <$> sepBy1 whiteSpace parseExpressionWithoutApplication
 
-parseExpressionWithoutIfThenElse :: Parser Expression
-parseExpressionWithoutIfThenElse =
+parseExpressionWithoutApplication :: Parser Expression
+parseExpressionWithoutApplication =
   literalParser
+    <|> idParser
+    <|> lambdaParser
+    <|> (openParen *> expressionParser <* closeParen)
+
+expressionParser :: Parser Expression
+expressionParser =
+  applicationsParser
+    <|> literalParser
     <|> idParser
     <|> lambdaParser
     <|> ( whiteSpaceO
@@ -136,29 +137,6 @@ parseExpressionWithoutIfThenElse =
                   <* closeParen
                )
         )
-parseExpressionWithoutApplication :: Parser Expression
-parseExpressionWithoutApplication =
-  ifThenElseParser
-    <|> literalParser
-    <|> idParser
-    <|> lambdaParser
-    <|> (openParen *> expressionParser <* closeParen)
-
-expressionParser :: Parser Expression
-expressionParser =
-  whiteSpaceO
-    *> ( ifThenElseParser
-          <|> applicationsParser
-          <|> literalParser
-          <|> idParser
-          <|> lambdaParser
-          <|> ( whiteSpaceO
-                  *> ( openParen
-                        *> (whiteSpaceO *> expressionParser <* whiteSpaceO)
-                        <* closeParen
-                     )
-              )
-       )
 
 parseExpression :: String -> Either LexicalError Expression
 parseExpression s =
