@@ -35,6 +35,7 @@ data Closure = Closure
   { clCaptures :: [Int]
   , clExpression :: Expression
   , clName :: CCode
+  , clIsLazy :: Bool
   }
   deriving (Show)
 
@@ -84,11 +85,19 @@ showExpressionS _ (FunctionRef func) = do
 showExpressionS gname (ClosureExpr closure) = addClosure gname closure
 showExpressionS gname (Application expr1 expr2) = do
   expr1' <- showExpressionS gname expr1
-  expr2' <- showExpressionS gname expr2
-  indx <- incBuilderIndex
-  let icl = "icl" ++ show indx
+  indx1 <- incBuilderIndex
+  let ifl = "ifl" ++ show indx1
+  addStatement $ "void* " ++ ifl ++ ";"
+  indx2 <- incBuilderIndex
+  let icl = "icl" ++ show indx2
   addStatement $ "gen_closure* " ++ icl ++ " = " ++ expr1' ++ ";"
-  return $ icl ++ "->clfunc(" ++ icl ++ ", " ++ expr2' ++ ")"
+  addStatement $ "if(!" ++ icl ++ "->isLazy){"
+  expr2' <- showExpressionS gname expr2
+  addStatement $ ifl ++ " = " ++ icl ++ "->clfunc(" ++ icl ++ ", " ++ expr2' ++ ");"
+  addStatement "} else {"
+  addStatement $ ifl ++ " = " ++ icl ++ "->clfunc(" ++ icl ++ ", NULL);"
+  addStatement "}"
+  return ifl
 {- FOURMOLU_ENABLE -}
 
 {- FOURMOLU_DISABLE -}
@@ -107,12 +116,19 @@ addClosureFunction ::
   L.Ident ->
   CCode ->
   Expression ->
+  Bool ->
   State ExpressionBuilder CCode
-addClosureFunction gname structName expr = do
+addClosureFunction gname structName expr isLazy = do
   ind <- incBuilderIndex
   expr' <- separateBuilder $ showExpressionS gname expr
   let fnname = "clfunc_" ++ show gname ++ "_" ++ show ind
-  let fncode =
+  let fncode = 
+        if isLazy 
+        then 
+        "void* " ++ fnname ++ "(" ++ structName ++ "* self) {\n" ++
+            expr' ++ "\n" ++
+        "}\n"
+        else 
         "void* " ++ fnname ++ "(" ++ structName ++ "* self, void* param) {\n" ++
             expr' ++ "\n" ++
         "}\n"
@@ -128,6 +144,7 @@ addClosureStruct gname cptrs = do
   let structCode =
         "typedef struct {\n" ++
             "\tvoid* clfunc;\n" ++
+            "\tchar isLazy;\n" ++
             concatMap ((++ ";\n") . ("\tvoid* capture_" ++) . show) cptrs ++
         "} " ++ structName ++ ";\n"
   addGlobalStatement structCode
@@ -136,15 +153,16 @@ addClosureStruct gname cptrs = do
 
 {- FOURMOLU_DISABLE -}
 addClosure :: L.Ident -> Closure -> State ExpressionBuilder CCode
-addClosure gname (Closure cptrs expr _) = do
+addClosure gname (Closure cptrs expr _ isLazy) = do
   ind <- incBuilderIndex
   clstruct <- addClosureStruct gname cptrs
-  clfunc <- addClosureFunction gname clstruct expr
+  clfunc <- addClosureFunction gname clstruct expr isLazy
   addStatement $
     clstruct ++ "* c" ++ show ind ++ " = (" ++ clstruct ++
     "*)new_closure(sizeof(" ++ clstruct ++ "));"
   mapM_ (addStatement . assignHelper ind) cptrs
   addStatement $ "c" ++ show ind ++ "->clfunc = " ++ clfunc ++ ";"
+  addStatement $ "c" ++ show ind ++ "->isLazy = " ++ if isLazy then "1" else "0" ++ ";"
   return $ "c" ++ show ind
 {- FOURMOLU_ENABLE -}
 
@@ -217,6 +235,7 @@ mkClosure ident expr = do
           { clCaptures = cptrs'
           , clExpression = expr'
           , clName = show ident ++ "_c_" ++ show clId
+          , clIsLazy = 1 `notElem` cptrs
           }
   return (closure, map (+ (-1)) cptrs')
 
@@ -258,6 +277,7 @@ constPredefs =
   "\n" ++
   "typedef struct {\n" ++
       "\tgen_closure_clfunc* clfunc;\n" ++
+      "\tchar isLazy;\n" ++
   "} gen_closure;\n" ++
   "\n"
 {- FOURMOLU_ENABLE -}
@@ -341,6 +361,7 @@ genStdDefinitionCodeStepS step rawDef@(name, cs, n)
       addGlobalStatement $
         "typedef struct {\n" ++
             "\tvoid* clfunc;\n" ++
+            "\tchar isLazy;\n" ++
             concatMap (\m -> "\tvoid* capture_" ++ show (m + 1) ++ ";\n") [0..step-1] ++
         "} " ++ closureTyp ++ ";\n" ++
         "\n" ++
@@ -351,6 +372,7 @@ genStdDefinitionCodeStepS step rawDef@(name, cs, n)
       return $
         "\t" ++ closureTyp ++ "* " ++ closureName ++ " = new_closure(sizeof(" ++ closureTyp ++ "));\n" ++
         "\t" ++ closureName ++ "->clfunc = " ++ show name ++ "_" ++ show (step + 1) ++ "_clfunc;\n" ++
+        "\t" ++ closureName ++ "->isLazy = 0;\n" ++
         concatMap (\m -> "\t" ++ assignHelper clid' (m + 1) ++ "\n") [0..step-1] ++
         "\treturn " ++ closureName ++ ";"
       where
