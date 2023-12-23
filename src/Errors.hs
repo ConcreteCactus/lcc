@@ -72,45 +72,51 @@ data SemanticErrorType
   deriving (Show, Eq)
 
 data LexicalElement
-  = LeChar Char
-  | LeWord String
-  | LeOperator String
-  | LeWhiteSpace
-  | LeNotWhiteSpace
-  | LeEndOfStatement
-  | LeEndOfLine
-  | LeLowercaseCharacter
-  | LeIdentFirstCharacter
-  | LeIdentCharacter
-  | LeUppercaseCharacter
-  | LeAlphabeticalCharacter
-  | LeAlphanumericCharacter
-  | LeNumber
-  | LeDigit
-  | LeHexDigit
-  | LeNotNewLine
-  | LeTypeName
+  -- = LeChar Char
+  -- | LeWord String
+  -- | LeOperator String
+  -- | LeWhiteSpace
+  -- | LeNotWhiteSpace
+  -- | LeEndOfStatement
+  -- | LeEndOfLine
+  -- | LeLowercaseCharacter
+  -- | LeIdentFirstCharacter
+  -- | LeIdentCharacter
+  -- | LeUppercaseCharacter
+  -- | LeAlphabeticalCharacter
+  -- | LeAlphanumericCharacter
+  -- | LeNumber
+  -- | LeDigit
+  -- | LeHexDigit
+  -- | LeNotNewLine
+  -- | LeTypeName
+  = LeColon
+  | LeArrow
+  | LeColonEquals
+  | LeBackslash
+  | LeDot
+  | LeExprWhiteSpace
+  | LeStmtWhiteSpace
+  | LeIf
+  | LeThen
+  | LeElse
+  | LeVarIdent
+  | LeTypIdent
   deriving (Eq)
 
 instance Show LexicalElement where
-  show (LeChar c) = show c
-  show (LeWord word) = show word
-  show (LeOperator op) = show op
-  show LeWhiteSpace = "whitespace"
-  show LeEndOfLine = "end of line"
-  show LeEndOfStatement = "end of statement"
-  show LeLowercaseCharacter = "lowercase character"
-  show LeIdentFirstCharacter = "lowercase character or '_'"
-  show LeIdentCharacter = "alpanumeric character or '_'"
-  show LeUppercaseCharacter = "uppercase character"
-  show LeAlphabeticalCharacter = "alphabetic character"
-  show LeAlphanumericCharacter = "alphanumeric character"
-  show LeNumber = "number"
-  show LeDigit = "digit"
-  show LeHexDigit = "hexadecimal digit (0-9,a-f,A-F)"
-  show LeNotNewLine = "anything but a linefeed"
-  show LeNotWhiteSpace = "anything but whitespace"
-  show LeTypeName = "type name"
+    show LeColon = ":"
+    show LeArrow = "->"
+    show LeColonEquals = ":="
+    show LeBackslash = "\\"
+    show LeDot = "."
+    show LeExprWhiteSpace = "white space"
+    show LeStmtWhiteSpace = "white space with a following new statement"
+    show LeIf = "if"
+    show LeThen = "then"
+    show LeElse = "else"
+    show LeVarIdent = "variable name (eg. x)"
+    show LeTypIdent = "type name (eg. I32)"
 
 mkLexErr :: TextPos -> [LexicalElement] -> LexicalError
 mkLexErr pos expect = ProgramError (LeUnexpectedLexicalElement expect) pos
@@ -131,8 +137,6 @@ mkCompErrSem (ProgramError et pos) = ProgramError (CeSemanticErrorType et) pos
 mkCompErrTyp :: TypeError -> CompilerError
 mkCompErrTyp (ProgramError et pos) = ProgramError (CeTypeErrorType et) pos
 
-incTextPos :: TextPos -> Char -> TextPos
-incTextPos (line, col) c =
-  if c == '\n' 
-  then (line+1, 0)
-  else (line, col+1)
+incTextPos :: Char -> TextPos -> TextPos
+incTextPos '\n' (x, _) = (x + 1, 0)
+incTextPos _ (x, y) = (x, y + 1)

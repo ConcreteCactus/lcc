@@ -31,6 +31,7 @@ library
       Interpreter
       Lexer
       Lexer.Internal
+      Lexer.Internal_old
       Repl
       SemanticAnalyzer
       SemanticAnalyzer.DependencyGraph
