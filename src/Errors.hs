@@ -102,6 +102,7 @@ data LexicalElement
   | LeElse
   | LeVarIdent
   | LeTypIdent
+  | LeLiteral
   deriving (Eq)
 
 instance Show LexicalElement where
@@ -117,6 +118,7 @@ instance Show LexicalElement where
     show LeElse = "else"
     show LeVarIdent = "variable name (eg. x)"
     show LeTypIdent = "type name (eg. I32)"
+    show LeLiteral = "a literal (eg. 42i32)"
 
 mkLexErr :: TextPos -> [LexicalElement] -> LexicalError
 mkLexErr pos expect = ProgramError (LeUnexpectedLexicalElement expect) pos
