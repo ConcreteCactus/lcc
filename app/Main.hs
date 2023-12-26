@@ -16,7 +16,6 @@ main = do
       case compE of
         Left e -> do
           print e
-          print src
           return ()
         Right comp -> do
           _ <- writeFile (args !! 1) comp

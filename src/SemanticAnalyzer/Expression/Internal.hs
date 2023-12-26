@@ -8,21 +8,20 @@ import qualified Lexer as L
 import SemanticAnalyzer.Type
 import qualified SyntacticAnalyzer as Y
 import Util
-import Debug.Trace
 
 data Expression
   = Ident Int
-  | Ref L.Ident
+  | Ref L.VarIdent
   | Lit Y.Literal
-  | Lambda L.Ident Expression
+  | Lambda L.VarIdent Expression
   | Application Expression Expression
   | IfThenElse Expression Expression Expression
   deriving (Eq)
 
 data ConvertEnv = ConvertEnv
-  { ceGlobals :: [L.Ident]
-  , ceScope :: [L.Ident]
-  , ceDecls :: [(L.Ident, NormType)]
+  { ceGlobals :: [L.VarIdent]
+  , ceScope :: [L.VarIdent]
+  , ceDecls :: [(L.VarIdent, NormType)]
   }
   deriving (Eq, Show)
 
@@ -34,13 +33,13 @@ showHelper names (Ident identifier) =
   case names !!! identifier of
     Nothing -> "?_" ++ show identifier
     Just name -> name ++ "_" ++ show identifier
-showHelper _ (Ref name) = L.unIdent name
+showHelper _ (Ref name) = show name
 showHelper _ (Lit literal) = show literal
 showHelper names (Lambda paramName expr) =
   "λ"
-    ++ L.unIdent paramName
+    ++ show paramName
     ++ "."
-    ++ showHelper (L.unIdent paramName : names) expr
+    ++ showHelper (show paramName : names) expr
 showHelper names (Application expr1@(Lambda _ _) expr2@(Application _ _)) =
   "(" ++ showHelper names expr1 ++ ") (" ++ showHelper names expr2 ++ ")"
 showHelper names (Application expr1@(Lambda _ _) expr2) =
@@ -90,12 +89,12 @@ convertExpressionS (Y.IfThenElse cond expr1 expr2) = do
   expr2' <- convertExpressionS expr2
   return $ IfThenElse cond' expr1' expr2'
 
-addGlobal :: L.Ident -> State ConvertEnv ()
+addGlobal :: L.VarIdent -> State ConvertEnv ()
 addGlobal newGlobal = do
   env <- get
   put $ env{ceGlobals = newGlobal : ceGlobals env}
 
-addVar :: L.Ident -> State ConvertEnv ()
+addVar :: L.VarIdent -> State ConvertEnv ()
 addVar newVar = do
   env <- get
   put $ env{ceScope = newVar : ceScope env}
@@ -105,7 +104,7 @@ popVar = do
   env <- get
   put $ env{ceScope = tail $ ceScope env}
 
-findVar :: L.Ident -> State ConvertEnv (Maybe Int)
+findVar :: L.VarIdent -> State ConvertEnv (Maybe Int)
 findVar idName = do
   env <- get
   let scopeVars = ceScope env
@@ -122,18 +121,18 @@ findVar idName = do
     Nothing -> return Nothing
     Just _ -> return $ Just count
 
-findGlobal :: L.Ident -> State ConvertEnv (Maybe L.Ident)
+findGlobal :: L.VarIdent -> State ConvertEnv (Maybe L.VarIdent)
 findGlobal idName = do
   env <- get
   let globalVars = ceGlobals env
   let foundNameM = find (== idName) globalVars
   return foundNameM
 
-findDecl :: L.Ident -> State ConvertEnv (Maybe NormType)
+findDecl :: L.VarIdent -> State ConvertEnv (Maybe NormType)
 findDecl idName =
   lookup idName . ceDecls <$> get
 
-addDecl :: L.Ident -> NormType -> State ConvertEnv ()
+addDecl :: L.VarIdent -> NormType -> State ConvertEnv ()
 addDecl name typ = do
   env <- get
   put $ env{ceDecls = (name, typ) : ceDecls env}

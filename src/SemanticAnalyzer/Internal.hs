@@ -17,10 +17,9 @@ import SemanticAnalyzer.Type
 import StandardLibrary
 import qualified SyntacticAnalyzer as Y
 import Util
-import Debug.Trace
 
 stdLib ::
-  [ ( L.Ident
+  [ ( L.VarIdent
     , NormType
     , (Int -> Writer () String) ->
       Writer () [String]
@@ -29,7 +28,7 @@ stdLib ::
 stdLib = standardLibrary
 
 data UninfDefinition = UninfDefinition
-  { udefName :: L.Ident
+  { udefName :: L.VarIdent
   , udefPos :: TextPos
   , udefExpr :: Expression
   , udefWish :: Maybe NormType
@@ -55,13 +54,13 @@ instance Show TypedExpr where
   show (WishTyExpr expr typ) = show expr ++ " : " ++ show typ
 
 data Definition = Definition
-  { defName :: L.Ident
+  { defName :: L.VarIdent
   , defExpr :: TypedExpr
   }
   deriving (Eq)
 
 instance Show Definition where
-  show (Definition name expr) = L.unIdent name ++ " := " ++ show expr
+  show (Definition name expr) = show name ++ " := " ++ show expr
 
 newtype UninfProg
   = UninfProg [UninfDefinition]
@@ -69,7 +68,7 @@ newtype UninfProg
 
 data ProgInfDeps = ProgInfDeps
   { pidUninfProg :: UninfProg
-  , pidDepGraph :: DependencyList L.Ident
+  , pidDepGraph :: DependencyList L.VarIdent
   }
 
 newtype Program = Program
@@ -140,7 +139,7 @@ mkUninfProgS synProg = do
     return $ Right parts
   helper parts (Y.Definition pos name expr) = do
     semExpr <- convertExpressionS expr
-    trace (show semExpr) $ addGlobal name
+    addGlobal name
     return $ Right $ parts ++ [UninfDefinition name pos semExpr Nothing]
   checkUndefinedReferencesS ::
     TextPos -> Expression -> State ConvertEnv (Maybe SemanticError)
@@ -150,7 +149,7 @@ mkUninfProgS synProg = do
     globM <- findGlobal name
     case globM of
       Nothing ->
-        return $ Just $ mkSemErr pos $ SeUndefinedVariable (L.unIdent name)
+        return $ Just $ mkSemErr pos $ SeUndefinedVariable (show name)
       Just _ -> return Nothing
   checkUndefinedReferencesS pos (Lambda _ expr) =
     checkUndefinedReferencesS pos expr
@@ -203,18 +202,18 @@ mkProgInfDeps uiprog@(UninfProg uiDefs) =
                 Just
                   $ mkSemErr (udefPos udef)
                   $ SeUndefinedVariable
-                  $ L.unIdent e
+                  $ show e
               Nothing -> acc
           )
       )
       Nothing
       uiDefs'
-  getDeps :: UninfProg -> L.Ident -> [L.Ident]
+  getDeps :: UninfProg -> L.VarIdent -> [L.VarIdent]
   getDeps (UninfProg uiDefs') glob =
     case find ((== glob) . udefName) uiDefs' of
       Nothing -> error "Found an undefined global. This is a bug."
       Just definition -> getAllRefs $ udefExpr definition
-  getAllRefs :: Expression -> [L.Ident]
+  getAllRefs :: Expression -> [L.VarIdent]
   getAllRefs (Ident _) = []
   getAllRefs (Lit _) = []
   getAllRefs (Ref name) = [name]
@@ -237,7 +236,7 @@ mkProgram (ProgInfDeps uprog (DependencyList dList)) =
  where
   helperTree ::
     UninfProg ->
-    L.Ident ->
+    L.VarIdent ->
     Either TypeError [Definition] ->
     Either TypeError [Definition]
   helperTree _ _ (Left e) = Left e
@@ -246,7 +245,7 @@ mkProgram (ProgInfDeps uprog (DependencyList dList)) =
       <$> (Definition a <$> mkInfExprTree prevDeps (lookupUDefUnsafe uprog' a))
   helperCycle ::
     UninfProg ->
-    [L.Ident] ->
+    [L.VarIdent] ->
     Either TypeError [Definition] ->
     Either TypeError [Definition]
   helperCycle _ _ (Left e) = Left e
@@ -255,7 +254,7 @@ mkProgram (ProgInfDeps uprog (DependencyList dList)) =
       <$> ( zipWith Definition as
               <$> mkTyExprCycle prevDeps (lookupUDefUnsafe uprog' <$> as)
           )
-  lookupUDefUnsafe :: UninfProg -> L.Ident -> UninfDefinition
+  lookupUDefUnsafe :: UninfProg -> L.VarIdent -> UninfDefinition
   lookupUDefUnsafe (UninfProg udefs) sname =
     case find (\(UninfDefinition name _ _ _) -> name == sname) udefs of
       Nothing -> error "A global definition wasn't found."
@@ -477,7 +476,7 @@ infFromExprS parts (IfThenElse cond expr1 expr2) = do
             return
               $ Right (reconciled, generics)
 
-lookupRefType :: [Definition] -> L.Ident -> Maybe NormType
+lookupRefType :: [Definition] -> L.VarIdent -> Maybe NormType
 lookupRefType parts refName =
   ( find (\(Definition name _) -> name == refName) parts
       >>= ( \case

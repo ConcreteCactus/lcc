@@ -46,14 +46,18 @@ data CompilerErrorType
   | CeTypeErrorType TypeErrorType
   deriving (Eq, Show)
 
-newtype LexicalErrorType
+data LexicalErrorType
   = LeUnexpectedLexicalElement [LexicalElement]
+  | LeUnknownTypePostfix
+  | LeUnknownTypeName
   deriving (Eq)
 
 instance Show LexicalErrorType where
   show (LeUnexpectedLexicalElement expected) =
     "Unexpected lexical element. Expected elements: "
       ++ Li.intercalate ", " (map show expected)
+  show LeUnknownTypePostfix = "Unknown type postfix."
+  show LeUnknownTypeName = "Unknown type name."
 
 data TypeErrorType
   = TeReferenceNotFound
@@ -72,24 +76,6 @@ data SemanticErrorType
   deriving (Show, Eq)
 
 data LexicalElement
-  -- = LeChar Char
-  -- | LeWord String
-  -- | LeOperator String
-  -- | LeWhiteSpace
-  -- | LeNotWhiteSpace
-  -- | LeEndOfStatement
-  -- | LeEndOfLine
-  -- | LeLowercaseCharacter
-  -- | LeIdentFirstCharacter
-  -- | LeIdentCharacter
-  -- | LeUppercaseCharacter
-  -- | LeAlphabeticalCharacter
-  -- | LeAlphanumericCharacter
-  -- | LeNumber
-  -- | LeDigit
-  -- | LeHexDigit
-  -- | LeNotNewLine
-  -- | LeTypeName
   = LeColon
   | LeArrow
   | LeColonEquals
@@ -103,10 +89,13 @@ data LexicalElement
   | LeVarIdent
   | LeTypIdent
   | LeLiteral
+  | LeOpeningBracket
+  | LeClosingBracket
+  | LeEndOfFile
   deriving (Eq)
 
 instance Show LexicalElement where
-    show LeColon = ":"
+    show LeColon = "colon (:)"
     show LeArrow = "->"
     show LeColonEquals = ":="
     show LeBackslash = "\\"
@@ -119,6 +108,9 @@ instance Show LexicalElement where
     show LeVarIdent = "variable name (eg. x)"
     show LeTypIdent = "type name (eg. I32)"
     show LeLiteral = "a literal (eg. 42i32)"
+    show LeOpeningBracket = "opening bracket"
+    show LeClosingBracket = "closing bracket"
+    show LeEndOfFile = "end of file"
 
 mkLexErr :: TextPos -> [LexicalElement] -> LexicalError
 mkLexErr pos expect = ProgramError (LeUnexpectedLexicalElement expect) pos
@@ -140,5 +132,5 @@ mkCompErrTyp :: TypeError -> CompilerError
 mkCompErrTyp (ProgramError et pos) = ProgramError (CeTypeErrorType et) pos
 
 incTextPos :: Char -> TextPos -> TextPos
-incTextPos '\n' (x, _) = (x + 1, 0)
+incTextPos '\n' (x, _) = (x + 1, 1)
 incTextPos _ (x, y) = (x, y + 1)

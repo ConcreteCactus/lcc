@@ -31,7 +31,6 @@ library
       Interpreter
       Lexer
       Lexer.Internal
-      Lexer.Internal_old
       Repl
       SemanticAnalyzer
       SemanticAnalyzer.DependencyGraph
@@ -45,6 +44,7 @@ library
       SemanticAnalyzer.Type.Internal
       StandardLibrary
       SyntacticAnalyzer
+      SyntacticAnalyzer.Internal
       Util
       Util.Limited
   other-modules:

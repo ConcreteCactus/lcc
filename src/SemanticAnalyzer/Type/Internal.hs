@@ -37,7 +37,7 @@ data MutExcTy2 = MutExcTy2
   }
   deriving (Show)
 
-data InferEnv = InferEnv Int ReconcileEnv [(L.Ident, Int)] deriving (Show)
+data InferEnv = InferEnv Int ReconcileEnv [(L.VarIdent, Int)] deriving (Show)
 
 -- Laws
 --   1. forall (a, _) in RE : forall (_, b) in RE : forall genericId in b : a != genericId
@@ -55,7 +55,7 @@ convertType synType = NormType typ (nextId - 1)
   (ConvertEnv nextId _, typ) =
     runState (convertTypeS synType) (ConvertEnv 1 [])
 
-convertTypeS :: Y.Type -> State (ConvertEnv L.Ident) Type
+convertTypeS :: Y.Type -> State (ConvertEnv L.TypIdent) Type
 convertTypeS (Y.TypeName t) = return $ AtomicType t
 convertTypeS (Y.TypeId id') = do
   ConvertEnv ident decls <- get
@@ -316,7 +316,7 @@ getNewId = do
   put $ InferEnv (ident + 1) rec glob
   return ident
 
-getTypeOfGlobal :: L.Ident -> State InferEnv Type
+getTypeOfGlobal :: L.VarIdent -> State InferEnv Type
 getTypeOfGlobal gname = do
   InferEnv _ rec glob <- get
   case lookup gname glob of

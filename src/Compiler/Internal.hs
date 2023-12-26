@@ -24,7 +24,7 @@ data ExpressionBuilder = ExprBuildr
 
 data Expression
   = ClosureExpr Closure
-  | FunctionRef L.Ident
+  | FunctionRef L.VarIdent
   | CaptureRef Int
   | ParamRef
   | Application Expression Expression
@@ -62,7 +62,7 @@ compile program =
         )
         (S.progDefs program)
 
-showExpression :: L.Ident -> Expression -> (CCode, CCode)
+showExpression :: L.VarIdent -> Expression -> (CCode, CCode)
 showExpression gname expr =
   let (ExprBuildr statms gstatms _, expr') =
         runState (showExpressionS gname expr) (ExprBuildr [] [] 1)
@@ -71,7 +71,7 @@ showExpression gname expr =
       )
 
 {- FOURMOLU_DISABLE -}
-showExpressionS :: L.Ident -> Expression -> State ExpressionBuilder CCode
+showExpressionS :: L.VarIdent -> Expression -> State ExpressionBuilder CCode
 showExpressionS _ ParamRef = return "param"
 showExpressionS _ (Literal (Y.Literal typ lit)) = do
   lid <- incBuilderIndex
@@ -106,7 +106,7 @@ showExpressionS gname (IfThenElse cond expr1 expr2) = do
 {- FOURMOLU_ENABLE -}
 
 {- FOURMOLU_DISABLE -}
-genFunction :: L.Ident -> Expression -> CCode
+genFunction :: L.VarIdent -> Expression -> CCode
 genFunction name expr =
   gcode ++ "\n" ++
   "void* " ++ show name ++ "_func(void) {\n" ++
@@ -118,7 +118,7 @@ genFunction name expr =
 
 {- FOURMOLU_DISABLE -}
 addClosureFunction ::
-  L.Ident ->
+  L.VarIdent ->
   CCode ->
   Expression ->
   State ExpressionBuilder CCode
@@ -135,7 +135,7 @@ addClosureFunction gname structName expr = do
 {- FOURMOLU_ENABLE -}
 
 {- FOURMOLU_DISABLE -}
-addClosureStruct :: L.Ident -> [Int] -> State ExpressionBuilder CCode
+addClosureStruct :: L.VarIdent -> [Int] -> State ExpressionBuilder CCode
 addClosureStruct gname cptrs = do
   ind <- incBuilderIndex
   let structName = "clstruct_" ++ show gname ++ "_" ++ show ind
@@ -149,7 +149,7 @@ addClosureStruct gname cptrs = do
 {- FOURMOLU_ENABLE -}
 
 {- FOURMOLU_DISABLE -}
-addClosure :: L.Ident -> Closure -> State ExpressionBuilder CCode
+addClosure :: L.VarIdent -> Closure -> State ExpressionBuilder CCode
 addClosure gname (Closure cptrs expr _) = do
   ind <- incBuilderIndex
   clstruct <- addClosureStruct gname cptrs
@@ -203,7 +203,7 @@ mkExpression def =
    in expr
 
 mkExpressionS ::
-  L.Ident ->
+  L.VarIdent ->
   SE.Expression ->
   State Int (Expression, [Int])
 mkExpressionS _ (SE.Ident n) | n == 1 = return (ParamRef, [n])
@@ -228,7 +228,7 @@ mkExpressionS ident (SE.IfThenElse cond expr1 expr2) = do
     )
 
 mkClosure ::
-  L.Ident ->
+  L.VarIdent ->
   SE.Expression ->
   State Int (Closure, [Int])
 mkClosure ident expr = do
@@ -251,7 +251,7 @@ incState = do
 
 compileFull :: SourceCode -> Either CompilerError CCode
 compileFull sc = do
-  scy <- leftMap mkCompErrLex $ Y.parseProgramSingleError sc
+  scy <- leftMap mkCompErrLex $ Y.parseProgram sc
   scs <- S.mkProgramFromSyn scy
   return $ compile scs
 
@@ -314,7 +314,7 @@ stdDefinitions = Li.intercalate "\n" (map genStdDefinitionCode rawDefs)
       standardLibrary
 
 genStdRawDefinition ::
-  ( L.Ident
+  ( L.VarIdent
   , a
   , (Int -> Writer [Int] CCode) ->
     Writer [Int] [CCode]
@@ -326,7 +326,7 @@ genStdRawDefinition (_, _, f) = (code, maximum ns)
   ff n = Writer ("std_var_" ++ show n, [n])
   (code, ns) = runWriter $ f ff
 
-genStdDefinitionCode :: (L.Ident, [CCode], Int) -> CCode
+genStdDefinitionCode :: (L.VarIdent, [CCode], Int) -> CCode
 genStdDefinitionCode rawDef =
   let (ExprBuildr _ glStatms _, _) =
         runState
@@ -336,7 +336,7 @@ genStdDefinitionCode rawDef =
 
 {- FOURMOLU_DISABLE -}
 genStdDefinitionCodeS ::
-  (L.Ident, [CCode], Int) ->
+  (L.VarIdent, [CCode], Int) ->
   State ExpressionBuilder ()
 genStdDefinitionCodeS rawDef@(name, _, _) = do
   stdExpr <- genStdDefinitionCodeStepS 0 rawDef
@@ -349,7 +349,7 @@ genStdDefinitionCodeS rawDef@(name, _, _) = do
 {- FOURMOLU_DISABLE -}
 genStdDefinitionCodeStepS ::
   Int ->
-  (L.Ident, [CCode], Int) ->
+  (L.VarIdent, [CCode], Int) ->
   State ExpressionBuilder CCode
 genStdDefinitionCodeStepS step rawDef@(name, cs, n)
   | step >= n = return $

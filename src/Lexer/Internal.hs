@@ -11,11 +11,12 @@ type SourceCode = String
 
 newtype VarIdent = VarIdent String deriving (Eq)
 newtype TypIdent = TypIdent String deriving (Eq)
+newtype TypName = TypName String deriving (Eq)
 data Literal = Literal Integer String deriving (Eq)
 
 newtype Parser a
   = Parser
-      ((TextPos, SourceCode) -> Maybe (TextPos, a, SourceCode))
+      ((TextPos, SourceCode) -> Either TextPos (TextPos, a, SourceCode))
 
 newtype ParserE a
   = ParserE
@@ -39,7 +40,7 @@ instance Functor Parser where
       )
 
 instance Applicative Parser where
-  pure a = Parser $ const $ pure ((0, 0), a, "")
+  pure a = Parser (\(textPos, sourceCode) -> Right (textPos, a, sourceCode))
   (Parser ff) <*> (Parser fa) =
     Parser
       ( \(textPos, sourceCode) -> do
@@ -51,9 +52,11 @@ instance Applicative Parser where
 instance Alternative Parser where
   (Parser fa) <|> (Parser fb) =
     Parser
-      ( \(textPos, sourceCode) -> fa (textPos, sourceCode) <|> fb (textPos, sourceCode)
+      ( \(textPos, sourceCode) -> case fa (textPos, sourceCode) of
+          Right ok -> Right ok
+          Left _ -> fb (textPos, sourceCode)
       )
-  empty = Parser (const Nothing)
+  empty = Parser $ const $ Left (0, 0)
 
 instance Monad Parser where
   (Parser fa) >>= fp =
@@ -73,7 +76,7 @@ instance Functor ParserE where
       )
 
 instance Applicative ParserE where
-  pure a = ParserE $ const $ pure ((0, 0), a, "")
+  pure a = ParserE (\(textPos, sourceCode) -> Right (textPos, a, sourceCode))
   (ParserE ff) <*> (ParserE fa) =
     ParserE
       ( \(textPos, sourceCode) -> do
@@ -109,17 +112,28 @@ collapseMaybe :: Parser (Maybe a) -> Parser a
 collapseMaybe (Parser fa) =
   Parser
     ( \a -> case fa a of
-        Just (textPos, Just parsedValue, sourceCode) ->
-          Just (textPos, parsedValue, sourceCode)
-        _ -> Nothing
+        Right (textPos, Just parsedValue, sourceCode) ->
+          Right (textPos, parsedValue, sourceCode)
+        Right (textPos, Nothing, _) -> Left textPos
+        Left textPos -> Left textPos
+    )
+
+collapseEither :: ParserE (Either LexicalErrorType a) -> ParserE a
+collapseEither (ParserE fa) =
+  ParserE
+    ( \a -> case fa a of
+        Right (textPos, Right parsedValue, sourceCode) ->
+          Right (textPos, parsedValue, sourceCode)
+        Right (textPos, Left e, _) -> Left (mkLexErr' textPos e)
+        Left e -> Left e
     )
 
 satisfy :: (Char -> Bool) -> Parser Char
 satisfy f =
   Parser
     ( \(textPos, sourceCode) -> case sourceCode of
-        (c : cs) | f c -> Just (incTextPos c textPos, c, cs)
-        _ -> Nothing
+        (c : cs) | f c -> Right (incTextPos c textPos, c, cs)
+        _ -> Left textPos
     )
 
 satisfy_ :: (Char -> Bool) -> Parser ()
@@ -130,9 +144,9 @@ withError (Parser fa) e =
   ParserE
     ( \(textPos, sourceCode) ->
         case fa (textPos, sourceCode) of
-          Just (textPos', parsedValue, sourceCode') ->
+          Right (textPos', parsedValue, sourceCode') ->
             Right (textPos', parsedValue, sourceCode')
-          Nothing -> Left $ mkLexErr' textPos e
+          Left textPos' -> Left $ mkLexErr' textPos' e
     )
 
 infixl 4 `withError`
@@ -141,6 +155,15 @@ withExpected :: Parser a -> LexicalElement -> ParserE a
 withExpected p l = p `withError` LeUnexpectedLexicalElement [l]
 
 infixl 4 `withExpected`
+
+sepBy1 :: ParserE () -> ParserE a -> ParserE [a]
+sepBy1 delim pars = (:) <$> pars <*> many (delim *> pars)
+
+sepBy :: ParserE () -> ParserE a -> ParserE [a]
+sepBy delim pars = ([] <$ endOfFile) <|> sepBy1 delim pars
+
+leftAssoc :: (a -> a -> a) -> ParserE () -> ParserE a -> ParserE a
+leftAssoc f delim pars = foldl1 f <$> sepBy1 delim pars
 
 colon :: ParserE ()
 colon = satisfy_ (== ':') `withExpected` LeColon
@@ -158,20 +181,19 @@ dot :: ParserE ()
 dot = satisfy_ (== '.') `withExpected` LeBackslash
 
 exprWhiteSpace' :: Parser ()
-exprWhiteSpace' =
-  void
-    $ some
-      ( satisfy_ (`elem` "\t ")
-          <|> (satisfy_ (== '\n') *> exprWhiteSpace')
-      )
+exprWhiteSpace' = void $ some (space <|> newln)
+ where
+  space = satisfy_ (`elem` " \t")
+  newln = some (optional (satisfy_ (== '\r')) *> satisfy_ (== '\n')) *> space
 
 exprWhiteSpace :: ParserE ()
 exprWhiteSpace = exprWhiteSpace' `withExpected` LeExprWhiteSpace
 
 stmtWhiteSpace :: ParserE ()
 stmtWhiteSpace =
-  exprWhiteSpace'
-    *> satisfy_ (== '\n')
+  void
+    $ optional exprWhiteSpace'
+    *> some (optional (satisfy_ (== '\r')) *> satisfy_ (== '\n'))
     `withExpected` LeStmtWhiteSpace
 
 if_ :: ParserE ()
@@ -186,19 +208,34 @@ else_ = mapM_ (satisfy . (==)) "else" `withExpected` LeIf
 varIdent :: ParserE VarIdent
 varIdent =
   VarIdent
-    <$> ((:) <$> satisfy isLower <*> some (satisfy isAlphaNum))
+    <$> ( (:)
+            <$> satisfy isLower
+            <*> many (satisfy (\c -> isAlphaNum c || c == '_'))
+        )
     `withExpected` LeVarIdent
 
 typIdent :: ParserE TypIdent
 typIdent =
   TypIdent
-    <$> ((:) <$> satisfy isAlpha <*> some (satisfy isAlphaNum))
+    <$> ( (:)
+            <$> satisfy (\c -> isAlpha c && isLower c)
+            <*> many (satisfy isAlphaNum)
+        )
+    `withExpected` LeTypIdent
+
+typName :: ParserE TypName
+typName =
+  TypName
+    <$> ( (:)
+            <$> satisfy (\c -> isAlpha c && isUpper c)
+            <*> many (satisfy isAlphaNum)
+        )
     `withExpected` LeTypIdent
 
 literal :: ParserE Literal
 literal = collapseMaybe (decNum <|> hexNum) `withExpected` LeLiteral
  where
-  litTyp = some (satisfy (\c -> isAlphaNum c && isLower c))
+  litTyp = some (satisfy (\c -> isDigit c || isLower c))
   decNum =
     convertDec
       <$> optional (satisfy (`elem` "+-"))
@@ -209,6 +246,7 @@ literal = collapseMaybe (decNum <|> hexNum) `withExpected` LeLiteral
       <$> ( satisfy_ (== '0')
               *> satisfy_ (== 'x')
               *> some (satisfy isHexDigit)
+              <* satisfy (== '_')
           )
       <*> litTyp
   convertDec sign num typ = do
@@ -239,3 +277,40 @@ literal = collapseMaybe (decNum <|> hexNum) `withExpected` LeLiteral
     | c `elem` ['a' .. 'f'] = Just $ ord c - ord 'a' + 10
     | c `elem` ['A' .. 'F'] = Just $ ord c - ord 'A' + 10
     | otherwise = Nothing
+
+openingBracket :: ParserE ()
+openingBracket = satisfy_ (== '(') `withExpected` LeOpeningBracket
+
+closingBracket :: ParserE ()
+closingBracket = satisfy_ (== ')') `withExpected` LeClosingBracket
+
+endOfFile :: ParserE ()
+endOfFile = 
+    optional stmtWhiteSpace *>
+    optional exprWhiteSpace *>
+    (endOfFile' `withExpected` LeEndOfFile)
+
+endOfFile' :: Parser ()
+endOfFile' =
+  Parser
+    ( \(textPos, sourceCode) -> 
+        if null sourceCode
+          then Right (textPos, (), sourceCode)
+          else Left textPos
+    )
+
+currentPos :: ParserE TextPos
+currentPos =
+  ParserE
+    ( \(textPos, sourceCode) ->
+        Right (textPos, textPos, sourceCode)
+    )
+
+execParser :: ParserE a -> SourceCode -> Either LexicalError a
+execParser (ParserE fa) sc = (\(_, val, _) -> val) <$> fa ((1, 1), sc)
+
+-- traceParser :: String -> ParserE ()
+-- traceParser str =
+--   ParserE
+--     ( \(textPos, sourceCode) -> trace (str ++ " " ++ show textPos) $ Right (textPos, (), sourceCode)
+--     )

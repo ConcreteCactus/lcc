@@ -41,14 +41,14 @@ typeNameOf ABool = "bool"
 
 standardLibrary ::
   (Monoid a) =>
-  [ ( L.Ident
+  [ ( L.VarIdent
     , T.NormType
     , (Int -> Writer a String) -> Writer a [String]
     )
   ]
 standardLibrary =
   map
-    (\(idnt, typ, comp) -> (L.Ident idnt, T.mkNormType typ, comp))
+    (\(idnt, typ, comp) -> (L.VarIdent idnt, T.mkNormType typ, comp))
     library'
 
 p :: (Applicative m) => a -> m a
