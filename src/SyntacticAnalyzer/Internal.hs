@@ -108,12 +108,11 @@ varIdent = Id <$> L.varIdent
 lambda :: L.ParserE Expression
 lambda =
   Lambda
-    <$> 
-     (wo *> L.backSlash *> wo *> L.varIdent)
+    <$> ( wo *> L.backSlash *> wo *> L.varIdent)
     <*> (wo *> L.dot *> wo *> expression)
 
 applications :: L.ParserE Expression
-applications = wo *> L.leftAssoc Application wr expressionWoA
+applications = wo *> L.leftAssoc2 Application wr expressionWoA
 
 ifThenElse :: L.ParserE Expression
 ifThenElse =
@@ -123,16 +122,17 @@ ifThenElse =
     <*> (wr *> L.else_ *> wr *> expression)
 
 expression :: L.ParserE Expression
-expression = 
+expression =
   ifThenElse
-    <|> applications
     <|> lambda
+    <|> expressionBr
+    <|> applications
     <|> varIdent
     <|> literal
-    <|> expressionBr
 
+-- Expression inside brackets
 expressionBr :: L.ParserE Expression
-expressionBr = 
+expressionBr =
   wo
     *> L.openingBracket
     *> wo
@@ -145,9 +145,9 @@ expressionWoA :: L.ParserE Expression
 expressionWoA =
   ifThenElse
     <|> lambda
+    <|> expressionBr
     <|> varIdent
     <|> literal
-    <|> expressionBr
 
 typeId :: L.ParserE Type
 typeId = TypeId <$> L.typIdent

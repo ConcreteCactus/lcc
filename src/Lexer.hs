@@ -10,6 +10,7 @@ module Lexer
     sepBy1,
     sepBy,
     leftAssoc,
+    leftAssoc2,
     colon,
     arrow,
     colonEquals,

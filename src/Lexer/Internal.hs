@@ -5,6 +5,7 @@ module Lexer.Internal where
 import Control.Applicative
 import Control.Monad
 import Data.Char
+import Debug.Trace
 import Errors
 
 type SourceCode = String
@@ -159,11 +160,17 @@ infixl 4 `withExpected`
 sepBy1 :: ParserE () -> ParserE a -> ParserE [a]
 sepBy1 delim pars = (:) <$> pars <*> many (delim *> pars)
 
+sepBy2 :: ParserE () -> ParserE a -> ParserE [a]
+sepBy2 delim pars = (:) <$> pars <*> some (delim *> pars)
+
 sepBy :: ParserE () -> ParserE a -> ParserE [a]
 sepBy delim pars = ([] <$ endOfFile) <|> sepBy1 delim pars
 
 leftAssoc :: (a -> a -> a) -> ParserE () -> ParserE a -> ParserE a
 leftAssoc f delim pars = foldl1 f <$> sepBy1 delim pars
+
+leftAssoc2 :: (a -> a -> a) -> ParserE () -> ParserE a -> ParserE a
+leftAssoc2 f delim pars = foldl1 f <$> sepBy2 delim pars
 
 colon :: ParserE ()
 colon = satisfy_ (== ':') `withExpected` LeColon
@@ -172,7 +179,10 @@ arrow :: ParserE ()
 arrow = satisfy_ (== '-') *> satisfy_ (== '>') `withExpected` LeColon
 
 colonEquals :: ParserE ()
-colonEquals = satisfy_ (== ':') *> satisfy_ (== '=') `withExpected` LeColonEquals
+colonEquals =
+  satisfy_ (== ':')
+    *> satisfy_ (== '=')
+    `withExpected` LeColonEquals
 
 backSlash :: ParserE ()
 backSlash = satisfy_ (== '\\') `withExpected` LeBackslash
@@ -208,11 +218,17 @@ else_ = mapM_ (satisfy . (==)) "else" `withExpected` LeIf
 varIdent :: ParserE VarIdent
 varIdent =
   VarIdent
-    <$> ( (:)
+    <$> filterKeywords ["if", "then", "else"] ( (:)
             <$> satisfy isLower
             <*> many (satisfy (\c -> isAlphaNum c || c == '_'))
         )
     `withExpected` LeVarIdent
+
+filterKeywords :: [String] -> Parser String -> Parser String
+filterKeywords ks p =
+  collapseMaybe
+    $ (\w -> if w `elem` ks then Nothing else Just w)
+    <$> p
 
 typIdent :: ParserE TypIdent
 typIdent =
@@ -257,7 +273,7 @@ literal = collapseMaybe (decNum <|> hexNum) `withExpected` LeLiteral
     let (num', _) =
           foldr
             (\n (num'', pow) -> (n * (10 ^ pow) + num'', num'' + 1))
-            (0, 1)
+            (0, 0)
             digits
     case sign of
       Nothing -> return $ Literal (fromIntegral num') typ
@@ -285,15 +301,15 @@ closingBracket :: ParserE ()
 closingBracket = satisfy_ (== ')') `withExpected` LeClosingBracket
 
 endOfFile :: ParserE ()
-endOfFile = 
-    optional stmtWhiteSpace *>
-    optional exprWhiteSpace *>
-    (endOfFile' `withExpected` LeEndOfFile)
+endOfFile =
+  optional stmtWhiteSpace
+    *> optional exprWhiteSpace
+    *> (endOfFile' `withExpected` LeEndOfFile)
 
 endOfFile' :: Parser ()
 endOfFile' =
   Parser
-    ( \(textPos, sourceCode) -> 
+    ( \(textPos, sourceCode) ->
         if null sourceCode
           then Right (textPos, (), sourceCode)
           else Left textPos
