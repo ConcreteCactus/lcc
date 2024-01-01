@@ -3,6 +3,7 @@
 
 module Compiler.Internal where
 
+import Control.Monad
 import qualified Data.List as Li
 import Data.Maybe
 import Errors
@@ -32,10 +33,13 @@ data Expression
   | Literal Y.Literal
   deriving (Show)
 
+type DeBrujinInd = Int
+type MemoryInd = Int
+
 data Closure = Closure
-  { clCaptures :: [Int]
-  , clExpression :: Expression
+  { clExpression :: Expression
   , clName :: CCode
+  , clDepth :: Int
   }
   deriving (Show)
 
@@ -45,10 +49,16 @@ compile program =
     ++ constPredefs
     ++ concatMap ((++ "\n") . predefHelper) (S.progDefs program)
     ++ runtime
-    ++ stdDefinitions
-    ++ unlines (map genHelper $ S.progDefs program)
+    ++ stdDefinitions usedFunctions
+    ++ programCode
     ++ if mainfnHelper then mainfn else mainfnEmpty
  where
+  usedFunctions =
+    foldr
+      (\x acc -> getUsedFunctions (mkExpression x) +-+ acc)
+      []
+      $ S.progDefs program
+  programCode = unlines (map genHelper $ S.progDefs program)
   genHelper def@(S.Definition gname _) = genFunction gname $ mkExpression def
   predefHelper (S.Definition gname _) =
     "void* "
@@ -79,16 +89,17 @@ showExpressionS _ (Literal (Y.Literal typ lit)) = do
   addStatement $ cTypeOf typ ++ "* " ++ litName ++ " = new_literal(sizeof(" ++ cTypeOf typ ++ "));"
   addStatement $ "*" ++ litName ++ " = " ++ show lit ++ ";"
   return litName
-showExpressionS _ (CaptureRef n) = return $ "self->capture_" ++ show n
+showExpressionS _ (CaptureRef n) = return $ "self->captures[" ++ show (n - 2) ++ "]"
 showExpressionS _ (FunctionRef func) = do
   return $ show func ++ "_func()"
-showExpressionS gname (ClosureExpr closure) = addClosure gname closure
+showExpressionS gname (ClosureExpr closure) = 
+    addClosure gname closure
 showExpressionS gname (Application expr1 expr2) = do
   expr1' <- showExpressionS gname expr1
   expr2' <- showExpressionS gname expr2
   indx <- incBuilderIndex
   let icl = "icl" ++ show indx
-  addStatement $ "gen_closure* " ++ icl ++ " = " ++ expr1' ++ ";"
+  addStatement $ "closure* " ++ icl ++ " = " ++ expr1' ++ ";"
   return $ icl ++ "->clfunc(" ++ icl ++ ", " ++ expr2' ++ ")"
 showExpressionS gname (IfThenElse cond expr1 expr2) = do
   cond' <- showExpressionS gname cond
@@ -119,15 +130,14 @@ genFunction name expr =
 {- FOURMOLU_DISABLE -}
 addClosureFunction ::
   L.VarIdent ->
-  CCode ->
   Expression ->
   State ExpressionBuilder CCode
-addClosureFunction gname structName expr = do
+addClosureFunction gname expr = do
   ind <- incBuilderIndex
   expr' <- separateBuilder $ showExpressionS gname expr
-  let fnname = "clfunc_" ++ show gname ++ "_" ++ show ind
+  let fnname = show gname ++ "_clfunc_" ++ show ind
   let fncode =
-        "void* " ++ fnname ++ "(" ++ structName ++ "* self, void* param) {\n" ++
+        "void* " ++ fnname ++ "(closure* self, void* param) {\n" ++
             expr' ++ "\n" ++
         "}\n"
   addGlobalStatement fncode
@@ -135,37 +145,20 @@ addClosureFunction gname structName expr = do
 {- FOURMOLU_ENABLE -}
 
 {- FOURMOLU_DISABLE -}
-addClosureStruct :: L.VarIdent -> [Int] -> State ExpressionBuilder CCode
-addClosureStruct gname cptrs = do
-  ind <- incBuilderIndex
-  let structName = "clstruct_" ++ show gname ++ "_" ++ show ind
-  let structCode =
-        "typedef struct {\n" ++
-            "\tvoid* clfunc;\n" ++
-            concatMap ((++ ";\n") . ("\tvoid* capture_" ++) . show) cptrs ++
-        "} " ++ structName ++ ";\n"
-  addGlobalStatement structCode
-  return structName
-{- FOURMOLU_ENABLE -}
-
-{- FOURMOLU_DISABLE -}
 addClosure :: L.VarIdent -> Closure -> State ExpressionBuilder CCode
-addClosure gname (Closure cptrs expr _) = do
+addClosure gname (Closure expr _ depth) = do
   ind <- incBuilderIndex
-  clstruct <- addClosureStruct gname cptrs
-  clfunc <- addClosureFunction gname clstruct expr
+  let cl = "c" ++ show ind
+  addGlobalStatement $ "// depth: " ++ show depth
+  clfunc <- addClosureFunction gname expr
   addStatement $
-    clstruct ++ "* c" ++ show ind ++ " = (" ++ clstruct ++
-    "*)new_closure(sizeof(" ++ clstruct ++ "));"
-  mapM_ (addStatement . assignHelper ind) cptrs
-  addStatement $ "c" ++ show ind ++ "->clfunc = " ++ clfunc ++ ";"
+    "closure* " ++ cl ++ " = (closure*)new_closure(" ++ show depth ++ ");"
+  addStatement $ cl ++ "->clfunc = " ++ clfunc ++ ";"
+  when (depth >= 1) $
+      addStatement $ cl ++ "->captures[0] = param;"
+  when (depth >= 2) $
+    addStatement $ "memcpy(&(" ++ cl ++ "->captures[1]), &(self->captures), sizeof(void*) * " ++ show (depth - 1) ++ ");"
   return $ "c" ++ show ind
-{- FOURMOLU_ENABLE -}
-
-{- FOURMOLU_DISABLE -}
-assignHelper :: Int -> Int -> CCode
-assignHelper ind n = "c" ++ show ind ++ "->capture_" ++ show n ++ " = " ++
-    (if n > 2 then "self->capture_" ++ show (n - 1) else "param") ++ ";"
 {- FOURMOLU_ENABLE -}
 
 incBuilderIndex :: State ExpressionBuilder Int
@@ -194,33 +187,46 @@ separateBuilder builderS = do
   put (ExprBuildr statms (gstatms' ++ gstatms) ctr')
   return $ unlines (map ("\t" ++) statms') ++ "\treturn " ++ code ++ ";"
 
+getUsedFunctions :: Expression -> [L.VarIdent]
+getUsedFunctions (ClosureExpr (Closure clExpr _ _)) = getUsedFunctions clExpr
+getUsedFunctions (FunctionRef ident) = [ident]
+getUsedFunctions (Application expr1 expr2) =
+  getUsedFunctions expr1
+    +-+ getUsedFunctions expr2
+getUsedFunctions (IfThenElse cond expr1 expr2) =
+  getUsedFunctions cond
+    +-+ getUsedFunctions expr1
+    +-+ getUsedFunctions expr2
+getUsedFunctions _ = []
+
 mkExpression :: S.Definition -> Expression
 mkExpression def =
   let (expr, _) =
         execState
-          (mkExpressionS (S.defName def) (S.teExpr (S.defExpr def)))
+          (mkExpressionS (S.defName def) 0 (S.teExpr (S.defExpr def)))
           1
    in expr
 
 mkExpressionS ::
   L.VarIdent ->
+  Int ->
   SE.Expression ->
   State Int (Expression, [Int])
-mkExpressionS _ (SE.Ident n) | n == 1 = return (ParamRef, [n])
-mkExpressionS _ (SE.Ident n) = return (CaptureRef n, [n])
-mkExpressionS _ (SE.Ref n) = return (FunctionRef n, [])
-mkExpressionS _ (SE.Lit l) = return (Literal l, [])
-mkExpressionS ident (SE.Lambda _ expr) = do
-  (closure, cptrs) <- mkClosure ident expr
+mkExpressionS _ _ (SE.Ident n) | n == 1 = return (ParamRef, [n])
+mkExpressionS _ _ (SE.Ident n) = return (CaptureRef n, [n])
+mkExpressionS _ _ (SE.Ref n) = return (FunctionRef n, [])
+mkExpressionS _ _ (SE.Lit l) = return (Literal l, [])
+mkExpressionS ident depth (SE.Lambda _ expr) = do
+  (closure, cptrs) <- mkClosure ident depth expr
   return (ClosureExpr closure, cptrs)
-mkExpressionS ident (SE.Application expr1 expr2) = do
-  (expr1', cptrs1) <- mkExpressionS ident expr1
-  (expr2', cptrs2) <- mkExpressionS ident expr2
+mkExpressionS ident depth (SE.Application expr1 expr2) = do
+  (expr1', cptrs1) <- mkExpressionS ident depth expr1
+  (expr2', cptrs2) <- mkExpressionS ident depth expr2
   return (Application expr1' expr2', Li.sort (cptrs1 +-+ cptrs2))
-mkExpressionS ident (SE.IfThenElse cond expr1 expr2) = do
-  (cond', cptrsc) <- mkExpressionS ident cond
-  (expr1', cptrs1) <- mkExpressionS ident expr1
-  (expr2', cptrs2) <- mkExpressionS ident expr2
+mkExpressionS ident depth (SE.IfThenElse cond expr1 expr2) = do
+  (cond', cptrsc) <- mkExpressionS ident depth cond
+  (expr1', cptrs1) <- mkExpressionS ident depth expr1
+  (expr2', cptrs2) <- mkExpressionS ident depth expr2
   return
     ( IfThenElse cond' expr1' expr2'
     , Li.sort
@@ -229,17 +235,18 @@ mkExpressionS ident (SE.IfThenElse cond expr1 expr2) = do
 
 mkClosure ::
   L.VarIdent ->
+  Int ->
   SE.Expression ->
   State Int (Closure, [Int])
-mkClosure ident expr = do
-  (expr', cptrs) <- mkExpressionS ident expr
-  clId <- incState
+mkClosure ident depth expr = do
+  (expr', cptrs) <- mkExpressionS ident (depth + 1) expr
   let cptrs' = filter (> 1) cptrs
+  clId <- incState
   let closure =
         Closure
-          { clCaptures = cptrs'
-          , clExpression = expr'
+          { clExpression = expr'
           , clName = show ident ++ "_c_" ++ show clId
+          , clDepth = depth
           }
   return (closure, map (+ (-1)) cptrs')
 
@@ -257,7 +264,12 @@ compileFull sc = do
 
 {- FOURMOLU_DISABLE -}
 includes :: CCode
-includes = "#include <stdlib.h>\n#include <stdio.h>\n#include <stdint.h>\n\n"
+includes = 
+    "#include <stdlib.h>\n" ++
+    "#include <stdio.h>\n" ++
+    "#include <stdint.h>\n" ++
+    "#include <string.h>\n" ++
+    "\n"
 {- FOURMOLU_ENABLE -}
 
 {- FOURMOLU_DISABLE -}
@@ -265,8 +277,8 @@ runtime :: CCode
 runtime =
   "typedef __int128 int128_t;\n" ++
   "typedef unsigned __int128 uint128_t;\n" ++
-  "void* new_closure(size_t size) {\n" ++
-      "\treturn malloc(size);\n" ++
+  "void* new_closure(uint32_t count) {\n" ++
+      "\treturn malloc(sizeof(closure) + sizeof(void*) * count);\n" ++
   "}\n" ++
   "\n" ++
   "void* new_literal(size_t size) {\n" ++
@@ -277,11 +289,13 @@ runtime =
 {- FOURMOLU_DISABLE -}
 constPredefs :: CCode
 constPredefs =
-  "typedef void* gen_closure_clfunc(void*, void*);\n" ++
+  "typedef struct closure closure;\n" ++
+  "typedef void* closure_clfunc(closure*, void*);\n" ++
   "\n" ++
-  "typedef struct {\n" ++
-      "\tgen_closure_clfunc* clfunc;\n" ++
-  "} gen_closure;\n" ++
+  "struct closure {\n" ++
+      "\tclosure_clfunc* clfunc;\n" ++
+      "\tvoid* captures[];\n" ++
+  "};\n" ++
   "\n"
 {- FOURMOLU_ENABLE -}
 
@@ -301,8 +315,9 @@ mainfnEmpty =
   "}\n"
 {- FOURMOLU_ENABLE -}
 
-stdDefinitions :: CCode
-stdDefinitions = Li.intercalate "\n" (map genStdDefinitionCode rawDefs)
+stdDefinitions :: [L.VarIdent] -> CCode
+stdDefinitions usedFunctions =
+  Li.intercalate "\n" (map genStdDefinitionCode filteredDefs)
  where
   rawDefs =
     map
@@ -312,6 +327,7 @@ stdDefinitions = Li.intercalate "\n" (map genStdDefinitionCode rawDefs)
            in (name, cs, n)
       )
       standardLibrary
+  filteredDefs = filter (\(n, _, _) -> n `elem` usedFunctions) rawDefs
 
 genStdRawDefinition ::
   ( L.VarIdent
@@ -351,33 +367,32 @@ genStdDefinitionCodeStepS ::
   Int ->
   (L.VarIdent, [CCode], Int) ->
   State ExpressionBuilder CCode
-genStdDefinitionCodeStepS step rawDef@(name, cs, n)
-  | step >= n = return $
+genStdDefinitionCodeStepS depth rawDef@(name, cs, n)
+  | depth >= n = return $
     concatMap (\m -> "\tvoid* std_var_" ++ show m ++ " = " ++ helper m ++ ";\n") [1..n] ++
     concatMap (("\t" ++) . (++ ";\n")) (init cs) ++
     "\treturn " ++ last cs ++ ";"
   | otherwise = do
-      nextExpr <- genStdDefinitionCodeStepS (step + 1) rawDef
+      nextExpr <- genStdDefinitionCodeStepS (depth + 1) rawDef
       clid <- incBuilderIndex
-      clid' <- incBuilderIndex
-      let closureTyp = show name ++ "_std_closure_" ++ show clid
+      let clfunc = show name ++ "_clfunc_" ++ show (depth + 1)
       addGlobalStatement $
-        "typedef struct {\n" ++
-            "\tvoid* clfunc;\n" ++
-            concatMap (\m -> "\tvoid* capture_" ++ show (m + 1) ++ ";\n") [0..step-1] ++
-        "} " ++ closureTyp ++ ";\n" ++
-        "\n" ++
-        "void* " ++ show name ++ "_" ++ show (step + 1) ++ "_clfunc(" ++ closureTyp ++ "* self, void* param){\n" ++
+        "void* " ++ clfunc ++ "(closure* self, void* param){\n" ++
             nextExpr ++ "\n" ++
         "}\n"
-      let closureName = "c" ++ show clid'
+      let cl = "c" ++ show clid
       return $
-        "\t" ++ closureTyp ++ "* " ++ closureName ++ " = new_closure(sizeof(" ++ closureTyp ++ "));\n" ++
-        "\t" ++ closureName ++ "->clfunc = " ++ show name ++ "_" ++ show (step + 1) ++ "_clfunc;\n" ++
-        concatMap (\m -> "\t" ++ assignHelper clid' (m + 1) ++ "\n") [0..step-1] ++
-        "\treturn " ++ closureName ++ ";"
+        "\tclosure* " ++ cl ++ " = new_closure(" ++ show depth ++ ");\n" ++
+        "\t" ++ cl ++ "->clfunc = " ++ clfunc ++ ";\n" ++
+        (if depth >= 1
+        then "\t" ++ cl ++ "->captures[0] = param;\n"
+        else "") ++
+        (if depth >= 2
+        then "\tmemcpy(&(" ++ cl ++ "->captures[1]), &(self->captures), sizeof(void*) * " ++ show (depth - 1) ++ ");\n"
+        else "") ++
+        "\treturn " ++ cl ++ ";"
       where
       helper m
         | m >= n = "param"
-        | otherwise = "self->capture_" ++ show m
+        | otherwise = "self->captures[" ++ show (n - m - 1) ++ "]"
 {- FOURMOLU_ENABLE -}
