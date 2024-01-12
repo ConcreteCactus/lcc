@@ -119,10 +119,14 @@ library' =
     , \t -> a t `to` a t `to` a t
     , \t w ->
         sequence
-          [ p (cTypeOf t) <> p "* s1 = " <> w 1
-          , p (cTypeOf t) <> p "* s2 = " <> w 2
-          , p (cTypeOf t) <> p "* s3 = new_literal(sizeof(" <> p (cTypeOf t) <> p "))"
-          , p "*s3 = (*s1) + (*s2)"
+          [ p "literal* s1 = " <> w 1
+          , p "literal* s2 = " <> w 2
+          , p "literal* s3 = new_literal(sizeof(" <> p (cTypeOf t) <> p "))"
+          , p "void* s1data = &s1->data"
+          , p "void* s2data = &s2->data"
+          , p "void* s3data = &s3->data"
+          , p (cTypeOf t) <> p "* s3datai = s3data"
+          , p "*s3datai = *(" <> p (cTypeOf t) <> p "*)s1data + *(" <> p (cTypeOf t) <> p "*)s2data"
           , p "s3"
           ]
     )
@@ -132,8 +136,10 @@ library' =
       , \t -> a t `to` g 1 `to` g 1
       , \t w ->
           sequence
-            [ p (cTypeOf t) <> p "* s1 = " <> w 1
-            , p "printf(\"%" <> p (printfFormatStringBasedOnType t) <> p "\", (*s1)" <> p ")"
+            [ p "literal* s1 = " <> w 1
+            , p "void* s1data = &s1->data" 
+            , p (cTypeOf t) <> p "* s1datai = s1data"
+            , p "printf(\"%" <> p (printfFormatStringBasedOnType t) <> p "\", (*s1datai)" <> p ")"
             , w 2
             ]
       )
@@ -143,10 +149,12 @@ library' =
       , \t -> a t `to` a t `to` a ABool
       , \t w ->
           sequence
-            [ p (cTypeOf t) <> p "* s1 = " <> w 1
-            , p (cTypeOf t) <> p "* s2 = " <> w 2
-            , p (cTypeOf t) <> p "* s3 = new_literal(sizeof(" <> p (cTypeOf t) <> p "))"
-            , p "*s3 = (*s1) == (*s2)"
+            [ p "literal* s1 = " <> w 1
+            , p "literal* s2 = " <> w 2
+            , p "literal* s3 = new_literal(sizeof(" <> p (cTypeOf t) <> p "))"
+            , p "void* s1data = &s1->data"
+            , p "void* s2data = &s2->data"
+            , p "s3->data[0] = *(" <> p (cTypeOf t) <> p "*)s1data == *(" <> p (cTypeOf t) <> p "*)s2data"
             , p "s3"
             ]
       )

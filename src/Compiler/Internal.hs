@@ -86,8 +86,10 @@ showExpressionS _ ParamRef = return "param"
 showExpressionS _ (Literal (Y.Literal typ lit)) = do
   lid <- incBuilderIndex
   let litName = "l" ++ show lid
-  addStatement $ cTypeOf typ ++ "* " ++ litName ++ " = new_literal(sizeof(" ++ cTypeOf typ ++ "));"
-  addStatement $ "*" ++ litName ++ " = " ++ show lit ++ ";"
+  addStatement $ "literal* " ++ litName ++ " = new_literal(sizeof(" ++ cTypeOf typ ++ "));"
+  addStatement $ "void* " ++ litName ++ "_data = &" ++ litName ++ "->data;"
+  addStatement $ cTypeOf typ ++ "* " ++ litName ++ "_datai = " ++ litName ++ "_data;"
+  addStatement $ "*" ++ litName ++ "_datai = " ++ show lit ++ ";"
   return litName
 showExpressionS _ (CaptureRef n) = return $ "self->captures[" ++ show (n - 2) ++ "]"
 showExpressionS _ (FunctionRef func) = do
@@ -106,7 +108,7 @@ showExpressionS gname (IfThenElse cond expr1 expr2) = do
   indx <- incBuilderIndex
   let ifr = "ifr" ++ show indx
   addStatement $ "void* " ++ ifr ++ ";"
-  addStatement $ "if(*(char*)(" ++ cond' ++ ")){"
+  addStatement $ "if(((literal*)" ++ cond' ++ ")->data[0]){"
   expr1' <- showExpressionS gname expr1
   addStatement $ ifr ++ " = " ++ expr1' ++ ";"
   addStatement "} else {"
@@ -275,26 +277,37 @@ includes =
 {- FOURMOLU_DISABLE -}
 runtime :: CCode
 runtime =
-  "typedef __int128 int128_t;\n" ++
-  "typedef unsigned __int128 uint128_t;\n" ++
-  "void* new_closure(uint32_t count) {\n" ++
+  "closure* new_closure(uint32_t count) {\n" ++
       "\treturn malloc(sizeof(closure) + sizeof(void*) * count);\n" ++
   "}\n" ++
   "\n" ++
-  "void* new_literal(size_t size) {\n" ++
-      "\treturn malloc(size);\n" ++
+  "literal* new_literal(size_t size) {\n" ++
+      "\treturn malloc(sizeof(literal) + size);\n" ++
   "}\n\n"
 {- FOURMOLU_ENABLE -}
 
 {- FOURMOLU_DISABLE -}
 constPredefs :: CCode
 constPredefs =
+  "typedef __int128 int128_t;\n" ++
+  "typedef unsigned __int128 uint128_t;\n" ++
   "typedef struct closure closure;\n" ++
+  "typedef struct literal literal;\n" ++
+  "typedef struct gc_data gc_data;\n" ++
   "typedef void* closure_clfunc(closure*, void*);\n" ++
   "\n" ++
+  "struct gc_data {\n" ++
+      "\tuint32_t rc;\n" ++
+  "};\n" ++
+  "\n" ++
   "struct closure {\n" ++
+      "\tgc_data gc_data;\n" ++
       "\tclosure_clfunc* clfunc;\n" ++
       "\tvoid* captures[];\n" ++
+  "};\n" ++
+  "struct literal {\n" ++
+      "\tgc_data gc_data;\n" ++
+      "\tchar data[];\n" ++
   "};\n" ++
   "\n"
 {- FOURMOLU_ENABLE -}
