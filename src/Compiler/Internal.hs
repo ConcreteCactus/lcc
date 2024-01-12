@@ -20,6 +20,7 @@ type CCode = String
 data ExpressionBuilder = ExprBuildr
   { ebStatms :: [CCode]
   , ebGStatms :: [CCode]
+  , ebStackVars :: [CCode]
   , ebCounter :: Int
   }
 
@@ -74,11 +75,19 @@ compile program =
 
 showExpression :: L.VarIdent -> Expression -> (CCode, CCode)
 showExpression gname expr =
-  let (ExprBuildr statms gstatms _, expr') =
-        runState (showExpressionS gname expr) (ExprBuildr [] [] 1)
-   in ( unlines (map ("\t" ++) statms ++ ["\treturn " ++ expr' ++ ";"])
+  let (ExprBuildr statms gstatms stackVars cnt, expr') =
+        runState (showExpressionS gname expr) (ExprBuildr [] [] [] 1)
+   in ( unlines
+          ( map ("\t" ++) statms
+              ++ ["\tvoid* val" ++ show cnt ++ " = " ++ expr' ++ ";"]
+              ++ gcStackValRemovals stackVars
+              ++ ["\treturn val" ++ show cnt ++ ";"]
+          )
       , unlines gstatms
       )
+
+gcStackValRemovals :: [CCode] -> [CCode]
+gcStackValRemovals = map (\name -> "\t((gc_type*)" ++ name ++ ")->gc_data.isInStackSpace = 0;")
 
 {- FOURMOLU_DISABLE -}
 showExpressionS :: L.VarIdent -> Expression -> State ExpressionBuilder CCode
@@ -87,6 +96,7 @@ showExpressionS _ (Literal (Y.Literal typ lit)) = do
   lid <- incBuilderIndex
   let litName = "l" ++ show lid
   addStatement $ "literal* " ++ litName ++ " = new_literal(sizeof(" ++ cTypeOf typ ++ "));"
+  addStackVal litName
   addStatement $ "void* " ++ litName ++ "_data = &" ++ litName ++ "->data;"
   addStatement $ cTypeOf typ ++ "* " ++ litName ++ "_datai = " ++ litName ++ "_data;"
   addStatement $ "*" ++ litName ++ "_datai = " ++ show lit ++ ";"
@@ -94,7 +104,7 @@ showExpressionS _ (Literal (Y.Literal typ lit)) = do
 showExpressionS _ (CaptureRef n) = return $ "self->captures[" ++ show (n - 2) ++ "]"
 showExpressionS _ (FunctionRef func) = do
   return $ show func ++ "_func()"
-showExpressionS gname (ClosureExpr closure) = 
+showExpressionS gname (ClosureExpr closure) =
     addClosure gname closure
 showExpressionS gname (Application expr1 expr2) = do
   expr1' <- showExpressionS gname expr1
@@ -109,11 +119,15 @@ showExpressionS gname (IfThenElse cond expr1 expr2) = do
   let ifr = "ifr" ++ show indx
   addStatement $ "void* " ++ ifr ++ ";"
   addStatement $ "if(((literal*)" ++ cond' ++ ")->data[0]){"
+  ifvars <- takeStackVars
   expr1' <- showExpressionS gname expr1
   addStatement $ ifr ++ " = " ++ expr1' ++ ";"
+  putStackVarsAndRemove ifvars
   addStatement "} else {"
+  elsevars <- takeStackVars
   expr2' <- showExpressionS gname expr2
   addStatement $ ifr ++ " = " ++ expr2' ++ ";"
+  putStackVarsAndRemove elsevars
   addStatement "}"
   return ifr
 {- FOURMOLU_ENABLE -}
@@ -140,7 +154,7 @@ addClosureFunction gname expr = do
   let fnname = show gname ++ "_clfunc_" ++ show ind
   let fncode =
         "void* " ++ fnname ++ "(closure* self, void* param) {\n" ++
-            expr' ++ "\n" ++
+            expr' ++
         "}\n"
   addGlobalStatement fncode
   return fnname
@@ -155,6 +169,7 @@ addClosure gname (Closure expr _ depth) = do
   clfunc <- addClosureFunction gname expr
   addStatement $
     "closure* " ++ cl ++ " = (closure*)new_closure(" ++ show depth ++ ");"
+  addStackVal cl
   addStatement $ cl ++ "->clfunc = " ++ clfunc ++ ";"
   when (depth >= 1) $
       addStatement $ cl ++ "->captures[0] = param;"
@@ -165,29 +180,53 @@ addClosure gname (Closure expr _ depth) = do
 
 incBuilderIndex :: State ExpressionBuilder Int
 incBuilderIndex = do
-  ExprBuildr statms gstatms ind <- get
-  put $ ExprBuildr statms gstatms (ind + 1)
+  ExprBuildr statms gstatms stackVars ind <- get
+  put $ ExprBuildr statms gstatms stackVars (ind + 1)
   return ind
+
+addStackVal :: CCode -> State ExpressionBuilder ()
+addStackVal valName = do
+  ExprBuildr statms gstatms stackVars ind <- get
+  put $ ExprBuildr statms gstatms (valName : stackVars) ind
+
+takeStackVars :: State ExpressionBuilder [CCode]
+takeStackVars = do
+  buildr <- get
+  put $ buildr{ebStackVars = []}
+  return $ ebStackVars buildr
+
+putStackVarsAndRemove :: [CCode] -> State ExpressionBuilder ()
+putStackVarsAndRemove vars = do
+  vars' <- takeStackVars
+  mapM_ (addStatement . drop 1) $ gcStackValRemovals vars'
+  builder <- get
+  put $ builder{ebStackVars = vars}
 
 addStatement :: CCode -> State ExpressionBuilder ()
 addStatement code = do
-  ExprBuildr statms gstatms ind <- get
-  put $ ExprBuildr (statms ++ [code]) gstatms ind
+  ExprBuildr statms gstatms stackVars ind <- get
+  put $ ExprBuildr (statms ++ [code]) gstatms stackVars ind
 
 addGlobalStatement :: CCode -> State ExpressionBuilder ()
 addGlobalStatement code = do
-  ExprBuildr statms gstatms ind <- get
-  put $ ExprBuildr statms (gstatms ++ [code]) ind
+  ExprBuildr statms gstatms stackVars ind <- get
+  put $ ExprBuildr statms (gstatms ++ [code]) stackVars ind
 
 separateBuilder ::
   State ExpressionBuilder CCode ->
   State ExpressionBuilder CCode
 separateBuilder builderS = do
-  ExprBuildr statms gstatms ctr <- get
-  let (ExprBuildr statms' gstatms' ctr', code) =
-        runState builderS (ExprBuildr [] [] ctr)
-  put (ExprBuildr statms (gstatms' ++ gstatms) ctr')
-  return $ unlines (map ("\t" ++) statms') ++ "\treturn " ++ code ++ ";"
+  ExprBuildr statms gstatms stackVars cnt <- get
+  let (ExprBuildr statms' gstatms' stackVars' cnt', expr') =
+        runState builderS (ExprBuildr [] [] [] (cnt + 1))
+  put (ExprBuildr statms (gstatms' ++ gstatms) stackVars cnt')
+  return
+    $ unlines
+      ( map ("\t" ++) statms'
+          ++ ["\tvoid* val" ++ show cnt ++ " = " ++ expr' ++ ";"]
+          ++ gcStackValRemovals stackVars'
+          ++ ["\treturn val" ++ show cnt ++ ";"]
+      )
 
 getUsedFunctions :: Expression -> [L.VarIdent]
 getUsedFunctions (ClosureExpr (Closure clExpr _ _)) = getUsedFunctions clExpr
@@ -266,7 +305,7 @@ compileFull sc = do
 
 {- FOURMOLU_DISABLE -}
 includes :: CCode
-includes = 
+includes =
     "#include <stdlib.h>\n" ++
     "#include <stdio.h>\n" ++
     "#include <stdint.h>\n" ++
@@ -278,12 +317,29 @@ includes =
 runtime :: CCode
 runtime =
   "closure* new_closure(uint32_t count) {\n" ++
-      "\treturn malloc(sizeof(closure) + sizeof(void*) * count);\n" ++
+      "\tclosure* cl = malloc(sizeof(closure) + sizeof(void*) * count);\n" ++
+      "\tcl->gc_data.isInStackSpace = 1;\n" ++
+      "\tcl->gc_data.next = gc_object_stack;\n" ++
+      "\tgc_object_stack = (gc_type*)cl;\n" ++
+      "\treturn cl;\n" ++
   "}\n" ++
   "\n" ++
   "literal* new_literal(size_t size) {\n" ++
-      "\treturn malloc(sizeof(literal) + size);\n" ++
-  "}\n\n"
+      "\tliteral* lit = malloc(sizeof(literal) + size);\n" ++
+      "\tlit->gc_data.isInStackSpace = 1;\n" ++
+      "\tlit->gc_data.next = gc_object_stack;\n" ++
+      "\tgc_object_stack = (gc_type*)lit;\n" ++
+      "\treturn lit;\n" ++
+  "}\n" ++
+  "\n" ++
+  "void gc_free_all() {\n" ++
+      "\twhile(gc_object_stack != NULL) {\n" ++
+          "\t\tgc_type* next = gc_object_stack->gc_data.next;\n" ++
+          "\t\tfree(gc_object_stack);\n" ++
+          "\t\tgc_object_stack = next;\n" ++
+      "\t}\n" ++
+  "}\n" ++
+  "\n"
 {- FOURMOLU_ENABLE -}
 
 {- FOURMOLU_DISABLE -}
@@ -294,11 +350,18 @@ constPredefs =
   "typedef struct closure closure;\n" ++
   "typedef struct literal literal;\n" ++
   "typedef struct gc_data gc_data;\n" ++
+  "typedef struct gc_type gc_type;\n" ++
   "typedef void* closure_clfunc(closure*, void*);\n" ++
   "\n" ++
   "struct gc_data {\n" ++
-      "\tuint32_t rc;\n" ++
+      "\tchar isInStackSpace;\n" ++
+      "\tgc_type* next;\n" ++
   "};\n" ++
+  "struct gc_type {\n" ++
+      "\tgc_data gc_data;\n" ++
+  "};\n" ++
+  "\n" ++
+  "gc_type* gc_object_stack = NULL;\n" ++
   "\n" ++
   "struct closure {\n" ++
       "\tgc_data gc_data;\n" ++
@@ -316,7 +379,9 @@ constPredefs =
 mainfn :: CCode
 mainfn =
   "int main(void) {\n" ++
-      "\treturn (size_t)(main_func());\n" ++
+      "\tliteral* ret = main_func();\n" ++
+      "\tgc_free_all();\n" ++
+      "\treturn ret->data[0];\n" ++
   "}\n"
 {- FOURMOLU_ENABLE -}
 
@@ -324,6 +389,7 @@ mainfn =
 mainfnEmpty :: CCode
 mainfnEmpty =
   "int main(void) {\n" ++
+      "\tgc_free_all();\n" ++
       "\treturn 0;\n" ++
   "}\n"
 {- FOURMOLU_ENABLE -}
@@ -357,10 +423,10 @@ genStdRawDefinition (_, _, f) = (code, maximum ns)
 
 genStdDefinitionCode :: (L.VarIdent, [CCode], Int) -> CCode
 genStdDefinitionCode rawDef =
-  let (ExprBuildr _ glStatms _, _) =
+  let (ExprBuildr _ glStatms _ _, _) =
         runState
           (genStdDefinitionCodeS rawDef)
-          (ExprBuildr [] [] 1)
+          (ExprBuildr [] [] [] 1)
    in unlines glStatms
 
 {- FOURMOLU_DISABLE -}
