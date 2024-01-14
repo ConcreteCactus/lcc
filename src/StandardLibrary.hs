@@ -127,6 +127,7 @@ library' =
           , p "void* s3data = &s3->data"
           , p (cTypeOf t) <> p "* s3datai = s3data"
           , p "*s3datai = *(" <> p (cTypeOf t) <> p "*)s1data + *(" <> p (cTypeOf t) <> p "*)s2data"
+          , p "s3->gc_data.isInStackSpace = 0;"
           , p "s3"
           ]
     )
@@ -155,19 +156,8 @@ library' =
             , p "void* s1data = &s1->data"
             , p "void* s2data = &s2->data"
             , p "s3->data[0] = *(" <> p (cTypeOf t) <> p "*)s1data == *(" <> p (cTypeOf t) <> p "*)s2data"
+            , p "s3->gc_data.isInStackSpace = 0;"
             , p "s3"
             ]
       )
       allAtomicTypes
-    ++ [
-         ( "ifthenelse"
-         , a ABool `to` g 1 `to` g 1 `to` g 1
-         , \w ->
-            sequence
-              [ p "char* s1 = " <> w 1
-              , p "void* s2 = " <> w 2
-              , p "void* s3 = " <> w 3
-              , p "(*s1) ? s2 : s3"
-              ]
-         )
-       ]

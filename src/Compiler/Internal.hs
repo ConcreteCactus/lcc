@@ -112,6 +112,7 @@ showExpressionS gname (Application expr1 expr2) = do
   indx <- incBuilderIndex
   let icl = "icl" ++ show indx
   addStatement $ "closure* " ++ icl ++ " = " ++ expr1' ++ ";"
+  addStackVal icl
   return $ icl ++ "->clfunc(" ++ icl ++ ", " ++ expr2' ++ ")"
 showExpressionS gname (IfThenElse cond expr1 expr2) = do
   cond' <- showExpressionS gname cond
@@ -222,7 +223,9 @@ separateBuilder builderS = do
   put (ExprBuildr statms (gstatms' ++ gstatms) stackVars cnt')
   return
     $ unlines
-      ( map ("\t" ++) statms'
+      ( 
+          ["\tgc_invoke();"]
+          ++ map ("\t" ++) statms'
           ++ ["\tvoid* val" ++ show cnt ++ " = " ++ expr' ++ ";"]
           ++ gcStackValRemovals stackVars'
           ++ ["\treturn val" ++ show cnt ++ ";"]
@@ -319,6 +322,7 @@ runtime =
   "closure* new_closure(uint32_t count) {\n" ++
       "\tclosure* cl = malloc(sizeof(closure) + sizeof(void*) * count);\n" ++
       "\tcl->gc_data.isInStackSpace = 1;\n" ++
+      "\tcl->gc_data.captureCount = count;\n" ++
       "\tcl->gc_data.next = gc_object_stack;\n" ++
       "\tgc_object_stack = (gc_type*)cl;\n" ++
       "\treturn cl;\n" ++
@@ -327,16 +331,52 @@ runtime =
   "literal* new_literal(size_t size) {\n" ++
       "\tliteral* lit = malloc(sizeof(literal) + size);\n" ++
       "\tlit->gc_data.isInStackSpace = 1;\n" ++
+      "\tlit->gc_data.captureCount = 0;\n" ++
       "\tlit->gc_data.next = gc_object_stack;\n" ++
       "\tgc_object_stack = (gc_type*)lit;\n" ++
       "\treturn lit;\n" ++
   "}\n" ++
   "\n" ++
-  "void gc_free_all() {\n" ++
-      "\twhile(gc_object_stack != NULL) {\n" ++
-          "\t\tgc_type* next = gc_object_stack->gc_data.next;\n" ++
-          "\t\tfree(gc_object_stack);\n" ++
-          "\t\tgc_object_stack = next;\n" ++
+  "void gc_mark(gc_type* startPoint) {\n" ++
+      "\tif(startPoint->gc_data.isMarked) { return; }\n" ++
+      "\tstartPoint->gc_data.isMarked = 1;\n" ++
+      "\tfor(int i = 0; i < startPoint->gc_data.captureCount; i++) {\n" ++
+          "\t\tgc_mark(((closure*)startPoint)->captures[i]);\n" ++
+      "\t}\n" ++
+  "}\n" ++
+  "\n" ++
+  "void gc_invoke() {\n" ++
+      "\tif(gc_object_stack == NULL) { return; }\n" ++
+      "\tgc_type* object_ptr = gc_object_stack;\n" ++
+      "\twhile(object_ptr != NULL) {\n" ++
+          "\t\tobject_ptr->gc_data.isMarked = 0;\n" ++
+          "\t\tobject_ptr = object_ptr->gc_data.next;\n" ++
+      "\t}\n" ++
+      "\n" ++
+      "\tobject_ptr = gc_object_stack;\n" ++
+      "\twhile(object_ptr != NULL) {\n" ++
+          "\t\tif(object_ptr->gc_data.isInStackSpace) {\n" ++
+              "\t\t\tgc_mark(object_ptr);\n" ++ 
+          "\t\t}\n" ++
+          "\t\tobject_ptr = object_ptr->gc_data.next;\n" ++
+      "\t}\n" ++
+      "\n" ++
+      "\tobject_ptr = gc_object_stack;\n" ++
+      "\tgc_type* object_ptr_prev = NULL;\n" ++
+      "\twhile(object_ptr != NULL) {\n" ++
+          "\t\tif(!object_ptr->gc_data.isMarked) {\n" ++
+                "\t\t\tgc_type* next = object_ptr->gc_data.next;\n" ++
+                "\t\t\tfree(object_ptr);\n" ++
+                "\t\t\tobject_ptr = next;\n" ++
+                "\t\t\tif(object_ptr_prev == NULL) {\n" ++
+                    "\t\t\t\tgc_object_stack = object_ptr;\n" ++
+                "\t\t\t} else {\n" ++
+                    "\t\t\t\tobject_ptr_prev->gc_data.next = object_ptr;\n" ++
+                "\t\t\t}\n" ++
+          "\t\t} else {\n" ++
+              "\t\t\tobject_ptr_prev = object_ptr;\n" ++
+              "\t\t\tobject_ptr = object_ptr->gc_data.next;\n" ++
+          "\t\t}\n" ++
       "\t}\n" ++
   "}\n" ++
   "\n"
@@ -355,6 +395,8 @@ constPredefs =
   "\n" ++
   "struct gc_data {\n" ++
       "\tchar isInStackSpace;\n" ++
+      "\tchar isMarked;\n" ++
+      "\tuint32_t captureCount;\n" ++
       "\tgc_type* next;\n" ++
   "};\n" ++
   "struct gc_type {\n" ++
@@ -380,8 +422,10 @@ mainfn :: CCode
 mainfn =
   "int main(void) {\n" ++
       "\tliteral* ret = main_func();\n" ++
-      "\tgc_free_all();\n" ++
-      "\treturn ret->data[0];\n" ++
+      "\tchar ret_data = ret->data[0];\n" ++
+      "\tret->gc_data.isInStackSpace = 0;\n" ++
+      "\tgc_invoke();\n" ++
+      "\treturn ret_data;\n" ++
   "}\n"
 {- FOURMOLU_ENABLE -}
 
@@ -389,7 +433,6 @@ mainfn =
 mainfnEmpty :: CCode
 mainfnEmpty =
   "int main(void) {\n" ++
-      "\tgc_free_all();\n" ++
       "\treturn 0;\n" ++
   "}\n"
 {- FOURMOLU_ENABLE -}
