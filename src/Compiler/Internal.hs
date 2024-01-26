@@ -17,6 +17,8 @@ import Util
 
 type CCode = String
 
+data MemoryObjectKind = MoLiteral | MoClosure
+
 data ExpressionBuilder = ExprBuildr
   { ebStatms :: [CCode]
   , ebGStatms :: [CCode]
@@ -93,27 +95,23 @@ gcStackValRemovals = map (\name -> "\t((gc_type*)" ++ name ++ ")->gc_data.isInSt
 showExpressionS :: L.VarIdent -> Expression -> State ExpressionBuilder CCode
 showExpressionS _ ParamRef = return "param"
 showExpressionS _ (Literal (Y.Literal typ lit)) = do
-  lid <- incBuilderIndex
-  let litName = "l" ++ show lid
-  addStatement $ "literal* " ++ litName ++ " = new_literal(sizeof(" ++ cTypeOf typ ++ "));"
-  addStackVal litName
+  litName <- addObject (Just MoLiteral) $ "new_literal(sizeof(" ++ cTypeOf typ ++ "))"
   addStatement $ "void* " ++ litName ++ "_data = &" ++ litName ++ "->data;"
   addStatement $ cTypeOf typ ++ "* " ++ litName ++ "_datai = " ++ litName ++ "_data;"
   addStatement $ "*" ++ litName ++ "_datai = " ++ show lit ++ ";"
   return litName
 showExpressionS _ (CaptureRef n) = return $ "self->captures[" ++ show (n - 2) ++ "]"
 showExpressionS _ (FunctionRef func) = do
-  return $ show func ++ "_func()"
+  addObject Nothing $ show func ++ "_func()"
 showExpressionS gname (ClosureExpr closure) =
-    addClosure gname closure
+  addClosure gname closure
 showExpressionS gname (Application expr1 expr2) = do
   expr1' <- showExpressionS gname expr1
   expr2' <- showExpressionS gname expr2
   indx <- incBuilderIndex
   let icl = "icl" ++ show indx
-  addStatement $ "closure* " ++ icl ++ " = " ++ expr1' ++ ";"
-  addStackVal icl
-  return $ icl ++ "->clfunc(" ++ icl ++ ", " ++ expr2' ++ ")"
+  addStatement $ "closure* " ++ icl ++ " = (closure*)(" ++ expr1' ++ ");"
+  addObject Nothing $ icl ++ "->clfunc(" ++ icl ++ ", " ++ expr2' ++ ")"
 showExpressionS gname (IfThenElse cond expr1 expr2) = do
   cond' <- showExpressionS gname cond
   indx <- incBuilderIndex
@@ -164,19 +162,16 @@ addClosureFunction gname expr = do
 {- FOURMOLU_DISABLE -}
 addClosure :: L.VarIdent -> Closure -> State ExpressionBuilder CCode
 addClosure gname (Closure expr _ depth) = do
-  ind <- incBuilderIndex
-  let cl = "c" ++ show ind
   addGlobalStatement $ "// depth: " ++ show depth
   clfunc <- addClosureFunction gname expr
-  addStatement $
-    "closure* " ++ cl ++ " = (closure*)new_closure(" ++ show depth ++ ");"
+  cl <- addObject (Just MoClosure) $ "new_closure(" ++ show depth ++ ");"
   addStackVal cl
   addStatement $ cl ++ "->clfunc = " ++ clfunc ++ ";"
   when (depth >= 1) $
       addStatement $ cl ++ "->captures[0] = param;"
   when (depth >= 2) $
     addStatement $ "memcpy(&(" ++ cl ++ "->captures[1]), &(self->captures), sizeof(void*) * " ++ show (depth - 1) ++ ");"
-  return $ "c" ++ show ind
+  return cl
 {- FOURMOLU_ENABLE -}
 
 incBuilderIndex :: State ExpressionBuilder Int
@@ -203,6 +198,19 @@ putStackVarsAndRemove vars = do
   builder <- get
   put $ builder{ebStackVars = vars}
 
+addObject :: Maybe MemoryObjectKind -> CCode -> State ExpressionBuilder CCode
+addObject kind code = do
+  ind <- incBuilderIndex
+  let (objectKindTypeName, objectKindName) = case kind of
+        Just MoLiteral -> ("literal", "lit")
+        Just MoClosure -> ("closure", "cl")
+        Nothing -> ("gc_type", "obj")
+  let objName = objectKindName ++ show ind
+  addStatement $ objectKindTypeName ++ "* " ++ objName ++ " = " ++ code ++ ";"
+  addStatement $ objName ++ "->gc_data.isInStackSpace = 1;"
+  addStackVal objName
+  return objName
+
 addStatement :: CCode -> State ExpressionBuilder ()
 addStatement code = do
   ExprBuildr statms gstatms stackVars ind <- get
@@ -223,8 +231,7 @@ separateBuilder builderS = do
   put (ExprBuildr statms (gstatms' ++ gstatms) stackVars cnt')
   return
     $ unlines
-      ( 
-          ["\tgc_invoke();"]
+      ( ["\tgc_invoke();"]
           ++ map ("\t" ++) statms'
           ++ ["\tvoid* val" ++ show cnt ++ " = " ++ expr' ++ ";"]
           ++ gcStackValRemovals stackVars'
@@ -518,3 +525,5 @@ genStdDefinitionCodeStepS depth rawDef@(name, cs, n)
         | m >= n = "param"
         | otherwise = "self->captures[" ++ show (n - m - 1) ++ "]"
 {- FOURMOLU_ENABLE -}
+
+-- AEJC 567
