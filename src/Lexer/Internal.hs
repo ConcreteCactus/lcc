@@ -5,7 +5,6 @@ module Lexer.Internal where
 import Control.Applicative
 import Control.Monad
 import Data.Char
-import Debug.Trace
 import Errors
 
 type SourceCode = String
@@ -15,15 +14,15 @@ newtype TypIdent = TypIdent String deriving (Eq)
 newtype TypName = TypName String deriving (Eq)
 data Literal = Literal Integer String deriving (Eq)
 
-newtype Parser a
-  = Parser
-      ((TextPos, SourceCode) -> Either TextPos (TextPos, a, SourceCode))
+newtype Parser a = Parser
+  { runParser ::
+      (TextPos, SourceCode) -> Either TextPos (TextPos, a, SourceCode)
+  }
 
-newtype ParserE a
-  = ParserE
-      ( (TextPos, SourceCode) ->
-        Either LexicalError (TextPos, a, SourceCode)
-      )
+newtype ParserE a = ParserE
+  { runParserE ::
+      (TextPos, SourceCode) -> Either LexicalError (TextPos, a, SourceCode)
+  }
 
 instance Show VarIdent where
   show (VarIdent i) = i
@@ -218,10 +217,12 @@ else_ = mapM_ (satisfy . (==)) "else" `withExpected` LeIf
 varIdent :: ParserE VarIdent
 varIdent =
   VarIdent
-    <$> filterKeywords ["if", "then", "else"] ( (:)
-            <$> satisfy isLower
-            <*> many (satisfy (\c -> isAlphaNum c || c == '_'))
-        )
+    <$> filterKeywords
+      ["if", "then", "else"]
+      ( (:)
+          <$> satisfy isLower
+          <*> many (satisfy (\c -> isAlphaNum c || c == '_'))
+      )
     `withExpected` LeVarIdent
 
 filterKeywords :: [String] -> Parser String -> Parser String

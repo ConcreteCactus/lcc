@@ -19,6 +19,8 @@ module Util (
   forgivingZipWithME,
   (<<$>>),
   (<<*>>),
+  (>$<),
+  (>*<),
   fstMap,
   sndMap,
   leftMap,
@@ -181,3 +183,12 @@ except :: (Eq a) => [a] -> [a] -> [a]
 except as bs = filter (`notElem` bs) as
 
 infixl 4 `except`
+
+(>$<) :: (Functor f) => f a -> (a -> b) -> f b
+(>$<) = flip (<$>)
+
+(>*<) :: (Applicative m) => m a -> m (a -> b) -> m b
+(>*<) = flip (<*>)
+
+infixl 4 >$<
+infixl 3 >*<

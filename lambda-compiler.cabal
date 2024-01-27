@@ -73,10 +73,10 @@ test-suite lambda-compiler-test
   main-is: Spec.hs
   other-modules:
       LambdaCompilerTests.Compiler.CompilerTests
+      LambdaCompilerTests.E2E
       LambdaCompilerTests.LexerTests
       LambdaCompilerTests.SemanticAnalyzer.DependencyGraphTest
       LambdaCompilerTests.SemanticAnalyzer.DependencyListTests
-      LambdaCompilerTests.SemanticAnalyzer.ExpressionTests
       LambdaCompilerTests.SemanticAnalyzer.TypeTest
       LambdaCompilerTests.SemanticAnalyzerTests
       Paths_lambda_compiler

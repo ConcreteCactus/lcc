@@ -5,7 +5,7 @@ import qualified Lexer as L
 import SemanticAnalyzer.Expression
 import SemanticAnalyzer.Internal
 import SemanticAnalyzer.Type
-import qualified SyntacticAnalyzer as Y
+import qualified SyntacticAnalyzer.Internal as Y
 import Test.Hspec
 import Util
 
@@ -17,7 +17,7 @@ spec = do
       test "\\a.\\b.a b"
         `shouldBe` Right (lam "a" (lam "b" (appl (Ident 2) (Ident 1))))
       test "(\\a.a) x"
-        `shouldBe` Right (appl (lam "a" (Ident 1)) (Ref (L.Ident "x")))
+        `shouldBe` Right (appl (lam "a" (Ident 1)) (Ref (L.VarIdent "x")))
   describe "convertType" $ do
     it "can convert simple types" $ do
       testT "a" `shouldBe` Right (mkn (GenericType 1))
@@ -105,22 +105,28 @@ isRight :: Either a b -> Bool
 isRight (Right _) = True
 isRight _ = False
 
+parseExpression :: L.SourceCode -> Either LexicalError Y.Expression
+parseExpression = L.execParser Y.expression
+
+parseType :: L.SourceCode -> Either LexicalError Y.Type
+parseType = L.execParser Y.type_
+
 test :: SourceCode -> Either LexicalError Expression
-test s = convertExpression <$> Y.parseExpression s
+test s = convertExpression <$> parseExpression s
 
 testT :: SourceCode -> Either LexicalError NormType
-testT s = convertType <$> Y.parseType ((0, 0), s)
+testT s = convertType <$> parseType s
 
 testP :: SourceCode -> Either CompilerError Program
 testP s =
-  leftMap mkCompErrLex (Y.parseProgramSingleError s)
+  leftMap mkCompErrLex (Y.parseProgram s)
     >>= mkProgramFromSyn
 
 nai :: Type
 nai = AtomicType Y.AI32
 
 lam :: String -> Expression -> Expression
-lam s = Lambda (L.Ident s)
+lam s = Lambda (L.VarIdent s)
 
 appl :: Expression -> Expression -> Expression
 appl = Application

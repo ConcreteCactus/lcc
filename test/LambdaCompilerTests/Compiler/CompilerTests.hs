@@ -50,7 +50,7 @@ program4 =
 
 testCompile :: SourceCode -> Either CompilerError CCode
 testCompile sc = do
-  scy <- leftMap mkCompErrLex $ Y.parseProgramSingleError sc
+  scy <- leftMap mkCompErrLex $ Y.parseProgram sc
   scs <- S.mkProgramFromSyn scy
   return $ compile scs
 

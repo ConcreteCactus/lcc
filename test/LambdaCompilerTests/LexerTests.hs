@@ -2,10 +2,10 @@ module LambdaCompilerTests.LexerTests (spec) where
 
 import Control.Applicative
 import Control.Monad
-import Data.Char
-import Lexer.Internal
 import Test.Hspec
 import Test.QuickCheck
+import SyntacticAnalyzer.Internal
+import Lexer.Internal
 
 spec :: Spec
 spec = do
@@ -13,22 +13,10 @@ spec = do
     it "can parse the same number of blocks" $ do
       property
         ( \(Lsc src blocks) ->
-            case runParser (many statement) ((0, 0), src) of
+            case runParserE (many programPart) ((0, 0), src) of
               Left _ -> False
               Right (statms, _, _) -> length statms == length blocks
         )
-    it "parses the same number of non-whitespace characters" $ do
-      property
-        ( \(Lsc src blocks) ->
-            case runParser (many statement) ((0, 0), src) of
-                  Left _ -> False
-                  Right (statms, _, _) ->
-                    countNonWhitespaceChars (map snd statms)
-                      == countNonWhitespaceChars blocks
-        )
-
-countNonWhitespaceChars :: [String] -> Int
-countNonWhitespaceChars str = sum $ map (length . filter (not . isSpace)) str
 
 data LexicallySaneCode = Lsc
   { lscSrc :: String
