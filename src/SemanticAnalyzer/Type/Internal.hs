@@ -9,10 +9,14 @@ import qualified Lexer as L
 import qualified SyntacticAnalyzer as Y
 import Util
 
+-- Improvement idea: implement foldable for type
+
 data Type
   = AtomicType Y.AtomicType
   | GenericType Int
   | FunctionType Type Type
+  | SumType Type Type
+  | ProductType Type Type
   deriving (Eq)
 
 data NormType = NormType
@@ -26,6 +30,10 @@ instance Show Type where
   show (GenericType n) = "T" ++ show n
   show (FunctionType t1@(FunctionType _ _) t2) = "(" ++ show t1 ++ ") -> " ++ show t2
   show (FunctionType t1 t2) = show t1 ++ " -> " ++ show t2
+  show (SumType t1@(SumType _ _) t2) = "(" ++ show t1 ++ ") + " ++ show t2
+  show (SumType t1 t2) = show t1 ++ " + " ++ show t2
+  show (ProductType t1@(ProductType _ _) t2) = "(" ++ show t1 ++ ") * " ++ show t2
+  show (ProductType t1 t2) = show t1 ++ " * " ++ show t2
 
 instance Show NormType where
   show nt = show $ ntType nt
@@ -68,6 +76,14 @@ convertTypeS (Y.FunctionType t1 t2) = do
   t1' <- convertTypeS t1
   t2' <- convertTypeS t2
   return $ FunctionType t1' t2'
+convertTypeS (Y.SumType t1 t2) = do
+  t1' <- convertTypeS t1
+  t2' <- convertTypeS t2
+  return $ SumType t1' t2'
+convertTypeS (Y.ProductType t1 t2) = do
+  t1' <- convertTypeS t1
+  t2' <- convertTypeS t2
+  return $ ProductType t1' t2'
 
 mkNormType :: Type -> NormType
 mkNormType typ = NormType typ' (maxId - 1)
@@ -91,6 +107,14 @@ mkNormTypeS (FunctionType paramType returnType) = do
   normalizedParam <- mkNormTypeS paramType
   normalizedReturn <- mkNormTypeS returnType
   return $ FunctionType normalizedParam normalizedReturn
+mkNormTypeS (SumType t1 t2) = do
+  nt1 <- mkNormTypeS t1
+  nt2 <- mkNormTypeS t2
+  return $ SumType nt1 nt2
+mkNormTypeS (ProductType t1 t2) = do
+  nt1 <- mkNormTypeS t1
+  nt2 <- mkNormTypeS t2
+  return $ ProductType nt1 nt2
 
 mkMutExcTy2 :: NormType -> NormType -> MutExcTy2
 mkMutExcTy2 original shiftCandidate =
@@ -109,6 +133,8 @@ shiftNewIds typ = do
 getHighestId :: Type -> Int
 getHighestId (AtomicType _) = 0
 getHighestId (FunctionType t1 t2) = max (getHighestId t1) (getHighestId t2)
+getHighestId (SumType t1 t2) = max (getHighestId t1) (getHighestId t2)
+getHighestId (ProductType t1 t2) = max (getHighestId t1) (getHighestId t2)
 getHighestId (GenericType n) = n
 
 shiftIds :: Int -> Type -> (Type, Int)
@@ -117,6 +143,14 @@ shiftIds ident (FunctionType t1 t2) =
   let (newT1, maxIdent1) = shiftIds ident t1
       (newT2, maxIdent2) = shiftIds ident t2
    in (FunctionType newT1 newT2, max maxIdent1 maxIdent2)
+shiftIds ident (SumType t1 t2) =
+  let (newT1, maxIdent1) = shiftIds ident t1
+      (newT2, maxIdent2) = shiftIds ident t2
+   in (SumType newT1 newT2, max maxIdent1 maxIdent2)
+shiftIds ident (ProductType t1 t2) =
+  let (newT1, maxIdent1) = shiftIds ident t1
+      (newT2, maxIdent2) = shiftIds ident t2
+   in (ProductType newT1 newT2, max maxIdent1 maxIdent2)
 shiftIds ident (GenericType gid) = (GenericType (gid + ident), gid + ident)
 
 addNewSubstitution ::
@@ -147,12 +181,24 @@ addNewSubstitution genericId typ = do
     FunctionType
       (checkAndSubstitute subs paramType)
       (checkAndSubstitute subs returnType)
+  checkAndSubstitute subs (SumType type1 type2) =
+    SumType
+      (checkAndSubstitute subs type1)
+      (checkAndSubstitute subs type2)
+  checkAndSubstitute subs (ProductType type1 type2) =
+    ProductType
+      (checkAndSubstitute subs type1)
+      (checkAndSubstitute subs type2)
   -- 2. Check for self references in the new substitution (fail if found)
   checkSelfRefs :: Int -> Type -> Bool
   checkSelfRefs genericId' (GenericType genericId'') = genericId' == genericId''
   checkSelfRefs _ (AtomicType _) = False
   checkSelfRefs genericId' (FunctionType paramType returnType) =
     checkSelfRefs genericId' paramType || checkSelfRefs genericId' returnType
+  checkSelfRefs genericId' (SumType type1 type2) =
+    checkSelfRefs genericId' type1 || checkSelfRefs genericId' type2
+  checkSelfRefs genericId' (ProductType type1 type2) =
+    checkSelfRefs genericId' type1 || checkSelfRefs genericId' type2
   -- 3. Check for and substitute references in the old substitutions
   substituteSimple :: Int -> Type -> Type -> Type
   substituteSimple genericId' typ' (GenericType genericId'') =
@@ -164,6 +210,14 @@ addNewSubstitution genericId typ = do
     FunctionType
       (substituteSimple genericId' typ' paramType)
       (substituteSimple genericId' typ' returnType)
+  substituteSimple genericId' typ' (SumType type1 type2) =
+    SumType
+      (substituteSimple genericId' typ' type1)
+      (substituteSimple genericId' typ' type2)
+  substituteSimple genericId' typ' (ProductType type1 type2) =
+    ProductType
+      (substituteSimple genericId' typ' type1)
+      (substituteSimple genericId' typ' type2)
   substituteOldSubs :: Int -> Type -> [(Int, Type)] -> [(Int, Type)]
   substituteOldSubs genericId' typ' =
     map (second (substituteSimple genericId' typ'))
@@ -189,6 +243,14 @@ updateWithSubstitutions typ = do
     FunctionType
       (updateWithSubstitutions' subs paramType)
       (updateWithSubstitutions' subs returnType)
+  updateWithSubstitutions' subs (SumType type1 type2) =
+    SumType
+      (updateWithSubstitutions' subs type1)
+      (updateWithSubstitutions' subs type2)
+  updateWithSubstitutions' subs (ProductType type1 type2) =
+    ProductType
+      (updateWithSubstitutions' subs type1)
+      (updateWithSubstitutions' subs type2)
 
 updateWithSubstitutionsI :: Type -> State InferEnv Type
 updateWithSubstitutionsI typ = do
@@ -330,26 +392,3 @@ getTypeOfGlobal gname = do
       case lookup recId recList of
         Nothing -> return $ GenericType recId
         Just typ -> return typ
-
--- Unit tests
-
--- semanticAnalyzerSemTypeTests :: [Bool]
--- semanticAnalyzerSemTypeTests =
---   [ checkType (MutExcTy2 (na AInt) (a AInt)) == Right (),
---     checkType (MutExcTy2 (na AInt) (t 1)) == Right (),
---     checkType (MutExcTy2 (mn $ t 1) (a AInt))
---       == Left (TeTypeMismatch "AInt" "T1"),
---     checkType (MutExcTy2 (mn $ t 1 --> t 2) (t 1 --> t 2)) == Right (),
---     checkType (MutExcTy2 (mn $ t 1 --> t 2) (t 1 --> t 3)) == Right (),
---     checkType (MutExcTy2 (mn $ t 1 --> t 2) (t 1 --> t 1))
---       == Left (TeTypeMismatch "T2" "T3"),
---     checkType (MutExcTy2 (mn $ t 1 --> a AInt) (t 1 --> t 1))
---       == Left (TeTypeMismatch "T2" "AInt"),
---     checkType (MutExcTy2 (mn $ t 1 --> t 2) (t 3 --> t 2)) == Right ()
---   ]
---   where
---     (-->) = FunctionType
---     t = GenericType
---     a = AtomicType
---     na at = NormType (AtomicType at) 0
---     mn = mkNormType

@@ -33,6 +33,8 @@ data Type
   = TypeId L.TypIdent
   | TypeName AtomicType
   | FunctionType Type Type
+  | SumType Type Type
+  | ProductType Type Type
   deriving (Show, Eq)
 
 data ProgramPart
@@ -108,7 +110,7 @@ varIdent = Id <$> L.varIdent
 lambda :: L.ParserE Expression
 lambda =
   Lambda
-    <$> ( wo *> L.backSlash *> wo *> L.varIdent)
+    <$> (wo *> L.backSlash *> wo *> L.varIdent)
     <*> (wo *> L.dot *> wo *> expression)
 
 applications :: L.ParserE Expression
@@ -167,9 +169,23 @@ functionType =
     <$> (wo *> typeWoF)
     <*> (wo *> L.arrow *> wo *> type_)
 
+sumType :: L.ParserE Type
+sumType =
+  SumType
+    <$> (wo *> typeWoS)
+    <*> (wo *> L.plus *> wo *> typeWoF)
+
+productType :: L.ParserE Type
+productType =
+  ProductType
+    <$> (wo *> typeWoT)
+    <*> (wo *> L.star *> wo *> typeWoS)
+
 type_ :: L.ParserE Type
 type_ =
   functionType
+    <|> sumType
+    <|> productType
     <|> typeId
     <|> typeName
     <|> typeBr
@@ -181,9 +197,27 @@ typeBr = wo *> L.openingBracket *> wo *> type_ <* wo <* L.closingBracket
 -- Type without FunctionType
 typeWoF :: L.ParserE Type
 typeWoF =
-  typeId
+  sumType
+    <|> productType
+    <|> typeId
     <|> typeName
     <|> typeBr
+
+-- Type without SumType and FuncionType
+typeWoS :: L.ParserE Type
+typeWoS =
+    productType
+    <|> typeId
+    <|> typeName
+    <|> typeBr
+
+-- Type without ProductType, SumType, and FunctionType
+typeWoT :: L.ParserE Type
+typeWoT =
+    typeId
+    <|> typeName
+    <|> typeBr
+
 
 definition :: L.ParserE ProgramPart
 definition =

@@ -13,6 +13,8 @@ module Lexer
     leftAssoc2,
     colon,
     arrow,
+    plus,
+    star,
     colonEquals,
     backSlash,
     dot,

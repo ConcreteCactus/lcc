@@ -473,8 +473,7 @@ infFromExprS parts (IfThenElse cond expr1 expr2) = do
           (_, Left e, _) -> return $ Left e
           (_, _, Left e) -> return $ Left e
           (Right generics, Right (), Right reconciled) ->
-            return
-              $ Right (reconciled, generics)
+            return $ Right (reconciled, generics)
 
 lookupRefType :: [Definition] -> L.VarIdent -> Maybe NormType
 lookupRefType parts refName =

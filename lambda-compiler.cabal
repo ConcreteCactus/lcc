@@ -78,6 +78,7 @@ test-suite lambda-compiler-test
       LambdaCompilerTests.SemanticAnalyzer.DependencyListTests
       LambdaCompilerTests.SemanticAnalyzer.TypeTest
       LambdaCompilerTests.SemanticAnalyzerTests
+      LambdaCompilerTests.SyntacticAnalyzerTests
       Paths_lambda_compiler
   hs-source-dirs:
       test

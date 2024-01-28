@@ -77,6 +77,8 @@ data SemanticErrorType
 
 data LexicalElement
   = LeColon
+  | LeStar
+  | LePlus
   | LeArrow
   | LeColonEquals
   | LeBackslash
@@ -96,6 +98,8 @@ data LexicalElement
 
 instance Show LexicalElement where
     show LeColon = "colon (:)"
+    show LeStar = "star (*)"
+    show LePlus = "plus (+)"
     show LeArrow = "->"
     show LeColonEquals = ":="
     show LeBackslash = "\\"

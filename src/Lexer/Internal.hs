@@ -177,6 +177,12 @@ colon = satisfy_ (== ':') `withExpected` LeColon
 arrow :: ParserE ()
 arrow = satisfy_ (== '-') *> satisfy_ (== '>') `withExpected` LeColon
 
+plus :: ParserE ()
+plus = satisfy_ (== '+') `withExpected` LeColon
+
+star :: ParserE ()
+star = satisfy_ (== '*') `withExpected` LeColon
+
 colonEquals :: ParserE ()
 colonEquals =
   satisfy_ (== ':')
