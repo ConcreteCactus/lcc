@@ -74,7 +74,6 @@ test-suite lambda-compiler-test
   other-modules:
       LambdaCompilerTests.Compiler.CompilerTests
       LambdaCompilerTests.E2E
-      LambdaCompilerTests.LexerTests
       LambdaCompilerTests.SemanticAnalyzer.DependencyGraphTest
       LambdaCompilerTests.SemanticAnalyzer.DependencyListTests
       LambdaCompilerTests.SemanticAnalyzer.TypeTest

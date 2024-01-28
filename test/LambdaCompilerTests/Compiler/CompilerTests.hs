@@ -1,6 +1,7 @@
 module LambdaCompilerTests.Compiler.CompilerTests (spec) where
 
 import Compiler.Internal
+import Control.Concurrent
 import Errors
 import SemanticAnalyzer as S
 import SyntacticAnalyzer as Y
@@ -15,15 +16,17 @@ spec :: Spec
 spec = do
   describe "Compiler (system tests)" $ do
     it "can compile" $ do
-      isCompilableByGCC program1 `shouldReturn` True
+      isCompilableByGCC program1 `shouldReturn` Nothing
     it "can compile without warning" $ do
-      isCompilableByGCCWoWarning program1 `shouldReturn` True
+      isCompilableByGCCWoWarning program1 `shouldReturn` Nothing
     it "can compile with application" $ do
-      isCompilableByGCCWoWarning program2 `shouldReturn` True
+      isCompilableByGCCWoWarning program2 `shouldReturn` Nothing
     it "can compile with main fn" $ do
-      isCompilableByGCCWoWarning program3 `shouldReturn` True
+      isCompilableByGCCWoWarning program3 `shouldReturn` Nothing
     it "can compile with main fn and call to stdlib" $ do
-      isCompilableByGCCWoWarning program4 `shouldReturn` True
+      isCompilableByGCCWoWarning program4 `shouldReturn` Nothing
+    it "recursive program output should be 2222" $ do
+      outputOf program5 `shouldReturn` Right "2222"
 
 program1 :: SourceCode
 program1 =
@@ -45,8 +48,19 @@ program3 =
 
 program4 :: SourceCode
 program4 =
-  "one := 1"
-    ++ "main := add_i32 1 one"
+  "one := 1i32\n"
+    ++ "main := add_i32 1i32 one"
+
+program5 :: SourceCode
+program5 =
+  "compose : (b -> c) -> (a -> b) -> (a -> c)\n"
+    ++ "compose := \\f.\\g.\\x. f (g x)\n"
+    ++ "\n"
+    ++ "doUntil3 : I32 -> (a -> a) -> (a -> a)\n"
+    ++ "doUntil3 := \\n.\\f. if (iseq_i32 n 3i32) then f else (compose (doUntil3 (add_i32 n 1i32) f) f)\n"
+    ++ "\n"
+    ++ "main : I8\n"
+    ++ "main := doUntil3 0i32 (print_i32 2i32) 0i8\n"
 
 testCompile :: SourceCode -> Either CompilerError CCode
 testCompile sc = do
@@ -69,32 +83,84 @@ gccCompile src = do
             hPutStr srcHandle csrc
             hClose srcHandle
             let outfile = dirPath ++ "/a.out"
-            let cp = shell $ "gcc -Wall -o " ++ outfile ++ " " ++ srcPath
+            let cp = (shell $ "gcc -Wall -o " ++ outfile ++ " " ++ srcPath){cwd = Just dirPath}
             readCreateProcessWithExitCode cp ""
         )
 
-isCompilableByGCC :: SourceCode -> IO Bool
+gccCompileAndRun ::
+  SourceCode ->
+  Either
+    CompilerError
+    (IO ((ExitCode, String, String), Maybe (ExitCode, String, String)))
+gccCompileAndRun src = do
+  let csrcE = testCompile src
+  case csrcE of
+    Left e -> Left e
+    Right csrc -> Right $ do
+      withSystemTempDirectory
+        "lctmp"
+        ( \dirPath -> do
+            (srcPath, srcHandle) <- openTempFile dirPath "src.c"
+            hPutStr srcHandle csrc
+            hClose srcHandle
+            let outfile = dirPath ++ "/a.out"
+            let cp =
+                  ( shell $ "gcc -Wall -o " ++ outfile ++ " " ++ srcPath
+                  )
+                    { cwd = Just dirPath
+                    }
+            (compCode, compOut, compErr) <- readCreateProcessWithExitCode cp ""
+            case compCode of
+              ExitSuccess | null compErr -> do
+                let rcp = (shell outfile){cwd = Just dirPath}
+                (runCode, runOut, runErr) <- readCreateProcessWithExitCode rcp ""
+                return ((compCode, compOut, compErr), Just (runCode, runOut, runErr))
+              _ -> return ((compCode, compOut, compErr), Nothing)
+        )
+
+isCompilableByGCC ::
+  SourceCode ->
+  IO (Maybe (Either CompilerError (ExitCode, String, String)))
 isCompilableByGCC src = do
   let compilationE = gccCompile src
   case compilationE of
-    Left _ -> return False
+    Left e -> return $ Just $ Left e
     Right compilation -> do
-      (code, _, err) <- compilation
+      (code, out, err) <- compilation
       case code of
-        ExitSuccess -> return True
+        ExitSuccess -> return Nothing
         _ -> do
           putStrLn $ "\n" ++ err
-          return False
+          return $ Just $ Right (code, out, err)
 
-isCompilableByGCCWoWarning :: SourceCode -> IO Bool
+isCompilableByGCCWoWarning ::
+  SourceCode ->
+  IO (Maybe (Either CompilerError (ExitCode, String, String)))
 isCompilableByGCCWoWarning src = do
   let compilationE = gccCompile src
   case compilationE of
-    Left _ -> return False
+    Left e -> return $ Just $ Left e
     Right compilation -> do
-      (code, _, err) <- compilation
+      (code, out, err) <- compilation
       case code of
-        ExitSuccess | null err -> return True
+        ExitSuccess | null err -> return Nothing
         _ -> do
           putStrLn $ "\n" ++ err
-          return False
+          return $ Just $ Right (code, out, err)
+
+outputOf ::
+  SourceCode ->
+  IO (Either (Either CompilerError (ExitCode, String, String)) String)
+outputOf src = do
+  let compilationE = gccCompileAndRun src
+  case compilationE of
+    Left e -> return $ Left $ Left e
+    Right compilation -> do
+      ((compCode, compOut, compErr), runM) <- compilation
+      case (compCode, runM) of
+        (ExitSuccess, Just (ExitSuccess, output, err))
+          | null compErr && null err -> return $ Right output
+        _ -> do
+          putStrLn $ "\n" ++ compErr
+          return $ Left $ Right (compCode, compOut, compErr)
+

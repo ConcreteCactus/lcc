@@ -13,11 +13,19 @@ spec :: Spec
 spec = do
   describe "convertExpression" $ do
     it "can convert simple expressions" $ do
+      test "1i32" `shouldBe` Right (Lit (Y.Literal Y.AI32 1))
       test "\\a.a" `shouldBe` Right (lam "a" (Ident 1))
       test "\\a.\\b.a b"
         `shouldBe` Right (lam "a" (lam "b" (appl (Ident 2) (Ident 1))))
       test "(\\a.a) x"
         `shouldBe` Right (appl (lam "a" (Ident 1)) (Ref (L.VarIdent "x")))
+      test "if 1bool then \\a.\\b.a else \\a.\\b.b"
+        `shouldBe` Right
+          ( IfThenElse
+              (Lit (Y.Literal Y.ABool 1))
+              (lam "a" $ lam "b" $ Ident 2)
+              (lam "a" $ lam "b" $ Ident 1)
+          )
   describe "convertType" $ do
     it "can convert simple types" $ do
       testT "a" `shouldBe` Right (mkn (GenericType 1))

@@ -57,7 +57,7 @@ getTypeFromStr name
   | name == "f32" = Just AF32
   | name == "f64" = Just AF64
   | name == "char" = Just AChar
-  | name == "bool" = Just AChar
+  | name == "bool" = Just ABool
   | otherwise = Nothing
 
 getTypeNameFromStr :: String -> Maybe AtomicType
@@ -75,7 +75,7 @@ getTypeNameFromStr name
   | name == "F32" = Just AF32
   | name == "F64" = Just AF64
   | name == "Char" = Just AChar
-  | name == "Bool" = Just AChar
+  | name == "Bool" = Just ABool
   | otherwise = Nothing
 
 optional_ :: L.ParserE a -> L.ParserE ()
@@ -125,8 +125,8 @@ expression :: L.ParserE Expression
 expression =
   ifThenElse
     <|> lambda
-    <|> expressionBr
     <|> applications
+    <|> expressionBr
     <|> varIdent
     <|> literal
 
