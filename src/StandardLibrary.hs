@@ -126,8 +126,12 @@ library' =
           , p "void* s2data = &s2->data"
           , p "void* s3data = &s3->data"
           , p (cTypeOf t) <> p "* s3datai = s3data"
-          , p "*s3datai = *(" <> p (cTypeOf t) <> p "*)s1data + *(" <> p (cTypeOf t) <> p "*)s2data"
-          , p "s3->gc_data.isInStackSpace = 0;"
+          , p "*s3datai = *("
+              <> p (cTypeOf t)
+              <> p "*)s1data + *("
+              <> p (cTypeOf t)
+              <> p "*)s2data"
+          , p "s3->gc_data.isInStackSpace = 0"
           , p "s3"
           ]
     )
@@ -138,9 +142,12 @@ library' =
       , \t w ->
           sequence
             [ p "literal* s1 = " <> w 1
-            , p "void* s1data = &s1->data" 
+            , p "void* s1data = &s1->data"
             , p (cTypeOf t) <> p "* s1datai = s1data"
-            , p "printf(\"%" <> p (printfFormatStringBasedOnType t) <> p "\", (*s1datai)" <> p ")"
+            , p "printf(\"%"
+                <> p (printfFormatStringBasedOnType t)
+                <> p "\", (*s1datai)"
+                <> p ")"
             , w 2
             ]
       )
@@ -155,9 +162,94 @@ library' =
             , p "literal* s3 = new_literal(sizeof(" <> p (cTypeOf t) <> p "))"
             , p "void* s1data = &s1->data"
             , p "void* s2data = &s2->data"
-            , p "s3->data[0] = *(" <> p (cTypeOf t) <> p "*)s1data == *(" <> p (cTypeOf t) <> p "*)s2data"
-            , p "s3->gc_data.isInStackSpace = 0;"
+            , p "s3->data[0] = *("
+                <> p (cTypeOf t)
+                <> p "*)s1data == *("
+                <> p (cTypeOf t)
+                <> p "*)s2data"
+            , p "s3->gc_data.isInStackSpace = 0"
             , p "s3"
             ]
       )
       allAtomicTypes
+    ++ [
+         ( "tuple"
+         , g 1 `to` g 2 `to` T.ProductType (g 1) (g 2)
+         , \w ->
+            sequence
+              [ p "product* prod = new_product()"
+              , p "prod->gc_data.isInStackSpace = 1"
+              , p "prod->data_1 = " <> w 2
+              , p "prod->data_2 = " <> w 1
+              , p "prod->gc_data.isInStackSpace = 0"
+              , p "prod"
+              ]
+         )
+       ,
+         ( "fst"
+         , T.ProductType (g 1) (g 2) `to` g 1
+         , \w ->
+            sequence
+              [ p "product* prod = " <> w 1
+              , p "prod->data_1"
+              ]
+         )
+       ,
+         ( "snd"
+         , T.ProductType (g 1) (g 2) `to` g 2
+         , \w ->
+            sequence
+              [ p "product* prod = " <> w 1
+              , p "prod->data_2"
+              ]
+         )
+       ,
+         ( "case"
+         , T.SumType (g 1) (g 2)
+            `to` (g 1 `to` g 3)
+            `to` (g 2 `to` g 3)
+            `to` g 3
+         , \w ->
+            sequence
+              [ p "sum* su = " <> w 1
+              , p "closure* cl1 = " <> w 2
+              , p "closure* cl2 = " <> w 3
+              , p "gc_type* data"
+              , p "if(su->kind == 1) {"
+              , p "data = cl1->clfunc(cl1, su->data)"
+              , p "data->gc_data.isInStackSpace = 1"
+              , p "} else {"
+              , p "data = cl2->clfunc(cl2, su->data)"
+              , p "data->gc_data.isInStackSpace = 1"
+              , p "}"
+              , p "data->gc_data.isInStackSpace = 0"
+              , p "data"
+              ]
+         )
+       ,
+         ( "inl"
+         , g 1 `to` T.SumType (g 1) (g 2)
+         , \w ->
+            sequence
+              [ p "sum* sum = new_sum()"
+              , p "sum->gc_data.isInStackSpace = 1"
+              , p "sum->kind = 1"
+              , p "sum->data = " <> w 1
+              , p "sum->gc_data.isInStackSpace = 0"
+              , p "sum"
+              ]
+         )
+       ,
+         ( "inr"
+         , g 2 `to` T.SumType (g 1) (g 2)
+         , \w ->
+            sequence
+              [ p "sum* sum = new_sum()"
+              , p "sum->gc_data.isInStackSpace = 1"
+              , p "sum->kind = 2"
+              , p "sum->data = " <> w 1
+              , p "sum->gc_data.isInStackSpace = 0"
+              , p "sum"
+              ]
+         )
+       ]

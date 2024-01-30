@@ -292,8 +292,31 @@ reconcileTypesS
     case (reconciledParam, reconciledReturn) of
       (Left e, _) -> return $ Left e
       (_, Left e) -> return $ Left e
-      (Right reconciledParam', Right reconciledReturn') ->
-        return $ Right (FunctionType reconciledParam' reconciledReturn')
+      (Right reconciledParam', Right reconciledReturn') -> do
+        updatedReconciledReturn <- updateWithSubstitutions reconciledReturn'
+        return $ Right (FunctionType reconciledParam' updatedReconciledReturn)
+reconcileTypesS (ProductType t1 t2) (ProductType t3 t4) = do
+    firsts <- reconcileTypesS t1 t3
+    ut2 <- updateWithSubstitutions t2
+    ut4 <- updateWithSubstitutions t4
+    seconds <- reconcileTypesS ut2 ut4
+    case (firsts, seconds) of
+      (Left e, _) -> return $ Left e
+      (_, Left e) -> return $ Left e
+      (Right firsts', Right seconds') -> do
+        ufirsts <- updateWithSubstitutions firsts'
+        return $ Right $ ProductType ufirsts seconds'
+reconcileTypesS (SumType t1 t2) (SumType t3 t4) = do
+    firsts <- reconcileTypesS t1 t3
+    ut2 <- updateWithSubstitutions t2
+    ut4 <- updateWithSubstitutions t4
+    seconds <- reconcileTypesS ut2 ut4
+    case (firsts, seconds) of
+      (Left e, _) -> return $ Left e
+      (_, Left e) -> return $ Left e
+      (Right firsts', Right seconds') -> do
+        ufirsts <- updateWithSubstitutions firsts'
+        return $ Right $ SumType ufirsts seconds'
 reconcileTypesS typ typ' =
   return
     $ Left
@@ -344,9 +367,34 @@ checkTypeS
   (FunctionType paramType returnType)
   (FunctionType paramType' returnType') = do
     checkedParam <- checkTypeS hi paramType paramType'
+    updatedReturn <- updateWithSubstitutions returnType
     updatedReturn' <- updateWithSubstitutions returnType'
-    checkedReturn <- checkTypeS hi returnType updatedReturn'
+    checkedReturn <- checkTypeS hi updatedReturn updatedReturn'
     case (checkedParam, checkedReturn) of
+      (Left e, _) -> return $ Left e
+      (_, Left e) -> return $ Left e
+      (Right _, Right _) -> return $ Right ()
+checkTypeS
+  hi
+  (ProductType t1 t2)
+  (ProductType t3 t4) = do
+    firsts <- checkTypeS hi t1 t3
+    t2' <- updateWithSubstitutions t2
+    t4' <- updateWithSubstitutions t4
+    seconds <- checkTypeS hi t2' t4'
+    case (firsts, seconds) of
+      (Left e, _) -> return $ Left e
+      (_, Left e) -> return $ Left e
+      (Right _, Right _) -> return $ Right ()
+checkTypeS
+  hi
+  (SumType t1 t2)
+  (SumType t3 t4) = do
+    firsts <- checkTypeS hi t1 t3
+    t2' <- updateWithSubstitutions t2
+    t4' <- updateWithSubstitutions t4
+    seconds <- checkTypeS hi t2' t4'
+    case (firsts, seconds) of
       (Left e, _) -> return $ Left e
       (_, Left e) -> return $ Left e
       (Right _, Right _) -> return $ Right ()

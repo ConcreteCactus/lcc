@@ -325,11 +325,12 @@ includes =
 
 {- FOURMOLU_DISABLE -}
 runtime :: CCode
-runtime =
+runtime = 
   "closure* new_closure(uint32_t count) {\n" ++
       "\tclosure* cl = malloc(sizeof(closure) + sizeof(void*) * count);\n" ++
       "\tcl->gc_data.isInStackSpace = 1;\n" ++
       "\tcl->gc_data.captureCount = count;\n" ++
+      "\tcl->gc_data.type = GC_DATA_TYPE_CLOSURE;\n" ++
       "\tcl->gc_data.next = gc_object_stack;\n" ++
       "\tgc_object_stack = (gc_type*)cl;\n" ++
       "\treturn cl;\n" ++
@@ -339,16 +340,44 @@ runtime =
       "\tliteral* lit = malloc(sizeof(literal) + size);\n" ++
       "\tlit->gc_data.isInStackSpace = 1;\n" ++
       "\tlit->gc_data.captureCount = 0;\n" ++
+      "\tlit->gc_data.type = GC_DATA_TYPE_LITERAL;\n" ++
       "\tlit->gc_data.next = gc_object_stack;\n" ++
       "\tgc_object_stack = (gc_type*)lit;\n" ++
       "\treturn lit;\n" ++
   "}\n" ++
   "\n" ++
+  "product* new_product() {\n" ++
+    "\tproduct* prod = malloc(sizeof(product));\n" ++
+    "\tprod->gc_data.isInStackSpace = 1;\n" ++
+    "\tprod->gc_data.captureCount = 2;\n" ++
+    "\tprod->gc_data.type = GC_DATA_TYPE_PRODUCT;\n" ++
+    "\tprod->gc_data.next = gc_object_stack;\n" ++
+    "\tgc_object_stack = (gc_type*)prod;\n" ++
+    "\treturn prod;\n" ++
+  "}\n" ++
+  "\n" ++
+  "sum* new_sum() {\n" ++
+    "\tsum* su = malloc(sizeof(sum));\n" ++
+    "\tsu->gc_data.isInStackSpace = 1;\n" ++
+    "\tsu->gc_data.captureCount = 2;\n" ++
+    "\tsu->gc_data.type = GC_DATA_TYPE_SUM;\n" ++
+    "\tsu->gc_data.next = gc_object_stack;\n" ++
+    "\tgc_object_stack = (gc_type*)su;\n" ++
+    "\treturn su;\n" ++
+  "}\n" ++
+  "\n" ++
   "void gc_mark(gc_type* startPoint) {\n" ++
       "\tif(startPoint->gc_data.isMarked) { return; }\n" ++
       "\tstartPoint->gc_data.isMarked = 1;\n" ++
-      "\tfor(int i = 0; i < startPoint->gc_data.captureCount; i++) {\n" ++
-          "\t\tgc_mark(((closure*)startPoint)->captures[i]);\n" ++
+      "\tif(startPoint->gc_data.type == GC_DATA_TYPE_CLOSURE) {\n" ++
+        "\t\tfor(int i = 0; i < startPoint->gc_data.captureCount; i++) {\n" ++
+            "\t\t\tgc_mark(((closure*)startPoint)->captures[i]);\n" ++
+        "\t\t}\n" ++
+      "\t} else if(startPoint->gc_data.type == GC_DATA_TYPE_PRODUCT) {\n" ++
+        "\t\tgc_mark(((product*)startPoint)->data_1);\n" ++
+        "\t\tgc_mark(((product*)startPoint)->data_2);\n" ++
+      "\t} else if(startPoint->gc_data.type == GC_DATA_TYPE_SUM) {\n" ++
+        "\t\tgc_mark(((sum*)startPoint)->data);\n" ++
       "\t}\n" ++
   "}\n" ++
   "\n" ++
@@ -396,13 +425,23 @@ constPredefs =
   "typedef unsigned __int128 uint128_t;\n" ++
   "typedef struct closure closure;\n" ++
   "typedef struct literal literal;\n" ++
+  "typedef struct product product;\n" ++
+  "typedef struct sum sum;\n" ++
   "typedef struct gc_data gc_data;\n" ++
   "typedef struct gc_type gc_type;\n" ++
   "typedef void* closure_clfunc(closure*, void*);\n" ++
   "\n" ++
+  "typedef enum gc_data_type {\n" ++
+      "\tGC_DATA_TYPE_CLOSURE,\n" ++
+      "\tGC_DATA_TYPE_LITERAL,\n" ++
+      "\tGC_DATA_TYPE_PRODUCT,\n" ++
+      "\tGC_DATA_TYPE_SUM,\n" ++
+  "} gc_data_type;\n" ++
+  "\n" ++
   "struct gc_data {\n" ++
       "\tchar isInStackSpace;\n" ++
       "\tchar isMarked;\n" ++
+      "\tgc_data_type type;\n" ++
       "\tuint32_t captureCount;\n" ++
       "\tgc_type* next;\n" ++
   "};\n" ++
@@ -420,6 +459,17 @@ constPredefs =
   "struct literal {\n" ++
       "\tgc_data gc_data;\n" ++
       "\tchar data[];\n" ++
+  "};\n" ++
+  "struct product {\n" ++
+      "\tgc_data gc_data;\n" ++
+      "\tvoid* data_1;\n" ++
+      "\tvoid* data_2;\n" ++
+  "};\n" ++
+  "\n" ++
+  "struct sum {\n" ++
+      "\tgc_data gc_data;\n" ++
+      "\tchar kind;\n" ++
+      "\tvoid* data;\n" ++
   "};\n" ++
   "\n"
 {- FOURMOLU_ENABLE -}

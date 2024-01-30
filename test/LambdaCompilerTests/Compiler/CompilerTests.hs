@@ -27,6 +27,8 @@ spec = do
       isCompilableByGCCWoWarning program4 `shouldReturn` Nothing
     it "recursive program output should be 2222" $ do
       outputOf program5 `shouldReturn` Right "2222"
+    it "adt program output should be 9998" $ do
+      outputOf program6 `shouldReturn` Right "9998"
 
 program1 :: SourceCode
 program1 =
@@ -61,6 +63,24 @@ program5 =
     ++ "\n"
     ++ "main : I8\n"
     ++ "main := doUntil3 0i32 (print_i32 2i32) 0i8\n"
+
+program6 :: SourceCode
+program6 =
+  "main := case sumtuple (\\n. print_i32 n) (\\nm. compose (print_i16 (fst nm)) (print_i8 (snd nm))) 0i8\n" ++
+  "\n" ++
+  "tup : I32 * I16\n" ++
+  "tup := tuple 5i32 2i16\n" ++
+  "\n" ++
+  "sum1 : I32 + I16\n" ++
+  "sum1 := inl 12i32\n" ++
+  "\n" ++
+  "sum2 : I32 + I16\n" ++
+  "sum2 := inr 16i16\n" ++
+  "\n" ++
+  "sumtuple : I32 + I16 * I8\n" ++
+  "sumtuple := inr (tuple 99i16 98i8)\n" ++
+  "\n" ++
+  "compose := \\f.\\g.\\x. f (g x)\n"
 
 testCompile :: SourceCode -> Either CompilerError CCode
 testCompile sc = do
