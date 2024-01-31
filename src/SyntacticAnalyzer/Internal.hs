@@ -36,6 +36,8 @@ data Type
   | SumType Type Type
   | ProductType Type Type
   | ListType Type
+  | UnitType
+  | EmptyType
   deriving (Show, Eq)
 
 data ProgramPart
@@ -45,8 +47,8 @@ data ProgramPart
 
 type Program = [ProgramPart]
 
-getTypeFromStr :: String -> Maybe AtomicType
-getTypeFromStr name
+getTypeFromPostfix :: String -> Maybe AtomicType
+getTypeFromPostfix name
   | name == "i8" = Just AI8
   | name == "i16" = Just AI16
   | name == "i32" = Just AI32
@@ -81,6 +83,12 @@ getTypeNameFromStr name
   | name == "Bool" = Just ABool
   | otherwise = Nothing
 
+getTypeFromStr :: String -> Maybe Type
+getTypeFromStr name =
+  (if name == "Unit" then Just UnitType else Nothing)
+    <|> (if name == "Empty" then Just EmptyType else Nothing)
+    <|> (TypeName <$> getTypeNameFromStr name)
+
 optional_ :: L.ParserE a -> L.ParserE ()
 optional_ = void . optional
 
@@ -98,7 +106,7 @@ literal =
     <$> L.collapseEither
       ( ( \(L.Literal val typs) ->
             ( (`Literal` val)
-                <$> getTypeFromStr typs
+                <$> getTypeFromPostfix typs
             )
               `maybeToEither` E.LeUnknownTypePostfix
         )
@@ -157,12 +165,11 @@ typeId = TypeId <$> L.typIdent
 
 typeName :: L.ParserE Type
 typeName =
-  TypeName
-    <$> L.collapseEither
-      ( (`maybeToEither` E.LeUnknownTypeName)
-          . (\(L.TypName n) -> getTypeNameFromStr n)
-          <$> L.typName
-      )
+  L.collapseEither
+    ( (`maybeToEither` E.LeUnknownTypeName)
+        . (\(L.TypName n) -> getTypeFromStr n)
+        <$> L.typName
+    )
 
 functionType :: L.ParserE Type
 functionType =

@@ -14,12 +14,11 @@ import qualified SemanticAnalyzer.Expression as SE
 import StandardLibrary
 import qualified SyntacticAnalyzer as Y
 import Util
-import Control.Applicative
 
 type CCode = String
 
 data MemoryObjectKind = MoLiteral | MoClosure
--- Other kinds like Sum, or Product are only created inside std functions.
+-- Other kinds like Unit, Sum, or Product are only created inside std functions.
 
 data ExpressionBuilder = ExprBuildr
   { ebStatms :: [CCode]
@@ -368,6 +367,15 @@ runtime =
     "\treturn su;\n" ++
   "}\n" ++
   "\n" ++
+  "gc_type* new_unit() {\n" ++
+    "\tgc_type* u = malloc(sizeof(gc_type));\n" ++
+    "\tu->gc_data.isInStackSpace = 1;\n" ++
+    "\tu->gc_data.type = GC_DATA_TYPE_UNIT;\n" ++
+    "\tu->gc_data.next = gc_object_stack;\n" ++
+    "\tgc_object_stack = (gc_type*)u;\n" ++
+    "\treturn u;\n" ++
+  "}\n" ++
+  "\n" ++
   "void gc_mark(gc_type* startPoint) {\n" ++
       "\tif(startPoint->gc_data.isMarked) { return; }\n" ++
       "\tstartPoint->gc_data.isMarked = 1;\n" ++
@@ -438,6 +446,7 @@ constPredefs =
       "\tGC_DATA_TYPE_LITERAL,\n" ++
       "\tGC_DATA_TYPE_PRODUCT,\n" ++
       "\tGC_DATA_TYPE_SUM,\n" ++
+      "\tGC_DATA_TYPE_UNIT,\n" ++
   "} gc_data_type;\n" ++
   "\n" ++
   "struct gc_data {\n" ++

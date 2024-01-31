@@ -18,6 +18,8 @@ data Type
   | SumType Type Type
   | ProductType Type Type
   | ListType Type
+  | UnitType
+  | EmptyType
   deriving (Eq)
 
 data NormType = NormType
@@ -36,6 +38,8 @@ instance Show Type where
   show (ProductType t1@(ProductType _ _) t2) = "(" ++ show t1 ++ ") * " ++ show t2
   show (ProductType t1 t2) = show t1 ++ " * " ++ show t2
   show (ListType typ) = "[" ++ show typ ++ "]"
+  show UnitType = "Unit"
+  show EmptyType = "Empty"
 
 instance Show NormType where
   show nt = show $ ntType nt
@@ -89,6 +93,9 @@ convertTypeS (Y.ProductType t1 t2) = do
 convertTypeS (Y.ListType typ) = do
   typ' <- convertTypeS typ
   return $ ListType typ'
+convertTypeS Y.UnitType = return UnitType
+convertTypeS Y.EmptyType = return EmptyType
+
 
 mkNormType :: Type -> NormType
 mkNormType typ = NormType typ' (maxId - 1)
@@ -108,6 +115,8 @@ mkNormTypeS (GenericType ind) = do
       return $ GenericType (ceNextId env)
     Just ind' -> return $ GenericType ind'
 mkNormTypeS (AtomicType atomicType) = return $ AtomicType atomicType
+mkNormTypeS UnitType = return UnitType
+mkNormTypeS EmptyType = return EmptyType
 mkNormTypeS (FunctionType paramType returnType) = do
   normalizedParam <- mkNormTypeS paramType
   normalizedReturn <- mkNormTypeS returnType
@@ -140,6 +149,8 @@ shiftNewIds typ = do
 
 getHighestId :: Type -> Int
 getHighestId (AtomicType _) = 0
+getHighestId UnitType = 0
+getHighestId EmptyType = 0
 getHighestId (FunctionType t1 t2) = max (getHighestId t1) (getHighestId t2)
 getHighestId (SumType t1 t2) = max (getHighestId t1) (getHighestId t2)
 getHighestId (ProductType t1 t2) = max (getHighestId t1) (getHighestId t2)
@@ -148,6 +159,8 @@ getHighestId (GenericType n) = n
 
 shiftIds :: Int -> Type -> (Type, Int)
 shiftIds ident (AtomicType a) = (AtomicType a, ident)
+shiftIds ident UnitType = (UnitType, ident)
+shiftIds ident EmptyType = (EmptyType, ident)
 shiftIds ident (FunctionType t1 t2) =
   let (newT1, maxIdent1) = shiftIds ident t1
       (newT2, maxIdent2) = shiftIds ident t2
@@ -203,6 +216,8 @@ addNewSubstitution genericId typ = do
       (checkAndSubstitute subs type2)
   checkAndSubstitute subs (ListType typ') =
     ListType (checkAndSubstitute subs typ')
+  checkAndSubstitute _ UnitType = UnitType
+  checkAndSubstitute _ EmptyType = EmptyType
   -- 2. Check for self references in the new substitution (fail if found)
   checkSelfRefs :: Int -> Type -> Bool
   checkSelfRefs genericId' (GenericType genericId'') = genericId' == genericId''
@@ -214,6 +229,8 @@ addNewSubstitution genericId typ = do
   checkSelfRefs genericId' (ProductType type1 type2) =
     checkSelfRefs genericId' type1 || checkSelfRefs genericId' type2
   checkSelfRefs genericId' (ListType typ') = checkSelfRefs genericId' typ'
+  checkSelfRefs _ UnitType = False
+  checkSelfRefs _ EmptyType = False
   -- 3. Check for and substitute references in the old substitutions
   substituteSimple :: Int -> Type -> Type -> Type
   substituteSimple genericId' typ' (GenericType genericId'') =
@@ -235,6 +252,8 @@ addNewSubstitution genericId typ = do
       (substituteSimple genericId' typ' type2)
   substituteSimple genericId' typ' (ListType typ'') =
     ListType (substituteSimple genericId' typ' typ'')
+  substituteSimple _ _ UnitType = UnitType
+  substituteSimple _ _ EmptyType = EmptyType
   substituteOldSubs :: Int -> Type -> [(Int, Type)] -> [(Int, Type)]
   substituteOldSubs genericId' typ' =
     map (second (substituteSimple genericId' typ'))
@@ -270,6 +289,8 @@ updateWithSubstitutions typ = do
       (updateWithSubstitutions' subs type2)
   updateWithSubstitutions' subs (ListType typ') =
     ListType (updateWithSubstitutions' subs typ')
+  updateWithSubstitutions' _ UnitType = UnitType
+  updateWithSubstitutions' _ EmptyType = EmptyType
 
 updateWithSubstitutionsI :: Type -> State InferEnv Type
 updateWithSubstitutionsI typ = do
