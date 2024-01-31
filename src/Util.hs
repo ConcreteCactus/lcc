@@ -25,11 +25,12 @@ module Util (
   sndMap,
   leftMap,
   except,
+  maximumM
 )
 where
 
-import Data.Char
 import Control.Applicative
+import Data.Char
 
 sinkL :: Either e a -> Either (Either e f) a
 sinkL (Left e) = Left (Left e)
@@ -192,3 +193,12 @@ infixl 4 `except`
 
 infixl 4 >$<
 infixl 3 >*<
+
+maximumM :: (Foldable f, Ord a) => f a -> Maybe a
+maximumM =
+  foldr
+    ( \v acc -> case acc of
+        Nothing -> Just v
+        Just v' -> if v > v' then Just v else Just v'
+    )
+    Nothing

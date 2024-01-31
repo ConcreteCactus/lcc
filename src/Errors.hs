@@ -93,6 +93,8 @@ data LexicalElement
   | LeLiteral
   | LeOpeningBracket
   | LeClosingBracket
+  | LeOpeningSquareBracket
+  | LeClosingSquareBracket
   | LeEndOfFile
   deriving (Eq)
 
@@ -114,6 +116,8 @@ instance Show LexicalElement where
     show LeLiteral = "a literal (eg. 42i32)"
     show LeOpeningBracket = "opening bracket"
     show LeClosingBracket = "closing bracket"
+    show LeOpeningSquareBracket = "opening square bracket"
+    show LeClosingSquareBracket = "closing square bracket"
     show LeEndOfFile = "end of file"
 
 mkLexErr :: TextPos -> [LexicalElement] -> LexicalError

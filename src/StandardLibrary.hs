@@ -3,6 +3,7 @@ module StandardLibrary (standardLibrary, cTypeOf) where
 import qualified Lexer as L
 import qualified SemanticAnalyzer.Type as T
 import SyntacticAnalyzer
+import qualified SyntacticAnalyzer as Y
 import Util
 
 cTypeOf :: AtomicType -> String
@@ -250,6 +251,49 @@ library' =
               , p "sum->data = " <> w 1
               , p "sum->gc_data.isInStackSpace = 0"
               , p "sum"
+              ]
+         )
+       ,
+         ( "emptyList"
+         , T.ListType (g 1)
+         , \_ ->
+            sequence
+              [ p "sum* list = new_sum()"
+              , p "list->gc_data.isInStackSpace = 1"
+              , p "list->kind = 2"
+              , p "list->data = NULL"
+              , p "list->gc_data.isInStackSpace = 0"
+              , p "list"
+              ]
+         )
+       ,
+         ( "cons"
+         , g 1 `to` T.ListType (g 1) `to` T.ListType (g 1)
+         , \w ->
+            sequence
+              [ p "sum* list = new_sum()"
+              , p "list->gc_data.isInStackSpace = 1"
+              , p "list->kind = 1"
+              , p "product* list_internal = new_product()"
+              , p "list_internal->gc_data.isInStackSpace = 1"
+              , p "list_internal->data_1 = " <> w 1
+              , p "list_internal->data_2 = " <> w 2
+              , p "list->data = list_internal"
+              , p "list->gc_data.isInStackSpace = 0"
+              , p "list_internal->gc_data.isInStackSpace = 0"
+              , p "list"
+              ]
+         )
+       ,
+         ( "snoc"
+         , T.ListType (g 1)
+            `to` T.SumType
+              (T.ProductType (g 1) $ T.ListType (g 1))
+              (T.AtomicType Y.AU8) 
+              -- Warning, add a unit type, or this will create a segfault
+         , \w ->
+            sequence
+              [ w 1
               ]
          )
        ]

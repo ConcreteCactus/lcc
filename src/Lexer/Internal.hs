@@ -307,6 +307,12 @@ openingBracket = satisfy_ (== '(') `withExpected` LeOpeningBracket
 closingBracket :: ParserE ()
 closingBracket = satisfy_ (== ')') `withExpected` LeClosingBracket
 
+openingSquareBracket :: ParserE ()
+openingSquareBracket = satisfy_ (== '[') `withExpected` LeOpeningSquareBracket
+
+closingSquareBracket :: ParserE ()
+closingSquareBracket = satisfy_ (== ']') `withExpected` LeClosingSquareBracket
+
 endOfFile :: ParserE ()
 endOfFile =
   optional stmtWhiteSpace

@@ -17,6 +17,7 @@ data Type
   | FunctionType Type Type
   | SumType Type Type
   | ProductType Type Type
+  | ListType Type
   deriving (Eq)
 
 data NormType = NormType
@@ -34,6 +35,7 @@ instance Show Type where
   show (SumType t1 t2) = show t1 ++ " + " ++ show t2
   show (ProductType t1@(ProductType _ _) t2) = "(" ++ show t1 ++ ") * " ++ show t2
   show (ProductType t1 t2) = show t1 ++ " * " ++ show t2
+  show (ListType typ) = "[" ++ show typ ++ "]"
 
 instance Show NormType where
   show nt = show $ ntType nt
@@ -84,6 +86,9 @@ convertTypeS (Y.ProductType t1 t2) = do
   t1' <- convertTypeS t1
   t2' <- convertTypeS t2
   return $ ProductType t1' t2'
+convertTypeS (Y.ListType typ) = do
+  typ' <- convertTypeS typ
+  return $ ListType typ'
 
 mkNormType :: Type -> NormType
 mkNormType typ = NormType typ' (maxId - 1)
@@ -115,6 +120,9 @@ mkNormTypeS (ProductType t1 t2) = do
   nt1 <- mkNormTypeS t1
   nt2 <- mkNormTypeS t2
   return $ ProductType nt1 nt2
+mkNormTypeS (ListType typ) = do
+  typ' <- mkNormTypeS typ
+  return $ ListType typ'
 
 mkMutExcTy2 :: NormType -> NormType -> MutExcTy2
 mkMutExcTy2 original shiftCandidate =
@@ -135,6 +143,7 @@ getHighestId (AtomicType _) = 0
 getHighestId (FunctionType t1 t2) = max (getHighestId t1) (getHighestId t2)
 getHighestId (SumType t1 t2) = max (getHighestId t1) (getHighestId t2)
 getHighestId (ProductType t1 t2) = max (getHighestId t1) (getHighestId t2)
+getHighestId (ListType typ) = getHighestId typ
 getHighestId (GenericType n) = n
 
 shiftIds :: Int -> Type -> (Type, Int)
@@ -151,6 +160,9 @@ shiftIds ident (ProductType t1 t2) =
   let (newT1, maxIdent1) = shiftIds ident t1
       (newT2, maxIdent2) = shiftIds ident t2
    in (ProductType newT1 newT2, max maxIdent1 maxIdent2)
+shiftIds ident (ListType typ) =
+  let (typ', maxIdent) = shiftIds ident typ
+   in (ListType typ', maxIdent)
 shiftIds ident (GenericType gid) = (GenericType (gid + ident), gid + ident)
 
 addNewSubstitution ::
@@ -189,6 +201,8 @@ addNewSubstitution genericId typ = do
     ProductType
       (checkAndSubstitute subs type1)
       (checkAndSubstitute subs type2)
+  checkAndSubstitute subs (ListType typ') =
+    ListType (checkAndSubstitute subs typ')
   -- 2. Check for self references in the new substitution (fail if found)
   checkSelfRefs :: Int -> Type -> Bool
   checkSelfRefs genericId' (GenericType genericId'') = genericId' == genericId''
@@ -199,6 +213,7 @@ addNewSubstitution genericId typ = do
     checkSelfRefs genericId' type1 || checkSelfRefs genericId' type2
   checkSelfRefs genericId' (ProductType type1 type2) =
     checkSelfRefs genericId' type1 || checkSelfRefs genericId' type2
+  checkSelfRefs genericId' (ListType typ') = checkSelfRefs genericId' typ'
   -- 3. Check for and substitute references in the old substitutions
   substituteSimple :: Int -> Type -> Type -> Type
   substituteSimple genericId' typ' (GenericType genericId'') =
@@ -218,6 +233,8 @@ addNewSubstitution genericId typ = do
     ProductType
       (substituteSimple genericId' typ' type1)
       (substituteSimple genericId' typ' type2)
+  substituteSimple genericId' typ' (ListType typ'') =
+    ListType (substituteSimple genericId' typ' typ'')
   substituteOldSubs :: Int -> Type -> [(Int, Type)] -> [(Int, Type)]
   substituteOldSubs genericId' typ' =
     map (second (substituteSimple genericId' typ'))
@@ -251,6 +268,8 @@ updateWithSubstitutions typ = do
     ProductType
       (updateWithSubstitutions' subs type1)
       (updateWithSubstitutions' subs type2)
+  updateWithSubstitutions' subs (ListType typ') =
+    ListType (updateWithSubstitutions' subs typ')
 
 updateWithSubstitutionsI :: Type -> State InferEnv Type
 updateWithSubstitutionsI typ = do
@@ -296,27 +315,33 @@ reconcileTypesS
         updatedReconciledReturn <- updateWithSubstitutions reconciledReturn'
         return $ Right (FunctionType reconciledParam' updatedReconciledReturn)
 reconcileTypesS (ProductType t1 t2) (ProductType t3 t4) = do
-    firsts <- reconcileTypesS t1 t3
-    ut2 <- updateWithSubstitutions t2
-    ut4 <- updateWithSubstitutions t4
-    seconds <- reconcileTypesS ut2 ut4
-    case (firsts, seconds) of
-      (Left e, _) -> return $ Left e
-      (_, Left e) -> return $ Left e
-      (Right firsts', Right seconds') -> do
-        ufirsts <- updateWithSubstitutions firsts'
-        return $ Right $ ProductType ufirsts seconds'
+  firsts <- reconcileTypesS t1 t3
+  ut2 <- updateWithSubstitutions t2
+  ut4 <- updateWithSubstitutions t4
+  seconds <- reconcileTypesS ut2 ut4
+  case (firsts, seconds) of
+    (Left e, _) -> return $ Left e
+    (_, Left e) -> return $ Left e
+    (Right firsts', Right seconds') -> do
+      ufirsts <- updateWithSubstitutions firsts'
+      return $ Right $ ProductType ufirsts seconds'
 reconcileTypesS (SumType t1 t2) (SumType t3 t4) = do
-    firsts <- reconcileTypesS t1 t3
-    ut2 <- updateWithSubstitutions t2
-    ut4 <- updateWithSubstitutions t4
-    seconds <- reconcileTypesS ut2 ut4
-    case (firsts, seconds) of
-      (Left e, _) -> return $ Left e
-      (_, Left e) -> return $ Left e
-      (Right firsts', Right seconds') -> do
-        ufirsts <- updateWithSubstitutions firsts'
-        return $ Right $ SumType ufirsts seconds'
+  firsts <- reconcileTypesS t1 t3
+  ut2 <- updateWithSubstitutions t2
+  ut4 <- updateWithSubstitutions t4
+  seconds <- reconcileTypesS ut2 ut4
+  case (firsts, seconds) of
+    (Left e, _) -> return $ Left e
+    (_, Left e) -> return $ Left e
+    (Right firsts', Right seconds') -> do
+      ufirsts <- updateWithSubstitutions firsts'
+      return $ Right $ SumType ufirsts seconds'
+reconcileTypesS (ListType t1) (ListType t2) = do
+  rec <- reconcileTypesS t1 t2
+  case rec of
+    Left e -> return $ Left e
+    Right rec' -> do
+      return $ Right $ ListType rec'
 reconcileTypesS typ typ' =
   return
     $ Left
@@ -374,30 +399,25 @@ checkTypeS
       (Left e, _) -> return $ Left e
       (_, Left e) -> return $ Left e
       (Right _, Right _) -> return $ Right ()
-checkTypeS
-  hi
-  (ProductType t1 t2)
-  (ProductType t3 t4) = do
-    firsts <- checkTypeS hi t1 t3
-    t2' <- updateWithSubstitutions t2
-    t4' <- updateWithSubstitutions t4
-    seconds <- checkTypeS hi t2' t4'
-    case (firsts, seconds) of
-      (Left e, _) -> return $ Left e
-      (_, Left e) -> return $ Left e
-      (Right _, Right _) -> return $ Right ()
-checkTypeS
-  hi
-  (SumType t1 t2)
-  (SumType t3 t4) = do
-    firsts <- checkTypeS hi t1 t3
-    t2' <- updateWithSubstitutions t2
-    t4' <- updateWithSubstitutions t4
-    seconds <- checkTypeS hi t2' t4'
-    case (firsts, seconds) of
-      (Left e, _) -> return $ Left e
-      (_, Left e) -> return $ Left e
-      (Right _, Right _) -> return $ Right ()
+checkTypeS hi (ProductType t1 t2) (ProductType t3 t4) = do
+  firsts <- checkTypeS hi t1 t3
+  t2' <- updateWithSubstitutions t2
+  t4' <- updateWithSubstitutions t4
+  seconds <- checkTypeS hi t2' t4'
+  case (firsts, seconds) of
+    (Left e, _) -> return $ Left e
+    (_, Left e) -> return $ Left e
+    (Right _, Right _) -> return $ Right ()
+checkTypeS hi (SumType t1 t2) (SumType t3 t4) = do
+  firsts <- checkTypeS hi t1 t3
+  t2' <- updateWithSubstitutions t2
+  t4' <- updateWithSubstitutions t4
+  seconds <- checkTypeS hi t2' t4'
+  case (firsts, seconds) of
+    (Left e, _) -> return $ Left e
+    (_, Left e) -> return $ Left e
+    (Right _, Right _) -> return $ Right ()
+checkTypeS hi (ListType t1) (ListType t2) = checkTypeS hi t1 t2
 checkTypeS _ typ typ' =
   return
     $ Left

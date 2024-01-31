@@ -29,6 +29,8 @@ module Lexer
     literal,
     openingBracket,
     closingBracket,
+    openingSquareBracket,
+    closingSquareBracket,
     endOfFile,
     collapseMaybe,
     collapseEither,

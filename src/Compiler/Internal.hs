@@ -14,10 +14,12 @@ import qualified SemanticAnalyzer.Expression as SE
 import StandardLibrary
 import qualified SyntacticAnalyzer as Y
 import Util
+import Control.Applicative
 
 type CCode = String
 
 data MemoryObjectKind = MoLiteral | MoClosure
+-- Other kinds like Sum, or Product are only created inside std functions.
 
 data ExpressionBuilder = ExprBuildr
   { ebStatms :: [CCode]
@@ -515,7 +517,7 @@ genStdRawDefinition ::
     Writer [Int] [CCode]
   ) ->
   ([CCode], Int)
-genStdRawDefinition (_, _, f) = (code, maximum ns)
+genStdRawDefinition (_, _, f) = (code, fromMaybe 0 (maximumM ns))
  where
   ff :: Int -> Writer [Int] CCode
   ff n = Writer ("std_var_" ++ show n, [n])
@@ -575,5 +577,3 @@ genStdDefinitionCodeStepS depth rawDef@(name, cs, n)
         | m >= n = "param"
         | otherwise = "self->captures[" ++ show (n - m - 1) ++ "]"
 {- FOURMOLU_ENABLE -}
-
--- AEJC 567

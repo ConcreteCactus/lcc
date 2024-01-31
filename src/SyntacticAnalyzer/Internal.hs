@@ -35,6 +35,7 @@ data Type
   | FunctionType Type Type
   | SumType Type Type
   | ProductType Type Type
+  | ListType Type
   deriving (Show, Eq)
 
 data ProgramPart
@@ -181,11 +182,21 @@ productType =
     <$> (wo *> typeWoT)
     <*> (wo *> L.star *> wo *> typeWoS)
 
+listType :: L.ParserE Type
+listType =
+  ListType
+    <$> ( wo
+            *> L.openingSquareBracket
+            *> type_
+            <* L.closingSquareBracket
+        )
+
 type_ :: L.ParserE Type
 type_ =
   functionType
     <|> sumType
     <|> productType
+    <|> listType
     <|> typeId
     <|> typeName
     <|> typeBr
@@ -199,6 +210,7 @@ typeWoF :: L.ParserE Type
 typeWoF =
   sumType
     <|> productType
+    <|> listType
     <|> typeId
     <|> typeName
     <|> typeBr
@@ -206,7 +218,8 @@ typeWoF =
 -- Type without SumType and FuncionType
 typeWoS :: L.ParserE Type
 typeWoS =
-    productType
+  productType
+    <|> listType
     <|> typeId
     <|> typeName
     <|> typeBr
@@ -214,10 +227,10 @@ typeWoS =
 -- Type without ProductType, SumType, and FunctionType
 typeWoT :: L.ParserE Type
 typeWoT =
-    typeId
+  listType
+    <|> typeId
     <|> typeName
     <|> typeBr
-
 
 definition :: L.ParserE ProgramPart
 definition =
