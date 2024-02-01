@@ -180,8 +180,8 @@ library' =
             sequence
               [ p "product* prod = new_product()"
               , p "prod->gc_data.isInStackSpace = 1"
-              , p "prod->data_1 = " <> w 2
-              , p "prod->data_2 = " <> w 1
+              , p "prod->data_1 = " <> w 1
+              , p "prod->data_2 = " <> w 2
               , p "prod->gc_data.isInStackSpace = 0"
               , p "prod"
               ]
@@ -306,6 +306,15 @@ library' =
               [ p "gc_type* u = new_unit()"
               , p "u->gc_data.isInStackSpace = 0"
               , p "u"
+              ]
+         ),
+         ( "exfalso"
+         , T.EmptyType `to` g 1
+         , \_ ->
+            sequence
+              [ p "printf(\"exfalso used\\n\")"
+              , p "exit(100)"
+              , p "nullptr"
               ]
          )
        ]
