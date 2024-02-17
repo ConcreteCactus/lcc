@@ -3,7 +3,6 @@ module StandardLibrary (standardLibrary, cTypeOf) where
 import qualified Lexer as L
 import qualified SemanticAnalyzer.Type as T
 import SyntacticAnalyzer
-import qualified SyntacticAnalyzer as Y
 import Util
 
 cTypeOf :: AtomicType -> String
@@ -173,6 +172,26 @@ library' =
             ]
       )
       allAtomicTypes
+    ++ makeTypedDefs
+      ( "isle"
+      , \t -> a t `to` a t `to` a ABool
+      , \t w ->
+          sequence
+            [ p "literal* s1 = " <> w 1
+            , p "literal* s2 = " <> w 2
+            , p "literal* s3 = new_literal(sizeof(" <> p (cTypeOf t) <> p "))"
+            , p "void* s1data = &s1->data"
+            , p "void* s2data = &s2->data"
+            , p "s3->data[0] = *("
+                <> p (cTypeOf t)
+                <> p "*)s1data <= *("
+                <> p (cTypeOf t)
+                <> p "*)s2data"
+            , p "s3->gc_data.isInStackSpace = 0"
+            , p "s3"
+            ]
+      )
+      allAtomicTypes
     ++ [
          ( "tuple"
          , g 1 `to` g 2 `to` T.ProductType (g 1) (g 2)
@@ -312,9 +331,21 @@ library' =
          , T.EmptyType `to` g 1
          , \_ ->
             sequence
-              [ p "printf(\"exfalso used\\n\")"
+              [ p "fprintf(stderr, \"exfalso used\\n\")"
               , p "exit(100)"
               , p "nullptr"
               ]
-         )
+         ),
+         ("getc"
+         , g 1 `to` T.AtomicType AI32
+         , \_ -> 
+            sequence
+              [ p "int c = getchar()"
+              , p "literal* cl = new_literal(sizeof(uint32_t))"
+              , p "void* cldata = &cl->data"
+              , p "uint32_t* cldatai = cldata"
+              , p "*cldatai = c"
+              , p "cl"
+              ]
+          )
        ]
