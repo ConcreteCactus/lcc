@@ -27,6 +27,7 @@ module Lexer
     typIdent,
     typName,
     literal,
+    charLiteral,
     openingBracket,
     closingBracket,
     openingSquareBracket,

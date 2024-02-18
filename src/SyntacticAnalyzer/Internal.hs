@@ -7,6 +7,7 @@ import Control.Monad
 import qualified Errors as E
 import qualified Lexer as L
 import Util
+import Debug.Trace
 
 data Literal = Literal AtomicType Integer deriving (Eq)
 
