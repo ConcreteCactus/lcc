@@ -353,14 +353,14 @@ library' =
               ]
          )
        ,
-         ( "snoc"
+         ( "uncons"
          , T.ListType (g 1)
             `to` T.SumType
               (T.ProductType (g 1) $ T.ListType (g 1))
               T.UnitType
          , \w ->
             sequence
-              [ w 1
+              [ p "gc_clone((gc_type*)" <> w 1 <> p ")"
               ]
          )
        ,
@@ -384,7 +384,7 @@ library' =
               ]
          )
        ,
-         ( "getc"
+         ( "getchar"
          , g 1 `to` T.AtomicType AI32
          , \_ ->
             sequence

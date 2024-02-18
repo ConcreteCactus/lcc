@@ -47,6 +47,8 @@ spec = do
             outputOf program7 `shouldReturn` TrSuccess "18"
         it "literal printing program should output Ac-12B" $ do
             outputOf program8 `shouldReturn` TrSuccess "Ac-12B"
+        it "list printing program should output abc" $ do
+            outputOf program9 `shouldReturn` TrSuccess "abc"
 
 program1 :: SourceCode
 program1 =
@@ -132,6 +134,13 @@ program8 =
         ++ "        (print_char 'c')\n"
         ++ "        ) (print_i8 -12i8)\n"
         ++ "    ) (print_char 0x42_char) 0i8\n"
+program9 :: SourceCode
+program9 =
+    "printList : [Char] -> a -> a\n"
+        ++ "printList := \\list. case (uncons list) (\\cl. rcompose (print_char (fst cl)) (printList (snd cl))) (\\e. id)\n"
+        ++ "rcompose := \\f.\\g.\\x.g (f x)\n"
+        ++ "id := \\x.x\n"
+        ++ "main := printList (cons 'a' (cons 'b' (cons 'c' emptyList))) 0i8\n"
 
 testCompile :: SourceCode -> Either CompilerError CCode
 testCompile sc = do
