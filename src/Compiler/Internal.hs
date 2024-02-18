@@ -18,6 +18,7 @@ import Util
 type CCode = String
 
 data MemoryObjectKind = MoLiteral | MoClosure
+
 -- Other kinds like Unit, Sum, or Product are only created inside std functions.
 
 data ExpressionBuilder = ExprBuildr
@@ -69,8 +70,8 @@ compile program =
       ++ show gname
       ++ "_func(void);"
   mainfnHelper =
-    isJust
-      $ Li.find
+    isJust $
+      Li.find
         ( \(S.Definition gname _) ->
             show gname == "main"
         )
@@ -81,7 +82,8 @@ showExpression gname expr =
   let (ExprBuildr statms gstatms stackVars cnt, expr') =
         runState (showExpressionS gname expr) (ExprBuildr [] [] [] 1)
    in ( unlines
-          ( map ("\t" ++) statms
+          ( ["\tgc_invoke();"]
+              ++ map ("\t" ++) statms
               ++ ["\tvoid* val" ++ show cnt ++ " = " ++ expr' ++ ";"]
               ++ gcStackValRemovals stackVars
               ++ ["\treturn val" ++ show cnt ++ ";"]
@@ -230,8 +232,8 @@ separateBuilder builderS = do
   let (ExprBuildr statms' gstatms' stackVars' cnt', expr') =
         runState builderS (ExprBuildr [] [] [] (cnt + 1))
   put (ExprBuildr statms (gstatms' ++ gstatms) stackVars cnt')
-  return
-    $ unlines
+  return $
+    unlines
       ( ["\tgc_invoke();"]
           ++ map ("\t" ++) statms'
           ++ ["\tvoid* val" ++ show cnt ++ " = " ++ expr' ++ ";"]

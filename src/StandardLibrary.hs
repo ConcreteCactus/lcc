@@ -95,8 +95,17 @@ makeTypedDefs ::
   [AtomicType] ->
   [(String, T.Type, (Int -> Writer a String) -> Writer a [String])]
 makeTypedDefs (name, t, d) =
-  map
-    (\at -> (name ++ "_" ++ typeNameOf at, t at, d at))
+  map (\at -> (name ++ "_" ++ typeNameOf at, t at, d at))
+
+makeDoubleTypedDefs ::
+  ( AtomicType -> AtomicType -> String
+  , AtomicType -> AtomicType -> T.Type
+  , AtomicType -> AtomicType -> (Int -> Writer a String) -> Writer a [String]
+  ) ->
+  [(AtomicType, AtomicType)] ->
+  [(String, T.Type, (Int -> Writer a String) -> Writer a [String])]
+makeDoubleTypedDefs (nameF, typeF, defF) =
+  map (\(at, bt) -> (nameF at bt, typeF at bt, defF at bt))
 
 printfFormatStringBasedOnType :: AtomicType -> String
 printfFormatStringBasedOnType t
@@ -114,28 +123,45 @@ library' ::
   (Monoid a) =>
   [(String, T.Type, (Int -> Writer a String) -> Writer a [String])]
 library' =
-  makeTypedDefs
-    ( "add"
-    , \t -> a t `to` a t `to` a t
-    , \t w ->
+  makeDoubleTypedDefs
+    ( \at bt -> typeNameOf at ++ "To" ++ typeNameOf bt
+    , \at bt -> a at `to` a bt
+    , \at bt w ->
         sequence
           [ p "literal* s1 = " <> w 1
-          , p "literal* s2 = " <> w 2
-          , p "literal* s3 = new_literal(sizeof(" <> p (cTypeOf t) <> p "))"
           , p "void* s1data = &s1->data"
+          , p (cTypeOf at) <> p "* s1datai = s1data"
+          , p (cTypeOf bt) <> p " s2temp = (" <> p (cTypeOf bt) <> p ")*s1datai"
+          , p "literal* s2 = new_literal(sizeof(" <> p (cTypeOf bt) <> p "))"
           , p "void* s2data = &s2->data"
-          , p "void* s3data = &s3->data"
-          , p (cTypeOf t) <> p "* s3datai = s3data"
-          , p "*s3datai = *("
-              <> p (cTypeOf t)
-              <> p "*)s1data + *("
-              <> p (cTypeOf t)
-              <> p "*)s2data"
-          , p "s3->gc_data.isInStackSpace = 0"
-          , p "s3"
+          , p (cTypeOf bt) <> p "* s2datai = s2data"
+          , p "*s2datai = s2temp"
+          , p "s2"
           ]
     )
-    allAtomicTypes
+    [(at, bt) | at <- allAtomicTypes, bt <- allAtomicTypes]
+    ++ makeTypedDefs
+      ( "add"
+      , \t -> a t `to` a t `to` a t
+      , \t w ->
+          sequence
+            [ p "literal* s1 = " <> w 1
+            , p "literal* s2 = " <> w 2
+            , p "literal* s3 = new_literal(sizeof(" <> p (cTypeOf t) <> p "))"
+            , p "void* s1data = &s1->data"
+            , p "void* s2data = &s2->data"
+            , p "void* s3data = &s3->data"
+            , p (cTypeOf t) <> p "* s3datai = s3data"
+            , p "*s3datai = *("
+                <> p (cTypeOf t)
+                <> p "*)s1data + *("
+                <> p (cTypeOf t)
+                <> p "*)s2data"
+            , p "s3->gc_data.isInStackSpace = 0"
+            , p "s3"
+            ]
+      )
+      allAtomicTypes
     ++ makeTypedDefs
       ( "print"
       , \t -> a t `to` g 1 `to` g 1
@@ -346,7 +372,8 @@ library' =
               , p "u->gc_data.isInStackSpace = 0"
               , p "u"
               ]
-         ),
+         )
+       ,
          ( "exfalso"
          , T.EmptyType `to` g 1
          , \_ ->
@@ -355,10 +382,11 @@ library' =
               , p "exit(100)"
               , p "nullptr"
               ]
-         ),
-         ("getc"
+         )
+       ,
+         ( "getc"
          , g 1 `to` T.AtomicType AI32
-         , \_ -> 
+         , \_ ->
             sequence
               [ p "int c = getchar()"
               , p "literal* cl = new_literal(sizeof(uint32_t))"
@@ -367,5 +395,5 @@ library' =
               , p "*cldatai = c"
               , p "cl"
               ]
-          )
+         )
        ]

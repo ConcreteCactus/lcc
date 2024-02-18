@@ -43,6 +43,8 @@ spec = do
       outputOf program5 `shouldReturn` TrSuccess "2222"
     it "adt program output should be 98100" $ do
       outputOf program6 `shouldReturn` TrSuccess "98100"
+    it "casting program should output 18" $ do
+      outputOf program7 `shouldReturn` TrSuccess "18"
 
 program1 :: SourceCode
 program1 =
@@ -95,6 +97,28 @@ program6 =
     ++ "sumtuple := inr (tuple 99i16 98i8)\n"
     ++ "\n"
     ++ "compose := \\f.\\g.\\x. f (g x)\n"
+
+program7 :: SourceCode
+program7 =
+  "v1 := 1i8\n"
+    ++ "v2 := add_i16 1i16 (i8Toi16 v1)\n"
+    ++ "v3 := add_i32 1i32 (i16Toi32 v2)\n"
+    ++ "v4 := add_i64 1i64 (i32Toi64 v3)\n"
+    ++ "v5 := add_i128 1i128 (i64Toi128 v4)\n"
+    ++ "v6 := add_i64 1i64 (i128Toi64 v5)\n"
+    ++ "v7 := add_i32 1i32 (i64Toi32 v6)\n"
+    ++ "v8 := add_i16 1i16 (i32Toi16 v7)\n"
+    ++ "v9 := add_i8 1i8 (i16Toi8 v8)\n"
+    ++ "v10 := add_u8 1u8 (i8Tou8 v9)\n"
+    ++ "v11 := add_u16 1u16 (u8Tou16 v10)\n"
+    ++ "v12 := add_u32 1u32 (u16Tou32 v11)\n"
+    ++ "v13 := add_u64 1u64 (u32Tou64 v12)\n"
+    ++ "v14 := add_u128 1u128 (u64Tou128 v13)\n"
+    ++ "v15 := add_u64 1u64 (u128Tou64 v14)\n"
+    ++ "v16 := add_u32 1u32 (u64Tou32 v15)\n"
+    ++ "v17 := add_u16 1u16 (u32Tou16 v16)\n"
+    ++ "v18 := add_u8 1u8 (u16Tou8 v17)\n"
+    ++ "main := print_u8 v18 0i8\n"
 
 testCompile :: SourceCode -> Either CompilerError CCode
 testCompile sc = do
@@ -152,10 +176,10 @@ gccCompileAndRunWithValgrind src = do
                   readCreateProcessWithExitCode rcp ""
                 case valCode of
                   ExitSuccess ->
-                    return
-                      $ RrRuntimeOutput (runCode, runOut, runErr)
-                  _ -> return $ RrValgrindErr (valCode, valOut, valErr)
-              _ -> return $ RrGccErr (compCode, compOut, compErr)
+                    return $
+                      RrRuntimeOutput (runCode, runOut, runErr)
+                  _failure -> return $ RrValgrindErr (valCode, valOut, valErr)
+              _failure -> return $ RrGccErr (compCode, compOut, compErr)
         )
 
 isCompilableByGCC ::
@@ -169,7 +193,7 @@ isCompilableByGCC src = do
       (code, out, err) <- compilation
       case code of
         ExitSuccess -> return Nothing
-        _ -> do
+        _failure -> do
           putStrLn $ "\n" ++ err
           return $ Just $ Right (code, out, err)
 
@@ -184,7 +208,7 @@ isCompilableByGCCWoWarning src = do
       (code, out, err) <- compilation
       case code of
         ExitSuccess | null err -> return Nothing
-        _ -> do
+        _failure -> do
           putStrLn $ "\n" ++ err
           return $ Just $ Right (code, out, err)
 

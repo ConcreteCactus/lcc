@@ -439,6 +439,8 @@ checkTypeS hi (SumType t1 t2) (SumType t3 t4) = do
     (_, Left e) -> return $ Left e
     (Right _, Right _) -> return $ Right ()
 checkTypeS hi (ListType t1) (ListType t2) = checkTypeS hi t1 t2
+checkTypeS _ UnitType UnitType = return $ Right ()
+checkTypeS _ EmptyType EmptyType = return $ Right ()
 checkTypeS _ typ typ' =
   return
     $ Left
