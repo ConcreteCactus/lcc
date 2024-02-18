@@ -19,7 +19,7 @@
 # resolver: https://example.com/snapshots/2018-01-01.yaml
 resolver:
   # compiler: ghc-9.2.8
-  url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/22/11.yaml
+  url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/21/25.yaml
 
 # User packages to be built.
 # Various formats can be used as shown in the example below.
@@ -67,3 +67,6 @@ extra-deps:
 #
 # Allow a newer minor version of GHC than the snapshot specifies
 # compiler-check: newer-minor
+nix:
+  enable: true
+  packages: [valgrind]

@@ -73,16 +73,16 @@ allAtomicTypes =
   ]
 {- FOURMOLU_ENABLE -}
 
-{- FOURMOLU_DISABLE -}
-allIntegerTypes :: [AtomicType]
-allIntegerTypes =
-  [ AI8, AI16, AI32, AI64, AI128
-  , AU8, AU16, AU32, AU64, AU128, AUSize
-  ]
-{- FOURMOLU_ENABLE -}
-
-allFloatTypes :: [AtomicType]
-allFloatTypes = [AF32, AF64]
+-- {- FOURMOLU_DISABLE -}
+-- allIntegerTypes :: [AtomicType]
+-- allIntegerTypes =
+--   [ AI8, AI16, AI32, AI64, AI128
+--   , AU8, AU16, AU32, AU64, AU128, AUSize
+--   ]
+-- {- FOURMOLU_ENABLE -}
+--
+-- allFloatTypes :: [AtomicType]
+-- allFloatTypes = [AF32, AF64]
 
 all128BitTypes :: [AtomicType]
 all128BitTypes = [AI128, AU128]
@@ -174,6 +174,26 @@ library' =
       allAtomicTypes
     ++ makeTypedDefs
       ( "isle"
+      , \t -> a t `to` a t `to` a ABool
+      , \t w ->
+          sequence
+            [ p "literal* s1 = " <> w 1
+            , p "literal* s2 = " <> w 2
+            , p "literal* s3 = new_literal(sizeof(" <> p (cTypeOf t) <> p "))"
+            , p "void* s1data = &s1->data"
+            , p "void* s2data = &s2->data"
+            , p "s3->data[0] = *("
+                <> p (cTypeOf t)
+                <> p "*)s1data <= *("
+                <> p (cTypeOf t)
+                <> p "*)s2data"
+            , p "s3->gc_data.isInStackSpace = 0"
+            , p "s3"
+            ]
+      )
+      allAtomicTypes
+    ++ makeTypedDefs
+      ( ""
       , \t -> a t `to` a t `to` a ABool
       , \t w ->
           sequence
