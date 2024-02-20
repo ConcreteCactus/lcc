@@ -385,7 +385,7 @@ library' =
          )
        ,
          ( "getchar"
-         , g 1 `to` T.AtomicType AI32
+         , T.AtomicType AI32
          , \_ ->
             sequence
               [ p "int c = getchar()"
