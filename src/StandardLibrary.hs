@@ -396,4 +396,15 @@ library' =
               , p "cl"
               ]
          )
+         , 
+         ( "eof"
+         , T.AtomicType AI32
+         , \_ -> sequence
+              [ p "literal* cl = new_literal(sizeof(uint32_t))"
+              , p "void* cldata = &cl->data"
+              , p "uint32_t* cldatai = cldata"
+              , p "*cldatai = EOF"
+              , p "cl"
+              ]
+         )
        ]
