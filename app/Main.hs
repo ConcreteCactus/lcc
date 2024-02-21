@@ -1,10 +1,10 @@
 module Main (main) where
 
 import Compiler
+import Control.Monad
 import Data.Maybe
 import System.Environment
 import System.Exit
-import Control.Monad
 import System.Process
 
 data Options = Options
@@ -70,12 +70,12 @@ main = do
             exitWith (ExitFailure 1)
         Right opts
             | oShowHelp opts -> do
-                putStrLn helpText
+                putStr helpText
             | oShowVersion opts -> do
-                putStrLn versionText
+                putStr versionText
             | otherwise -> do
                 compile opts
-                when (oDontRunCC opts) $ run opts
+                unless (oDontRunCC opts) $ run opts
 
 compile :: Options -> IO ()
 compile opts = do
@@ -92,11 +92,9 @@ compile opts = do
 run :: Options -> IO ()
 run opts = do
     let cmd = fromMaybe "gcc" (oCCCmd opts)
-    let output = maybe "" ("-o "++) (oExeName opts)
+    let output = maybe "" ("-o " ++) (oExeName opts)
     let input = fromMaybe "a.c" (oCSrcName opts)
     callCommand $ cmd ++ " " ++ output ++ " " ++ input
-
-
 
 parseOptions :: [String] -> Either OptionError Options
 parseOptions [] = Left OeNoArgumentsGiven
@@ -109,7 +107,10 @@ parseOptions args =
         Either OptionError Options
     checkForErrors (_, Just oa) = Left (OeOptionArgumentNotGiven oa)
     checkForErrors (opts, Nothing)
-        | null (oInputName opts) = Left OeInputFileNotGiven
+        | null (oInputName opts)
+            && not (oShowHelp opts)
+            && not (oShowVersion opts) =
+            Left OeInputFileNotGiven
         | otherwise = Right opts
     foldOpt ::
         Either OptionError (Options, Maybe OptionArgument) ->
@@ -135,11 +136,14 @@ parseOptions args =
     optargF :: OptionArgument -> String -> Options -> Options
     optargF OaExeName arg opts = opts{oExeName = Just arg}
     optargF OaCSrcName arg opts = opts{oCSrcName = Just arg}
+    optargF OaCCName arg opts = opts{oCCCmd = Just arg}
 
 versionText :: String
 versionText =
     unlines
-        [ "___"
+        [ "lambda_compiler v1.0"
+        , ""
+        , "___"
         , "\\_ \\"
         , "  \\ \\       __     __       __     __"
         , "   \\ \\     (_ \\   / _)     (_ \\   / _)"
@@ -147,11 +151,9 @@ versionText =
         , "  / /\\ \\      ) _ (           ) _ ("
         , " / /  \\ \\   _/ / \\ \\_       _/ / \\ \\_"
         , "/_/    \\_\\ (__/   \\__) (_) (__/   \\__)"
-        , "lambda_compiler v1.0"
         , ""
         , "This project is part of the undergraduate thesis of Áron Hárnási"
         , "from Eötvös Lóránd University."
-        , ""
         ]
 
 helpText :: String

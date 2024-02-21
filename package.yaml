@@ -1,6 +1,6 @@
 name:                lambda-compiler
 version:             0.1.0.0
-github:              "githubuser/lambda-compiler"
+github:              "ConcreteCactus/lambda-compiler"
 license:             BSD3
 author:              "Author name here"
 maintainer:          "example@example.com"
