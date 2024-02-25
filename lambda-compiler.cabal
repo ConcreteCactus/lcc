@@ -5,23 +5,22 @@ cabal-version: 1.12
 -- see: https://github.com/sol/hpack
 
 name:           lambda-compiler
-version:        0.1.0.0
-description:    Please see the README on GitHub at <https://github.com/githubuser/lambda-compiler#readme>
-homepage:       https://github.com/githubuser/lambda-compiler#readme
-bug-reports:    https://github.com/githubuser/lambda-compiler/issues
-author:         Author name here
-maintainer:     example@example.com
-copyright:      2023 Author name here
+version:        1.0
+description:    Please see the README on GitHub at <https://github.com/ConcreteCactus/lambda-compiler>
+homepage:       https://github.com/ConcreteCactus/lambda-compiler#readme
+bug-reports:    https://github.com/ConcreteCactus/lambda-compiler/issues
+author:         Áron Hárnási
+maintainer:     aron.harnasi@gmail.com
+copyright:      2023 Áron Hárnási
 license:        BSD3
 license-file:   LICENSE
 build-type:     Simple
 extra-source-files:
     README.md
-    CHANGELOG.md
 
 source-repository head
   type: git
-  location: https://github.com/githubuser/lambda-compiler
+  location: https://github.com/ConcreteCactus/lambda-compiler
 
 library
   exposed-modules:

@@ -1,0 +1,60 @@
+\documentclass[12pt]{article}
+
+% Later references:
+% - https://pages.cs.wisc.edu/~horwitz/CS704-NOTES/1.LAMBDA-CALCULUS.html
+% - https://en.wikipedia.org/wiki/Lambda_calculus
+% - https://en.wikipedia.org/wiki/De_Bruijn_index
+
+\title{A lambda calculus compiler}
+\author{Áron Hárnási \\ \normalsize Eötvös Lóránd University Faculty of Informatics}
+
+\begin{document}
+\maketitle
+\pagebreak
+\tableofcontents
+\pagebreak
+
+\section{Description of the problem}
+\subsection{Lambda calculus}
+
+Lambda calculus is a mathematical system in which we are able to define any
+computation that can be defined with a Turing machine. This is achieved using
+function application and substitution on lambda terms. A lambda term in the
+simplest form of lambda calculus is built up of three parts:
+\begin{itemize}
+    \item $(x)$ A variable that can hold a value.
+    \item $(\lambda x. F)$ A lambda that can represent a function, where $x$
+        is the function parameter and $F$ is another term, that may or 
+        may not contain $x$.
+    \item $(f\:a)$ A function application where $f$ is the function $a$ is
+        applied to. Both $f$ and $a$ are terms. Note that since variable terms
+        can also be denoted with a string of characters, it is important to put
+        a space between the two terms to distinguish between a function
+        application and a variable term.
+\end{itemize}
+The main reduction operation is $\beta$-reduction. With $\beta$-reduction, we
+can reduce a function application from the form $(\lambda x. F)\:A$ to the
+form $F[x := (A)]$, where the $F[x := (A)]$ denotes a new term that is the same
+as $F$ except each $x$ variable is replaced with the $(A)$ term.
+
+$\beta$-reduction in this form, can introduce naming collisions in the program.
+For example, the term $((\lambda x. (\lambda y. x)) y) z$ would reduce to
+$(\lambda y. y) z$ and then $z$. If we instead used $w$ for the parameter of the
+inner lambda, $((\lambda x. (\lambda w. x)) y) z$ would reduce to $(\lambda w.
+y) z$ and then $y$, which is different from the first scenario.
+
+In order to avoid naming collisions, we can use the $\alpha$-reduction rule.
+With $\alpha$-reduction, we can rename variables in a given lambda calculus
+term. Renaming can be used before a $\beta$-reduction, for example, in the
+previous example $((\lambda x. (\lambda y. x)) y) z$ replacing $y$ with $w$ in
+the inner lambda term will result in $((\lambda x. (\lambda w. x)) y) z$, which
+does not have naming collisions.
+
+\subsubsection{De Bruijn indexing}
+\subsubsection{Simply typed lambda calculus}
+
+\subsection{Purpose of the thesis}
+\subsection{This implementation}
+\section{User documentation}
+\section{Developer documentation}
+\end{document}
