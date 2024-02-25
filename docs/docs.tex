@@ -6,7 +6,7 @@
 % - https://en.wikipedia.org/wiki/De_Bruijn_index
 
 \title{A lambda calculus compiler}
-\author{Áron Hárnási \\ \normalsize Eötvös Lóránd University Faculty of Informatics}
+\author{Áron Hárnási \\ \normalsize Eötvös Lóránd University, Faculty of Informatics}
 
 \begin{document}
 \maketitle
@@ -14,7 +14,7 @@
 \tableofcontents
 \pagebreak
 
-\section{Description of the problem}
+\section{Introduction}
 \subsection{Lambda calculus}
 
 Lambda calculus is a mathematical system in which we are able to define any
@@ -37,7 +37,7 @@ can reduce a function application from the form $(\lambda x. F)\:A$ to the
 form $F[x := (A)]$, where the $F[x := (A)]$ denotes a new term that is the same
 as $F$ except each $x$ variable is replaced with the $(A)$ term.
 
-$\beta$-reduction in this form, can introduce naming collisions in the program.
+$\beta$-reduction in this form, can introduce naming collisions in the system.
 For example, the term $((\lambda x. (\lambda y. x)) y) z$ would reduce to
 $(\lambda y. y) z$ and then $z$. If we instead used $w$ for the parameter of the
 inner lambda, $((\lambda x. (\lambda w. x)) y) z$ would reduce to $(\lambda w.
@@ -51,10 +51,55 @@ the inner lambda term will result in $((\lambda x. (\lambda w. x)) y) z$, which
 does not have naming collisions.
 
 \subsubsection{De Bruijn indexing}
-\subsubsection{Simply typed lambda calculus}
 
-\subsection{Purpose of the thesis}
+One other way of eliminating naming collisions is the use of De Bruijn indexing.
+Bound variables can be represented not with names given to them at the start of
+a lambda term, but instead with numbers denoting how far the variable occurrence
+is compared to the lambda term that the variable is bound to. For example, the
+term $(\lambda x. (\lambda y. x))$ with De Bruijn indices would be $\lambda
+\lambda 2$, or the term $(\lambda y. (\lambda z. ((\lambda x. (\lambda y. x)) y)
+z))$, part of which was used in the previous paragraph, would be $\lambda
+\lambda ((\lambda \lambda 2) 2) 1$. Using De Bruijn indexing eliminates naming
+collisions, and it is used in this thesis as an alternative to
+$\alpha$-reduction.
+
 \subsection{This implementation}
+
+In this section, we will touch on the most important differences between the
+formal system of lambda calculus, and this implementation. There have been a lot
+of ideas borrowed from C and Haskell in order to make the language usable from a
+non-theoretical standpoint.
+
+\subsubsection{Global variables}
+
+In order to make the language more usable, much like in Haskell, it is possible
+to create global definitions for terms, that can be used in other parts of the
+program. This introduces recursion as the main fix-point combinator.
+
+\subsubsection{Static typing}
+
+It was decided, that the code this compiler compiles from was going to be
+statically typed. Each term has a type that is assigned to it at compile time by
+a type inference algorithm. Types of global variables can also be specified, in
+which case the compiler checks if it matches the inferred type of the same
+term.
+
+\subsubsection{Garbage collection}
+
+There is a simple garbage collection algorithm built into the runtime of the
+generated code. The algorithm uses a mark-and-sweep style method to find and
+free allocated memory that is not used.
+
+\subsubsection{Impure C back-end}
+
+The target language of the compiler is C, therefore there are functions and
+primitive types in the source language that have a corresponding pair in the
+target language. For example, number types and certain operations on them and
+several input-output functions. Note, that the IO functions are not handled in
+the way Haskell handles IO. The IO functions in this source language are impure
+functions.
+
 \section{User documentation}
+\subsubsection{Recursion ??}
 \section{Developer documentation}
 \end{document}
