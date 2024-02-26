@@ -27,9 +27,9 @@ simplest form of lambda calculus is built up of three parts:
         is the function parameter and $F$ is another term, that may or 
         may not contain $x$.
     \item $(f\:a)$ A function application where $f$ is the function $a$ is
-        applied to. Both $f$ and $a$ are terms. Note that since variable terms
-        can also be denoted with a string of characters, it is important to put
-        a space between the two terms to distinguish between a function
+        applied to. Both $f$ and $a$ are terms. \\ \textbf{Note:} Since variable
+        terms can also be denoted with a string of characters, it is important
+        to put a space between the two terms to distinguish between a function
         application and a variable term.
 \end{itemize}
 The main reduction operation is $\beta$-reduction. With $\beta$-reduction, we
@@ -92,14 +92,83 @@ free allocated memory that is not used.
 
 \subsubsection{Impure C back-end}
 
-The target language of the compiler is C, therefore there are functions and
+The target language of the compiler is C; therefore there are functions and
 primitive types in the source language that have a corresponding pair in the
 target language. For example, number types and certain operations on them and
-several input-output functions. Note, that the IO functions are not handled in
+several input-output functions. \\ \textbf{Note:} The IO functions are not handled in
 the way Haskell handles IO. The IO functions in this source language are impure
 functions.
 
 \section{User documentation}
-\subsubsection{Recursion ??}
+
+\subsection{Building the software}
+\subsubsection{Dependencies}
+
+To build the program one would require the following packages:
+\begin{itemize}
+    \item git
+    \item stack v2.11.1 or later
+    \item ghc v9.4.8 or later \\ Note that with default settings stack usually
+        downloads the appropriate ghc version for the project.
+\end{itemize}
+Note that the compiler was only tested on a few Linux distributions, and it is
+possible that it does not work properly on some others. Using Ubuntu 22.04
+should work. It is also recommended, that the Haskell tools are installed via
+ghcup. Alternatively, the repository is also set up to be built on NixOS, which
+might be a better choice in case it fails on Ubuntu.
+
+\subsubsection{Compilation and installation}
+
+If all the necessary dependencies are present, building the project should only
+require two steps. To build the project, execute the following commands in an
+appropriate directory.
+
+\begin{verbatim}
+git clone https://github.com/ConcreteCactus/lambda-compiler.git
+\end{verbatim}
+
+This will clone the repository, which is hosted on GitHub. In order to build and
+install the compiler, run the following:
+
+\begin{verbatim}
+cd lambda-compiler
+stack install
+\end{verbatim}
+
+This will build and install the required dependencies, including ghc. The
+compiler binary is usually copied to \texttt{\$HOME/.local/bin}. Please, make
+sure the resulting binary is on the \texttt{PATH}. If the installation goes
+correctly, running \texttt{lcc -v} should show a banner similar to the
+following:
+
+\begin{verbatim}
+$ lcc -v
+lambda_compiler v1.0
+
+___
+\_ \
+  \ \       __     __       __     __
+   \ \     (_ \   / _)     (_ \   / _)
+   /  \      \ \_/ /         \ \_/ /
+  / /\ \      ) _ (           ) _ (
+ / /  \ \   _/ / \ \_       _/ / \ \_
+/_/    \_\ (__/   \__) (_) (__/   \__)
+\end{verbatim}
+
+\subsubsection{Runtime dependency}
+
+In order to compile an executable, \texttt{lcc} uses \texttt{gcc} by default;
+therefore it is recommended, to have an installed \texttt{gcc} on the
+\texttt{PATH}. The version lambda compiler was tested with was gcc v11.4.0,
+however it is likely that compilation works on older versions as well.
+Alternatively, it is possible to specify a different C compiler with
+command-line arguments, which will be discussed in the next paragraphs.
+
+\subsection{Command-line arguments}
+
+\subsection{Syntax and semantics}
+\subsection{Type checking}
+\subsection{Compilation}
+
 \section{Developer documentation}
 \end{document}
