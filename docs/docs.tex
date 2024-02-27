@@ -17,7 +17,7 @@
 \section{Introduction}
 
 This is the user and development documentation of a compiler that compiles a
-flavor of simply typed lambda calculus, and produces C source code.
+language inspired by simply typed lambda calculus, and produces C source code.
 
 \subsection{Lambda calculus}
 
@@ -214,9 +214,41 @@ no compilation of any kind will be performed.
 
 \subsection{The LC language}
 
-In this subsection, the main parts of the LC language will be discussed.
+The LC language is a language inspired by simply typed lambda calculus.
+Expressions are similar to lambda calculus terms, types support parametric
+polymorphism. In this subsection, the key details of the language will be
+discussed.
 
 \subsubsection{Syntax and semantics}
+
+Syntactically, the language has several similarities to Haskell. Global
+variables can be defined with the \texttt{:=} operator in the following way.
+\begin{verbatim}
+globalVariable := expression
+\end{verbatim}
+Optionally, any global variable have its type specified. For each specified
+type, the compiler checks if it can be used in place of the inferred type. To
+specify the type of a global variable, one would use the \texttt{:} operator in
+the following way:
+\begin{verbatim}
+globalVariable : I32 -> I32 -> I32
+globalVariable := expression
+\end{verbatim}
+
+
+\subsubsection{A note on white-space}
+
+The language is white-space sensitive; therefore a global variable definition
+has to start at the start of the line. An expression can be broken down into
+multiple lines so long as there is at least one white-space character at the
+start of the next line. For example:
+\begin{verbatim*}
+adder := \a. \b.
+ add_i32 a
+         b
+nextDefinition := nextExpression
+\end{verbatim*}
+
 \subsubsection{Type checking}
 \subsubsection{Standard library}
 \subsubsection{Compilation errors}
