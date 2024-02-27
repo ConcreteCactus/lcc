@@ -15,6 +15,10 @@
 \pagebreak
 
 \section{Introduction}
+
+This is the user and development documentation of a compiler that compiles a
+flavor of simply typed lambda calculus, and produces C source code.
+
 \subsection{Lambda calculus}
 
 Lambda calculus is a mathematical system in which we are able to define any
@@ -67,8 +71,8 @@ $\alpha$-reduction.
 
 In this section, we will touch on the most important differences between the
 formal system of lambda calculus, and this implementation. There have been a lot
-of ideas borrowed from C and Haskell in order to make the language usable from a
-non-theoretical standpoint.
+of ideas borrowed from C, Rust, and Haskell in order to make the language usable
+from a non-theoretical standpoint.
 
 \subsubsection{Global variables}
 
@@ -82,7 +86,7 @@ It was decided, that the code this compiler compiles from was going to be
 statically typed. Each term has a type that is assigned to it at compile time by
 a type inference algorithm. Types of global variables can also be specified, in
 which case the compiler checks if it matches the inferred type of the same
-term.
+variable.
 
 \subsubsection{Garbage collection}
 
@@ -94,7 +98,7 @@ free allocated memory that is not used.
 
 The target language of the compiler is C; therefore there are functions and
 primitive types in the source language that have a corresponding pair in the
-target language. For example, number types and certain operations on them and
+target language. For example, number types, certain operations on them, and
 several input-output functions. \\ \textbf{Note:} The IO functions are not handled in
 the way Haskell handles IO. The IO functions in this source language are impure
 functions.
@@ -124,15 +128,16 @@ require two steps. To build the project, execute the following commands in an
 appropriate directory.
 
 \begin{verbatim}
-git clone https://github.com/ConcreteCactus/lambda-compiler.git
+$ git clone --depth=1 \
+    https://github.com/ConcreteCactus/lambda-compiler.git
 \end{verbatim}
 
 This will clone the repository, which is hosted on GitHub. In order to build and
-install the compiler, run the following:
+install the compiler, one would run the following:
 
 \begin{verbatim}
-cd lambda-compiler
-stack install
+$ cd lambda-compiler
+$ stack install
 \end{verbatim}
 
 This will build and install the required dependencies, including ghc. The
@@ -155,22 +160,66 @@ ___
 /_/    \_\ (__/   \__) (_) (__/   \__)
 \end{verbatim}
 
+\textbf{Note:} Throughout this document, the compiler is referred to by the name
+\texttt{lcc} and its input language is referred to by the name LC.
+
 \subsubsection{Runtime dependency}
 
-In order to compile an executable, \texttt{lcc} uses \texttt{gcc} by default;
-therefore it is recommended, to have an installed \texttt{gcc} on the
-\texttt{PATH}. The version lambda compiler was tested with was gcc v11.4.0,
-however it is likely that compilation works on older versions as well.
-Alternatively, it is possible to specify a different C compiler with
-command-line arguments, which will be discussed in the next paragraphs.
+In order to compile an executable, \texttt{lcc} uses \texttt{gcc} by default.
+Therefore it is recommended, to have an installed version of \texttt{gcc} on the
+\texttt{PATH}. The version \texttt{lcc} was tested with was gcc v11.4.0, however
+it is likely that compilation works on older versions as well. Alternatively, it
+is possible to specify a different C compiler with command-line arguments, which
+will be discussed under Command-line options.
 
-\subsection{Command-line arguments}
+\subsection{Running the compiler}
 
+The main job of the compiler is converting from LC source code to C source code.
+Once it has the C source file, it is compiled to binary using \texttt{gcc} if no
+other command-line option is specified. The file extension of the input file
+does not matter, however in this document they will be referred to with the
+extension \texttt{.lc}. To simply compile an input file, one would run the
+following:
+\begin{verbatim}
+$ lcc hello.lc
+\end{verbatim}
+This command compiles the input file \texttt{hello.lc} and produces a binary
+file with the default name \texttt{gcc} gives to output binaries. On Linux it is
+usually \texttt{a.out}. \texttt{lcc} produces a \texttt{.c} file containing the
+source code it has generated as well with the default name \texttt{a.c}.
 
+\subsubsection{Command-line options}
 
-\subsection{Syntax and semantics}
-\subsection{Type checking}
-\subsection{Compilation}
+It is possible to give command-line options to the compiler in order to alter
+its behavior. 
+
+\vspace{7pt}
+
+\begin{tabular}{l l}
+    \texttt{-n}\quad& Do not run any C compiler, only compile from \\ 
+                    & LC to C. \\
+    \texttt{-v}\quad& Show version and about information and exit. \\
+    \texttt{-h}\quad& Print some help text and exit. \\
+    \texttt{-o <output-exe>}\quad& Specify the name of the executable
+        generated. \\
+    \texttt{-O <output.c>}\quad& Specify the name of the C source generated. \\
+    \texttt{-c <cc>}\quad& Specify the C compiler command.
+\end{tabular}
+
+\vspace{8pt}
+
+\textbf{Note:} When using \texttt{-n} and \texttt{-o} and/or \texttt{-c} together,
+no C compiler will be run. Also note that when using \texttt{-v} or \texttt{-h},
+no compilation of any kind will be performed. 
+
+\subsection{The LC language}
+
+In this subsection, the main parts of the LC language will be discussed.
+
+\subsubsection{Syntax and semantics}
+\subsubsection{Type checking}
+\subsubsection{Standard library}
+\subsubsection{Compilation errors}
 
 \section{Developer documentation}
 \end{document}
