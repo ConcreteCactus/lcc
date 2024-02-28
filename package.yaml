@@ -35,7 +35,7 @@ library:
   source-dirs: src
 
 executables:
-  lambda-compiler-exe:
+  lcc:
     main:                Main.hs
     source-dirs:         app
     ghc-options:

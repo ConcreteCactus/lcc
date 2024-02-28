@@ -15,8 +15,6 @@ copyright:      2023 Áron Hárnási
 license:        BSD3
 license-file:   LICENSE
 build-type:     Simple
-extra-source-files:
-    README.md
 
 source-repository head
   type: git
@@ -55,7 +53,7 @@ library
       base >=4.7 && <5
   default-language: Haskell2010
 
-executable lambda-compiler-exe
+executable lcc
   main-is: Main.hs
   other-modules:
       Paths_lambda_compiler

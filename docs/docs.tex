@@ -219,9 +219,9 @@ no compilation of any kind will be performed.
 \subsection{The LC language}
 
 The LC language is a language inspired by simply typed lambda calculus.
-Expressions are similar to lambda calculus terms, types support parametric
-polymorphism. In this subsection, the key details of the language will be
-discussed.
+Expressions are similar to lambda calculus terms, they are simply typed, and
+types support parametric polymorphism. In this subsection, the key details of
+the language will be discussed.
 
 \subsubsection{Syntax and semantics}
 
@@ -230,7 +230,7 @@ variables can be defined with the \texttt{:=} operator in the following way.
 \begin{verbatim}
 globalVariable := expression
 \end{verbatim}
-Optionally, any global variable have its type specified. For each specified
+Optionally, any global variable can have its type specified. For each specified
 type, the compiler checks if it can be used in place of the inferred type. To
 specify the type of a global variable, one would use the \texttt{:} operator in
 the following way:
@@ -239,6 +239,36 @@ globalVariable : I32 -> I32 -> I32
 globalVariable := expression
 \end{verbatim}
 
+\subsubsection{The syntax of expressions}
+
+All expressions consist of six parts:
+\begin{itemize}
+    \item Variables, that always represent function parameters. They can be
+        denoted with a single ASCII character, or a string of ASCII characters.
+        Their first character is always lower-case; for example \texttt{x} or
+        \texttt{exampleVar}.
+    \item Lambdas, that represent functions. Lambdas have an expression body,
+        and a parameter, and their parameter can be used inside their expression
+        body. To create a lambda, one would write a backslash (\verb$\$)
+        character followed by the parameter name, a dot (\verb$.$), and the
+        expression body. For example: \verb$\a.(f a) g$. \\ \textbf{Note:} In
+        this example, \verb$f$ and \verb$g$ can either be global references, or
+        variables of outside lambdas.
+    \item Applications, that represent calling functions. Applications always
+        contain two expressions. The first part represents the function that
+        gets called, and the second part represents the parameter given to that
+        function. To apply an expression to another in the LC language, one
+        would write the function to be called first, and the parameter second
+        with white-space in between in the following way: \verb$func param$.
+    \item Literals, that represent values in the C back-end. All literals
+        represent numbers in the language. To create a literal, one needs to
+        write the value of the literal postfixed with the type of the literal.
+        The value of the literal can be written in signed decimal, unsigned
+        decimal, or hexadecimal notation, while the type postfix has to be the
+        type postfix of the given type. The possible type postfixes include
+        \verb$i32$, \verb$u8$, and \verb$f64$. Some example literals are:
+        \verb$-42i32$ and \verb$0xff_u8$.
+\end{itemize}
 
 \subsubsection{A note on white-space}
 
@@ -253,6 +283,7 @@ adder := \a. \b.
 nextDefinition := nextExpression
 \end{verbatim*}
 
+\subsubsection{Primitive types}
 \subsubsection{Type checking}
 \subsubsection{Standard library}
 \subsubsection{Compilation errors}
