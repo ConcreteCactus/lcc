@@ -1,0 +1,130 @@
+parseTuringMachine : [Char] -> [U16 * U32 * U16 * U32 * U8] + Unit
+parseTuringMachine := \str. 
+    case (parseTuringCell str)
+    (\cl. case (parseTwoOnes (snd (snd (snd (snd (snd cl))))))
+        (\strr. case (parseTuringMachine strr)
+            (\arr. inl (cons 
+                (tuple (fst cl)
+                (tuple (fst (snd cl))
+                (tuple (fst (snd (snd cl)))
+                (tuple (fst (snd (snd (snd cl))))
+                    (fst (snd (snd (snd (snd cl)))))))))
+                arr))
+            (\u. inr unit))
+        (\u. inl (cons 
+                (tuple (fst cl)
+                (tuple (fst (snd cl))
+                (tuple (fst (snd (snd cl)))
+                (tuple (fst (snd (snd (snd cl))))
+                    (fst (snd (snd (snd (snd cl)))))))))
+                emptyList)))
+    (\u. inr unit)
+
+parseTwoOnes : [Char] -> [Char] + Unit
+parseTwoOnes := \str.
+    case (uncons str)
+    (\xxs. if (iseq_char '1' (fst xxs))
+        then case (uncons (snd xxs))
+            (\xxss. if (iseq_char '1' (fst xxss))
+                then inl (snd xxss)
+                else inr unit)
+            (\u. inr unit)
+        else inr unit)
+    (\u. inr unit)
+
+parseTuringCell : [Char] -> U16 * U32 * U16 * U32 * U8 * [Char] + Unit
+parseTuringCell := \str.
+    case (parseTuringValue str)
+    (\tvcSt. case (parseTuringValue (snd tvcSt))
+        (\tvcRd. case (parseTuringValue (snd tvcRd))
+            (\tvcNSt. case (parseTuringValue (snd tvcNSt))
+                (\tvcWrt. case (parseTuringValue (snd tvcWrt))
+                    (\tvcG. inl
+                        (tuple (u32Tou16 (fst tvcSt))
+                        (tuple (fst tvcRd)
+                        (tuple (u32Tou16 (fst tvcNSt))
+                        (tuple (fst tvcWrt)
+                        (tuple (u32Tou8 (fst tvcG)) (snd tvcG)))))))
+                    (\u. inr unit))
+                (\u. inr unit))
+            (\u. inr unit))
+        (\u. inr unit))
+    (\u. inr unit)
+
+
+parseTuringValue : [Char] -> U32 * [Char] + Unit
+parseTuringValue := \str. 
+    case (uncons str) 
+    (\xxs. if (iseq_char '0' (fst xxs))
+        then inl (parseTuringValue1 (snd xxs) 1u32)
+        else inr unit)
+    (\u. inr unit)
+
+parseTuringValue1 : [Char] -> U32 -> U32 * [Char]
+parseTuringValue1 := \str.\n.
+    case (uncons str)
+    (\xxs. if (iseq_char '0' (fst xxs))
+        then (parseTuringValue1 (snd xxs) (add_u32 1u32 n))
+        else (tuple n (snd xxs)))
+    (\u. tuple n emptyList)
+
+let : a -> (a -> b) -> b
+let := \a.\f. f a
+
+cmp : (a -> b) -> (b -> c) -> a -> c
+cmp := \g.\f.\x. f (g x)
+
+printSp : a -> a
+printSp := print_char ' '
+
+lf : I32
+lf := 13i32
+
+printLn : a -> a
+printLn := print_char 0xd_char
+
+printTuringMachine : [U16 * U32 * U16 * U32 * U8] -> a -> a
+printTuringMachine := \tms.
+    case (uncons tms)
+    (\tmx. cmp (printTuringMachine1 (fst tmx)) (printTuringMachine (snd tmx)))
+    (\u.\x.x)
+
+printTuringMachine1 : U16 * U32 * U16 * U32 * U8 -> a -> a
+printTuringMachine1 := \tmg.
+    cmp (print_u16 (fst tmg))
+    (cmp printSp
+    (cmp (print_u32 (fst (snd tmg)))
+    (cmp printSp
+    (cmp (print_u16 (fst (snd (snd tmg))))
+    (cmp printSp
+    (cmp (print_u32 (fst (snd (snd (snd tmg)))))
+    (cmp printSp
+    (cmp (print_u8 (snd (snd (snd (snd tmg))))) printLn
+    ))))))))
+
+true := 1bool
+false := 0bool
+
+or : Bool -> Bool -> Bool
+or := \a.\b. if a then true else b
+
+and : Bool -> Bool -> Bool
+and := \a.\b. if a then b else false
+
+getLine : [Char]
+getLine := let getchar 
+    (\c. if or (iseq_i32 c lf) (iseq_i32 c eof)
+         then emptyList
+         else cons (i32Tochar c) getLine
+    )
+
+arrLength : [a] -> I32
+arrLength := \arr.
+    case (uncons arr)
+    (\xs. add_i32 1i32 (arrLength (snd xs)))
+    (\u. 0i32)
+
+main := let getLine 
+    (\line. case (parseTuringMachine line)
+        (\tm. printTuringMachine tm 0u8)
+        (\u. print_char 'E' 1u8))

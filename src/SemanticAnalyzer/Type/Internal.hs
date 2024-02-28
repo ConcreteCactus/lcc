@@ -364,6 +364,8 @@ reconcileTypesS (ListType t1) (ListType t2) = do
     Left e -> return $ Left e
     Right rec' -> do
       return $ Right $ ListType rec'
+reconcileTypesS UnitType UnitType = return $ Right UnitType
+reconcileTypesS EmptyType EmptyType = return $ Right EmptyType
 reconcileTypesS typ typ' =
   return
     $ Left
