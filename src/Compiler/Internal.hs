@@ -35,7 +35,7 @@ data Expression
     | ParamRef
     | Application Expression Expression
     | IfThenElse Expression Expression Expression
-    | Literal Y.Literal
+    | Literal L.Literal
     deriving (Show)
 
 type DeBrujinInd = Int
@@ -97,11 +97,11 @@ gcStackValRemovals = map (\name -> "\tgc_unset_stack((gc_type*)" ++ name ++ ");"
 {- FOURMOLU_DISABLE -}
 showExpressionS :: L.VarIdent -> Expression -> State ExpressionBuilder CCode
 showExpressionS _ ParamRef = return "param"
-showExpressionS _ (Literal (Y.Literal typ lit)) = do
+showExpressionS _ (Literal (L.Literal lit typ)) = do
   litName <- addObject (Just MoLiteral) $ "new_literal(sizeof(" ++ cTypeOf typ ++ "))"
   addStatement $ "void* " ++ litName ++ "_data = &" ++ litName ++ "->data;"
   addStatement $ cTypeOf typ ++ "* " ++ litName ++ "_datai = " ++ litName ++ "_data;"
-  addStatement $ "*" ++ litName ++ "_datai = " ++ show lit ++ ";"
+  addStatement $ "*" ++ litName ++ "_datai = " ++ lit ++ ";"
   return litName
 showExpressionS _ (CaptureRef n) = return $ "self->captures[" ++ show (n - 2) ++ "]"
 showExpressionS _ (FunctionRef func) = do

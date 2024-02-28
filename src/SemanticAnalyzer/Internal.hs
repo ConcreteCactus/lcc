@@ -10,6 +10,7 @@ import Control.Monad
 import Data.Bifunctor
 import Data.Foldable
 import Errors
+import AtomicType
 import qualified Lexer as L
 import SemanticAnalyzer.DependencyList
 import SemanticAnalyzer.Expression
@@ -372,7 +373,7 @@ infFromExprS ::
   [Definition] ->
   Expression ->
   State InferEnv (Either TypeErrorType (Type, [Type]))
-infFromExprS _ (Lit (Y.Literal typ _)) =
+infFromExprS _ (Lit (L.Literal _ typ)) =
   return $ Right (AtomicType typ, [])
 infFromExprS _ (Ident ident') = do
   (generics, lastGeneric) <- createGenericList ident'
@@ -464,8 +465,8 @@ infFromExprS parts (IfThenElse cond expr1 expr2) = do
         updatedExpr2Type <- updateWithSubstitutionsI expr2Type
         condWorked <- case updatedCondType of
           GenericType genericId ->
-            addNewSubstitutionI genericId $ AtomicType Y.ABool
-          AtomicType Y.ABool -> return $ Right ()
+            addNewSubstitutionI genericId $ AtomicType ABool
+          AtomicType ABool -> return $ Right ()
           _ -> return $ Left TeIfThenElseConditionIsNotBool
         reconciledE <- reconcileTypesIS updatedExpr1Type updatedExpr2Type
         case (genericsE, condWorked, reconciledE) of

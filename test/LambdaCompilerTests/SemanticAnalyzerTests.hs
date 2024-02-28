@@ -1,6 +1,7 @@
 module LambdaCompilerTests.SemanticAnalyzerTests (spec) where
 
 import Errors
+import AtomicType
 import qualified Lexer as L
 import SemanticAnalyzer.Expression
 import SemanticAnalyzer.Internal
@@ -13,7 +14,7 @@ spec :: Spec
 spec = do
   describe "convertExpression" $ do
     it "can convert simple expressions" $ do
-      test "1i32" `shouldBe` Right (Lit (Y.Literal Y.AI32 1))
+      test "1i32" `shouldBe` Right (Lit (L.Literal "1" AI32))
       test "\\a.a" `shouldBe` Right (lam "a" (Ident 1))
       test "\\a.\\b.a b"
         `shouldBe` Right (lam "a" (lam "b" (appl (Ident 2) (Ident 1))))
@@ -22,7 +23,7 @@ spec = do
       test "if 1bool then \\a.\\b.a else \\a.\\b.b"
         `shouldBe` Right
           ( IfThenElse
-              (Lit (Y.Literal Y.ABool 1))
+              (Lit (L.Literal "1" ABool))
               (lam "a" $ lam "b" $ Ident 2)
               (lam "a" $ lam "b" $ Ident 1)
           )
@@ -131,7 +132,7 @@ testP s =
     >>= mkProgramFromSyn
 
 nai :: Type
-nai = AtomicType Y.AI32
+nai = AtomicType AI32
 
 lam :: String -> Expression -> Expression
 lam s = Lambda (L.VarIdent s)

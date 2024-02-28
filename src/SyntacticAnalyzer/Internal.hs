@@ -4,31 +4,18 @@ module SyntacticAnalyzer.Internal where
 
 import Control.Applicative
 import Control.Monad
+import AtomicType
 import qualified Errors as E
 import qualified Lexer as L
 import Util
-import Debug.Trace
-
-data Literal = Literal AtomicType Integer deriving (Eq)
-
-instance Show Literal where
-  show (Literal _ n) = show n
 
 data Expression
   = Id L.VarIdent
-  | Lit Literal
+  | Lit L.Literal
   | Lambda L.VarIdent Expression
   | Application Expression Expression
   | IfThenElse Expression Expression Expression
   deriving (Show, Eq)
-
-{- FOURMOLU_DISABLE -}
-data AtomicType
-  = AI8 | AI16 | AI32 | AI64 | AI128
-  | AU8 | AU16 | AU32 | AU64 | AU128 | AUSize
-  | AF32 | AF64 | AChar | ABool
-  deriving (Show, Eq)
-{- FOURMOLU_ENABLE -}
 
 data Type
   = TypeId L.TypIdent
@@ -48,42 +35,6 @@ data ProgramPart
 
 type Program = [ProgramPart]
 
-getTypeFromPostfix :: String -> Maybe AtomicType
-getTypeFromPostfix name
-  | name == "i8" = Just AI8
-  | name == "i16" = Just AI16
-  | name == "i32" = Just AI32
-  | name == "i64" = Just AI64
-  | name == "i128" = Just AI128
-  | name == "u8" = Just AU8
-  | name == "u16" = Just AU16
-  | name == "u32" = Just AU32
-  | name == "u64" = Just AU64
-  | name == "u128" = Just AU128
-  | name == "f32" = Just AF32
-  | name == "f64" = Just AF64
-  | name == "char" = Just AChar
-  | name == "bool" = Just ABool
-  | otherwise = Nothing
-
-getTypeNameFromStr :: String -> Maybe AtomicType
-getTypeNameFromStr name
-  | name == "I8" = Just AI8
-  | name == "I16" = Just AI16
-  | name == "I32" = Just AI32
-  | name == "I64" = Just AI64
-  | name == "I128" = Just AI128
-  | name == "U8" = Just AU8
-  | name == "U16" = Just AU16
-  | name == "U32" = Just AU32
-  | name == "U64" = Just AU64
-  | name == "U128" = Just AU128
-  | name == "F32" = Just AF32
-  | name == "F64" = Just AF64
-  | name == "Char" = Just AChar
-  | name == "Bool" = Just ABool
-  | otherwise = Nothing
-
 getTypeFromStr :: String -> Maybe Type
 getTypeFromStr name =
   (if name == "Unit" then Just UnitType else Nothing)
@@ -102,17 +53,7 @@ wr :: L.ParserE ()
 wr = L.exprWhiteSpace
 
 literal :: L.ParserE Expression
-literal =
-  Lit
-    <$> L.collapseEither
-      ( ( \(L.Literal val typs) ->
-            ( (`Literal` val)
-                <$> getTypeFromPostfix typs
-            )
-              `maybeToEither` E.LeUnknownTypePostfix
-        )
-          <$> L.literal
-      )
+literal = Lit <$> L.literal
 
 varIdent :: L.ParserE Expression
 varIdent = Id <$> L.varIdent

@@ -2,10 +2,12 @@
 
 module Lexer.Internal where
 
+import AtomicType
 import Control.Applicative
 import Control.Monad
 import Data.Char
-import Debug.Trace
+
+-- import Debug.Trace
 import Errors
 
 type SourceCode = String
@@ -13,7 +15,7 @@ type SourceCode = String
 newtype VarIdent = VarIdent String deriving (Eq)
 newtype TypIdent = TypIdent String deriving (Eq)
 newtype TypName = TypName String deriving (Eq)
-data Literal = Literal Integer String deriving (Eq)
+data Literal = Literal String AtomicType deriving (Eq)
 
 newtype Parser a = Parser
     { runParser ::
@@ -32,7 +34,7 @@ instance Show VarIdent where
 instance Show TypIdent where
     show (TypIdent i) = i
 instance Show Literal where
-    show (Literal n typ) = show n ++ typ
+    show (Literal n typ) = show n ++ typeNameOf typ
 
 instance Functor Parser where
     fmap f (Parser fa) =
@@ -258,62 +260,48 @@ typName =
             )
             `withExpected` LeTypIdent
 
+nothingParser :: Parser a
+nothingParser = Parser (\(textPos, _) -> Left textPos)
+
+litPostfix :: [AtomicType] -> Parser AtomicType
+litPostfix =
+    foldr
+        ( \typ pars ->
+            ( mapM (satisfy . (==)) (typeNameOf typ) *> pure typ
+            )
+                <|> pars
+        )
+        nothingParser
+
 literal :: ParserE Literal
 literal =
-    (charLiteral <|> collapseMaybe (hexNum <|> decNum))
+    (charLit <|> hexNum <|> floatNum <|> decNum)
         `withExpected` LeLiteral
   where
-    litTyp = some (satisfy (\c -> isDigit c || isLower c))
     decNum =
-        convertDec
+        (\sign num typ -> Literal (maybe num (: num) sign) typ)
             <$> optional (satisfy (`elem` "+-"))
             <*> some (satisfy isDigit)
-            <*> litTyp
+            <*> litPostfix (signedIntAtomicTypes ++ unsignedIntAtomicTypes)
     hexNum =
-        convertHex
+        (\num typ -> Literal ("0x" ++ num) typ)
             <$> ( satisfy_ (== '0')
                     *> (satisfy_ (== 'x') <|> satisfy_ (== 'X'))
                     *> some (satisfy isHexDigit)
                     <* satisfy (== '_')
                 )
-            <*> litTyp
-    convertDec sign num typ = do
-        digits <-
-            mapM
-                (\c -> if isDigit c then Just (ord c - ord '0') else Nothing)
-                num
-        let (num', _) =
-                foldr
-                    (\n (num'', pow) -> (n * (10 ^ pow) + num'', pow + 1))
-                    (0, 0 :: Integer)
-                    digits
-        case sign of
-            Nothing -> return $ Literal (fromIntegral num') typ
-            Just '+' -> return $ Literal (fromIntegral num') typ
-            Just '-' -> return $ Literal (fromIntegral num' * (-1)) typ
-            _otherwise -> Nothing
-    convertHex num typ = do
-        digits <- mapM getHexVal num
-        let (num', _) =
-                foldr
-                    (\n (num'', pow) -> (n * (16 ^ pow) + num'', pow + 1))
-                    (0, 0 :: Integer)
-                    digits
-        return $ Literal (fromIntegral num') typ
-    getHexVal c
-        | isDigit c = Just $ ord c - ord '0'
-        | c `elem` ['a' .. 'f'] = Just $ ord c - ord 'a' + 10
-        | c `elem` ['A' .. 'F'] = Just $ ord c - ord 'A' + 10
-        | otherwise = Nothing
-
-charLiteral :: Parser Literal
-charLiteral =
-    charToLiteral
-        <$> (satisfy_ (== '\'') *> satisfy isPrint)
-        <* satisfy_ (== '\'')
-
-charToLiteral :: Char -> Literal
-charToLiteral c = Literal (fromIntegral $ ord c) "char"
+            <*> litPostfix unsignedIntAtomicTypes
+    charLit =
+        charToLiteral
+            <$> (satisfy_ (== '\'') *> satisfy isPrint)
+            <* satisfy_ (== '\'')
+    charToLiteral :: Char -> Literal
+    charToLiteral c = Literal ['\'', c, '\''] AChar
+    floatNum =
+        (\w f t -> Literal (maybe w ((w ++ ".") ++) f) t)
+            <$> some (satisfy isDigit)
+            <*> optional (satisfy_ (== '.') *> some (satisfy isDigit))
+            <*> litPostfix floatAtomicTypes
 
 openingBracket :: ParserE ()
 openingBracket = satisfy_ (== '(') `withExpected` LeOpeningBracket
@@ -352,8 +340,8 @@ currentPos =
 execParser :: ParserE a -> SourceCode -> Either LexicalError a
 execParser (ParserE fa) sc = (\(_, val, _) -> val) <$> fa ((1, 1), sc)
 
-traceParser :: String -> Parser ()
-traceParser str =
-    Parser
-        ( \(textPos, sourceCode) -> trace (str ++ " " ++ show textPos) $ Right (textPos, (), sourceCode)
-        )
+-- traceParser :: String -> Parser ()
+-- traceParser str =
+--     Parser
+--         ( \(textPos, sourceCode) -> trace (str ++ " " ++ show textPos) $ Right (textPos, (), sourceCode)
+--         )

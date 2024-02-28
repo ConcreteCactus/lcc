@@ -2,42 +2,9 @@ module StandardLibrary (standardLibrary, cTypeOf) where
 
 import qualified Lexer as L
 import qualified SemanticAnalyzer.Type as T
+import AtomicType
 import SyntacticAnalyzer
 import Util
-
-cTypeOf :: AtomicType -> String
-cTypeOf AI8 = "int8_t"
-cTypeOf AI16 = "int16_t"
-cTypeOf AI32 = "int32_t"
-cTypeOf AI64 = "int64_t"
-cTypeOf AI128 = "int128_t"
-cTypeOf AU8 = "uint8_t"
-cTypeOf AU16 = "uint16_t"
-cTypeOf AU32 = "uint32_t"
-cTypeOf AU64 = "uint64_t"
-cTypeOf AU128 = "uint128_t"
-cTypeOf AUSize = "size_t"
-cTypeOf AF32 = "float"
-cTypeOf AF64 = "double"
-cTypeOf AChar = "char"
-cTypeOf ABool = "char"
-
-typeNameOf :: AtomicType -> String
-typeNameOf AI8 = "i8"
-typeNameOf AI16 = "i16"
-typeNameOf AI32 = "i32"
-typeNameOf AI64 = "i64"
-typeNameOf AI128 = "i128"
-typeNameOf AU8 = "u8"
-typeNameOf AU16 = "u16"
-typeNameOf AU32 = "u32"
-typeNameOf AU64 = "u64"
-typeNameOf AU128 = "u128"
-typeNameOf AUSize = "usize"
-typeNameOf AF32 = "f32"
-typeNameOf AF64 = "f64"
-typeNameOf AChar = "char"
-typeNameOf ABool = "bool"
 
 standardLibrary ::
   (Monoid a) =>

@@ -12,7 +12,7 @@ import Util
 data Expression
   = Ident Int
   | Ref L.VarIdent
-  | Lit Y.Literal
+  | Lit L.Literal
   | Lambda L.VarIdent Expression
   | Application Expression Expression
   | IfThenElse Expression Expression Expression

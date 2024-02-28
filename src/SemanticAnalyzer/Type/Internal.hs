@@ -4,6 +4,7 @@ module SemanticAnalyzer.Type.Internal where
 
 import Control.Monad
 import Data.Bifunctor
+import AtomicType
 import Errors
 import qualified Lexer as L
 import qualified SyntacticAnalyzer as Y
@@ -12,7 +13,7 @@ import Util
 -- Improvement idea: implement foldable for type
 
 data Type
-  = AtomicType Y.AtomicType
+  = AtomicType AtomicType
   | GenericType Int
   | FunctionType Type Type
   | SumType Type Type

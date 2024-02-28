@@ -2,9 +2,7 @@
 {-# OPTIONS_GHC -Wno-partial-fields #-}
 
 module SyntacticAnalyzer (
-        Literal(..),
         Expression(..),
-        AtomicType(..),
         Type(..),
         ProgramPart(..),
         Program,

@@ -44,7 +44,7 @@ spec = do
         it "adt program output should be 98100" $ do
             outputOf program6 `shouldReturn` TrSuccess "98100"
         it "casting program should output 18" $ do
-            outputOf program7 `shouldReturn` TrSuccess "18"
+            outputOf program7 `shouldReturn` TrSuccess "20.300000"
         it "literal printing program should output Ac-12B" $ do
             outputOf program8 `shouldReturn` TrSuccess "Ac-12B"
         it "list printing program should output abc" $ do
@@ -122,7 +122,9 @@ program7 =
         ++ "v16 := add_u32 1u32 (u64Tou32 v15)\n"
         ++ "v17 := add_u16 1u16 (u32Tou16 v16)\n"
         ++ "v18 := add_u8 1u8 (u16Tou8 v17)\n"
-        ++ "main := print_u8 v18 0i8\n"
+        ++ "v19 := add_f32 1.1f32 (u8Tof32 v18)\n"
+        ++ "v20 := add_f64 1.2f64 (f32Tof64 v19)\n"
+        ++ "main := print_f64 v20 0i8\n"
 
 program8 :: SourceCode
 program8 =
