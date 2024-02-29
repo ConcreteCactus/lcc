@@ -24,11 +24,7 @@ parseTwoOnes : [Char] -> [Char] + Unit
 parseTwoOnes := \str.
     case (uncons str)
     (\xxs. if (iseq_char '1' (fst xxs))
-        then case (uncons (snd xxs))
-            (\xxss. if (iseq_char '1' (fst xxss))
-                then inl (snd xxss)
-                else inr unit)
-            (\u. inr unit)
+        then inl (snd xxs)
         else inr unit)
     (\u. inr unit)
 
@@ -78,10 +74,13 @@ printSp : a -> a
 printSp := print_char ' '
 
 lf : I32
-lf := 13i32
+lf := 10i32
+
+lfc : Char
+lfc := i32Tochar lf
 
 printLn : a -> a
-printLn := print_char 0xd_char
+printLn := print_char lfc
 
 printTuringMachine : [U16 * U32 * U16 * U32 * U8] -> a -> a
 printTuringMachine := \tms.
@@ -124,7 +123,15 @@ arrLength := \arr.
     (\xs. add_i32 1i32 (arrLength (snd xs)))
     (\u. 0i32)
 
-main := let getLine 
-    (\line. case (parseTuringMachine line)
-        (\tm. printTuringMachine tm 0u8)
-        (\u. print_char 'E' 1u8))
+printLine : [Char] -> a -> a
+printLine := \list. case (uncons list)
+    (\xs. cmp (print_char (fst xs)) (printLine (snd xs)))
+    (\u. printLn)
+
+main := let getLine \l. let (printLine l 0i8) \ll.
+    case (parseTuringMachine l)
+    (\tm. let (print_i32 (arrLength tm) ll) 
+        \ll. let (printLn ll)
+        \ll. printTuringMachine tm ll
+    )
+    (\u. print_char 'e' ll)

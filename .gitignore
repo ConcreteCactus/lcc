@@ -8,3 +8,6 @@ docs/*.log
 docs/*.pdf
 docs/*.synctex.gz
 docs/*.toc
+
+examplePrograms/*.c
+examplePrograms/*.out
