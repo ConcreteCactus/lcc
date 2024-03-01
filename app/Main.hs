@@ -84,7 +84,7 @@ compile opts = do
     case compE of
         Left e -> do
             print e
-            return ()
+            exitWith (ExitFailure 1)
         Right comp -> do
             _ <- writeFile (fromMaybe "a.c" (oCSrcName opts)) comp
             return ()

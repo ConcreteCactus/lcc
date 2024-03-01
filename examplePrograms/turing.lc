@@ -73,6 +73,18 @@ cmp := \g.\f.\x. f (g x)
 printSp : a -> a
 printSp := print_char ' '
 
+printArrow : a -> a
+printArrow := cmp printSp (
+    cmp (print_char ':') 
+    (cmp (print_char '>') printSp))
+
+printDir : U8 -> a -> a
+printDir := \d. if iseq_u8 d 1u8
+    then cmp (print_char '-') (print_char '>')
+    else if iseq_u8 d 2u8
+    then cmp (print_char '-') (print_char '-')
+    else cmp (print_char '<') (print_char '-')
+
 lf : I32
 lf := 10i32
 
@@ -93,12 +105,12 @@ printTuringMachine1 := \tmg.
     cmp (print_u16 (fst tmg))
     (cmp printSp
     (cmp (print_u32 (fst (snd tmg)))
-    (cmp printSp
+    (cmp printArrow
     (cmp (print_u16 (fst (snd (snd tmg))))
     (cmp printSp
     (cmp (print_u32 (fst (snd (snd (snd tmg)))))
     (cmp printSp
-    (cmp (print_u8 (snd (snd (snd (snd tmg))))) printLn
+    (cmp (printDir (snd (snd (snd (snd tmg))))) printLn
     ))))))))
 
 true := 1bool
@@ -128,10 +140,62 @@ printLine := \list. case (uncons list)
     (\xs. cmp (print_char (fst xs)) (printLine (snd xs)))
     (\u. printLn)
 
-main := let getLine \l. let (printLine l 0i8) \ll.
+appendList : a -> [a] -> [a]
+appendList := \x.\xs. case (uncons xs)
+    (\xs. cons (fst xs) (appendList x (snd xs)))
+    (\u. cons x emptyList)
+
+turingAppend : [U32] -> [U32]
+turingAppend := appendList 1u32
+
+turingPrepend : [U32] -> [U32]
+turingPrepend := cons 1u32
+
+startTuringState : U16 * U32 * [U32]
+startTuringState := tuple 1u16 (tuple 0u32 emptyList)
+
+find : (a -> Bool) -> [a] -> a + Unit
+find := \pred.\list.
+    case (uncons list)
+    (\xs. if pred (fst xs)
+        then inl (fst xs)
+        else find pred (snd xs))
+    (\u. inr unit)
+
+turingIndexList : U32 -> [U32] -> U32
+turingIndexList := \i.\list.
+    case (uncons list)
+    (\xs. if iseq_u32 i 0u32
+        then fst xs
+        else turingIndexList (sub_u32 1u32 i) (snd xs))
+    (\u. 1u32)
+
+turingRead : U16 * U32 * [U32] -> U32
+turingRead := \state. turingIndexList (fst (snd state)) (snd (snd state))
+
+turingState : U16 * U32 * [U32] -> U16
+turingState := fst
+
+turingLookup : [U16 * U32 * U16 * U32 * U8] -> U16 -> U32 -> U16 * U32 * U8 + Unit
+turingLookup := \tm.\state.\symbol.
+    case (find (\tmc. and (iseq_u16 (fst tmc) state) (iseq_u32 (fst (snd tmc)) symbol)) tm)
+    (\x. inl 
+        (tuple (fst (snd (snd x)))
+        (tuple (fst (snd (snd (snd x))))
+        (snd (snd (snd (snd x)))))))
+    (\u. inr unit)
+
+turingAction : U16 * U32 * U8 -> U16 * U32 * [U32] -> U16 * U32 * [U32]
+
+turingStep : U8 -> U16 * U32 * [U32] -> U16 * U32 * [U32]
+turingStep := \dir.\state.
+    tuple (fst state) (
+        if islt_u32 (fst (snd state)) (arrLength (snd (snd state))) 
+        then 
+
+main := let getLine \l. 
     case (parseTuringMachine l)
-    (\tm. let (print_i32 (arrLength tm) ll) 
+    (\tm. let (print_i32 (arrLength tm) 0i8) 
         \ll. let (printLn ll)
-        \ll. printTuringMachine tm ll
-    )
-    (\u. print_char 'e' ll)
+        \ll. printTuringMachine tm ll)
+    (\u. print_char 'e' 0i8)

@@ -130,6 +130,28 @@ library' =
       )
       allAtomicTypes
     ++ makeTypedDefs
+      ( "sub"
+      , \t -> a t `to` a t `to` a t
+      , \t w ->
+          sequence
+            [ p "literal* s1 = " <> w 1
+            , p "literal* s2 = " <> w 2
+            , p "literal* s3 = new_literal(sizeof(" <> p (cTypeOf t) <> p "))"
+            , p "void* s1data = &s1->data"
+            , p "void* s2data = &s2->data"
+            , p "void* s3data = &s3->data"
+            , p (cTypeOf t) <> p "* s3datai = s3data"
+            , p "*s3datai = *("
+                <> p (cTypeOf t)
+                <> p "*)s1data - *("
+                <> p (cTypeOf t)
+                <> p "*)s2data"
+            , p "s3->gc_data.isInStackSpace = 0"
+            , p "s3"
+            ]
+      )
+      allAtomicTypes
+    ++ makeTypedDefs
       ( "print"
       , \t -> a t `to` g 1 `to` g 1
       , \t w ->
@@ -178,6 +200,46 @@ library' =
             , p "s3->data[0] = *("
                 <> p (cTypeOf t)
                 <> p "*)s1data <= *("
+                <> p (cTypeOf t)
+                <> p "*)s2data"
+            , p "s3->gc_data.isInStackSpace = 0"
+            , p "s3"
+            ]
+      )
+      allAtomicTypes
+    ++ makeTypedDefs
+      ( "islt"
+      , \t -> a t `to` a t `to` a ABool
+      , \t w ->
+          sequence
+            [ p "literal* s1 = " <> w 1
+            , p "literal* s2 = " <> w 2
+            , p "literal* s3 = new_literal(sizeof(" <> p (cTypeOf t) <> p "))"
+            , p "void* s1data = &s1->data"
+            , p "void* s2data = &s2->data"
+            , p "s3->data[0] = *("
+                <> p (cTypeOf t)
+                <> p "*)s1data < *("
+                <> p (cTypeOf t)
+                <> p "*)s2data"
+            , p "s3->gc_data.isInStackSpace = 0"
+            , p "s3"
+            ]
+      )
+      allAtomicTypes
+    ++ makeTypedDefs
+      ( "isgt"
+      , \t -> a t `to` a t `to` a ABool
+      , \t w ->
+          sequence
+            [ p "literal* s1 = " <> w 1
+            , p "literal* s2 = " <> w 2
+            , p "literal* s3 = new_literal(sizeof(" <> p (cTypeOf t) <> p "))"
+            , p "void* s1data = &s1->data"
+            , p "void* s2data = &s2->data"
+            , p "s3->data[0] = *("
+                <> p (cTypeOf t)
+                <> p "*)s1data > *("
                 <> p (cTypeOf t)
                 <> p "*)s2data"
             , p "s3->gc_data.isInStackSpace = 0"
