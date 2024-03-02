@@ -131,7 +131,7 @@ showExpressionS gname (IfThenElse cond expr1 expr2) = do
   addStatement $ ifr ++ " = " ++ expr2' ++ ";"
   putStackVarsAndRemove elsevars
   addStatement "}"
-  return ifr
+  addObject Nothing ifr
 {- FOURMOLU_ENABLE -}
 
 {- FOURMOLU_DISABLE -}
@@ -437,6 +437,7 @@ runtime =
           "\t\tcase GC_DATA_TYPE_CLOSURE: {\n" ++
               "\t\t\tclosure* obj = new_closure(t->gc_data.captureCount);\n" ++
               "\t\t\tmemcpy(obj->captures, ((closure*)t)->captures, sizeof(void*) * t->gc_data.captureCount);\n" ++
+              "\t\t\tobj->clfunc = ((closure*)(t))->clfunc;\n" ++
               "\t\t\tnew_obj = (gc_type*)obj;\n" ++
               "\t\t\tbreak;\n" ++
           "\t\t}\n" ++

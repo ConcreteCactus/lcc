@@ -91,7 +91,7 @@ compile opts = do
 
 run :: Options -> IO ()
 run opts = do
-    let cmd = fromMaybe "gcc" (oCCCmd opts)
+    let cmd = fromMaybe "gcc -g" (oCCCmd opts)
     let output = maybe "" ("-o " ++) (oExeName opts)
     let input = fromMaybe "a.c" (oCSrcName opts)
     callCommand $ cmd ++ " " ++ output ++ " " ++ input

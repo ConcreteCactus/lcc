@@ -1,8 +1,10 @@
 \documentclass[12pt]{article}
 
 \usepackage[a4paper, top=2.5cm, right=2.5cm, bottom=2.5cm, left=2.5cm]{geometry}
+\usepackage{listings}
+\usepackage{setspace}
 
-\renewcommand{\baselinestretch}{1.5}
+\onehalfspace
 % Later references:
 % - https://pages.cs.wisc.edu/~horwitz/CS704-NOTES/1.LAMBDA-CALCULUS.html
 % - https://en.wikipedia.org/wiki/Lambda_calculus
@@ -10,6 +12,12 @@
 
 \title{A lambda calculus compiler}
 \author{Áron Hárnási \\ \normalsize Eötvös Lóránd University, Faculty of Informatics}
+
+\lstdefinestyle{mystyle}{
+    basicstyle=\ttfamily,
+}
+
+\lstset{style=mystyle}
 
 \begin{document}
 \linespread{1}
@@ -130,27 +138,22 @@ might be a better choice in case it fails on Ubuntu.
 If all the necessary dependencies are present, building the project should only
 require two steps. To build the project, execute the following commands in an
 appropriate directory.
-
-\begin{verbatim}
+\begin{lstlisting}
 $ git clone --depth=1 \
     https://github.com/ConcreteCactus/lambda-compiler.git
-\end{verbatim}
-
+\end{lstlisting}
 This will clone the repository, which is hosted on GitHub. In order to build and
 install the compiler, one would run the following:
-
-\begin{verbatim}
+\begin{lstlisting}
 $ cd lambda-compiler
 $ stack install
-\end{verbatim}
-
+\end{lstlisting}
 This will build and install the required dependencies, including ghc. The
 compiler binary is usually copied to \texttt{\$HOME/.local/bin}. Please, make
 sure the resulting binary is on the \texttt{PATH}. If the installation goes
 correctly, running \texttt{lcc -v} should show a banner similar to the
 following:
-
-\begin{verbatim}
+\begin{lstlisting}
 $ lcc -v
 lambda_compiler v1.0
 
@@ -162,8 +165,7 @@ ___
   / /\ \      ) _ (           ) _ (
  / /  \ \   _/ / \ \_       _/ / \ \_
 /_/    \_\ (__/   \__) (_) (__/   \__)
-\end{verbatim}
-
+\end{lstlisting}
 \textbf{Note:} Throughout this document, the compiler is referred to by the name
 \texttt{lcc} and its input language is referred to by the name LC.
 
@@ -184,9 +186,9 @@ other command-line option is specified. The file extension of the input file
 does not matter, however in this document they will be referred to with the
 extension \texttt{.lc}. To simply compile an input file, one would run the
 following:
-\begin{verbatim}
+\begin{lstlisting}
 $ lcc hello.lc
-\end{verbatim}
+\end{lstlisting}
 This command compiles the input file \texttt{hello.lc} and produces a binary
 file with the default name \texttt{gcc} gives to output binaries. On Linux it is
 usually \texttt{a.out}. \texttt{lcc} produces a \texttt{.c} file containing the
@@ -227,48 +229,95 @@ the language will be discussed.
 
 Syntactically, the language has several similarities to Haskell. Global
 variables can be defined with the \texttt{:=} operator in the following way.
-\begin{verbatim}
+\begin{lstlisting}
 globalVariable := expression
-\end{verbatim}
+\end{lstlisting}
 Optionally, any global variable can have its type specified. For each specified
 type, the compiler checks if it can be used in place of the inferred type. To
 specify the type of a global variable, one would use the \texttt{:} operator in
 the following way:
-\begin{verbatim}
+\begin{lstlisting}
 globalVariable : I32 -> I32 -> I32
 globalVariable := expression
-\end{verbatim}
+\end{lstlisting}
+In this case, \verb$globalVariable$ is a function that takes two 32bit signed
+integer parameters, and outputs a 32bit signed integer.
 
 \subsubsection{The syntax of expressions}
 
 All expressions consist of six parts:
 \begin{itemize}
-    \item Variables, that always represent function parameters. They can be
-        denoted with a single ASCII character, or a string of ASCII characters.
-        Their first character is always lower-case; for example \texttt{x} or
-        \texttt{exampleVar}.
-    \item Lambdas, that represent functions. Lambdas have an expression body,
-        and a parameter, and their parameter can be used inside their expression
-        body. To create a lambda, one would write a backslash (\verb$\$)
-        character followed by the parameter name, a dot (\verb$.$), and the
-        expression body. For example: \verb$\a.(f a) g$. \\ \textbf{Note:} In
-        this example, \verb$f$ and \verb$g$ can either be global references, or
-        variables of outside lambdas.
-    \item Applications, that represent calling functions. Applications always
-        contain two expressions. The first part represents the function that
-        gets called, and the second part represents the parameter given to that
-        function. To apply an expression to another in the LC language, one
-        would write the function to be called first, and the parameter second
-        with white-space in between in the following way: \verb$func param$.
-    \item Literals, that represent values in the C back-end. All literals
-        represent numbers in the language. To create a literal, one needs to
-        write the value of the literal postfixed with the type of the literal.
-        The value of the literal can be written in signed decimal, unsigned
-        decimal, or hexadecimal notation, while the type postfix has to be the
-        type postfix of the given type. The possible type postfixes include
-        \verb$i32$, \verb$u8$, and \verb$f64$. Some example literals are:
-        \verb$-42i32$ and \verb$0xff_u8$.
+    \item Variables
+    \item Lambdas
+    \item Applications
+    \item Global references
+    \item If-expressions
+    \item Literals
 \end{itemize}
+
+\paragraph{Variables} Variables always represent function parameters. They can
+be denoted with a single ASCII character, or a string of ASCII characters. Their
+first character is always lower-case. For example, \verb$x$ or \verb$exampleVar$.
+
+\paragraph{Lambdas} Lambdas represent functions. Lambdas have an expression
+body, and a parameter. Their parameter can be used inside their expression
+body. To create a lambda, one would write a backslash (\verb$\$) character
+followed by the parameter name, a dot (\verb$.$), and the expression body. For
+example, \verb$\x.x$ or \verb$\a.(f a) g$.
+
+\paragraph{Applications} Applications represent calling functions. Applications
+always contain two expressions, The first of which is the function getting
+called and the second represents the parameter given to that function. To apply
+an expression to another in the LC language, one would write the function to be
+called first and the parameter second separated by white-space. For example,
+\verb$func param$ or \verb$func param1 param2$.
+\noindent
+Note that function application is left-associative.
+
+\paragraph{Literals} Literals represent number values in the C back-end, on
+which the standard library provides basic operations. The following table shows
+the possible types they can have and their corresponding C type in the LC
+language.
+\begin{center}
+\begin{tabular}{c c c}
+    LC type & Type postfix & C type \\
+    \hline
+    \verb$I8$ to \verb$I128$ & \verb$i8$ to \verb$i128$ & \verb$int8_t$ to
+    \verb$int64_t$ and \verb$__int128$ \\
+    \verb$U8$ to \verb$U128$ & \verb$u8$ to \verb$u128$ & \verb$uint8_t$ to
+    \verb$uint64_t$ and \verb$unsigned __int128$ \\
+    \verb$F32$ and \verb$F64$ & \verb$f32$ and \verb$f64$ & \verb$float$ and
+    \verb$double$ \\
+    \verb$USize$ & \verb$usize$ & \verb$size_t$ \\
+    \verb$Char$ & \verb$char$ & \verb$char$ \\
+    \verb$Bool$ & \verb$bool$ & \verb$bool$
+\end{tabular}
+\end{center}
+There are four different ways to write literals. To write a character literal,
+one would write the desired character between two single quotes. Escape
+sequences are not supported. For example, \verb$'a'$ or \verb$' '$.
+
+With the exception of characters, in the LC language, it is required to use a
+type specifying postfix when writing literals. To write a hexadecimal number,
+one would prefix it with \verb$0x$ and write the desired value with the
+characters \verb$0$-\verb$9$ and \verb$a$-\verb$f$. Hexadecimal numbers need to
+be postfixed with an underscore (\verb$_$) and the desired type postfix shown in
+the table above. Only unsigned integers, characters, and booleans can be written
+in this form. For example, \verb$0x1_u8$ or \verb$0xdeadbeef_u32$.
+
+In order to write a floating point number, one would write the whole part of the
+number in decimal form, optionally include the fractional part separated by a
+dot (\verb$.$) character, then write the postfix \verb$f32$ or \verb$f64$. For
+example, \verb$0f32$ or \verb$3.14f64$.
+
+Decimal numbers can be written similarly to floating point ones with the
+exception that decimal numbers can not have a fractional part. Decimal numbers
+can be postfixed with all type postfixes except \verb$f32$ and \verb$f64$. For
+example, \verb$42u32$ or \verb$-1i8$.
+
+\subsubsection{Types}
+\subsubsection{Standard library}
+\subsubsection{Compilation errors}
 
 \subsubsection{A note on white-space}
 
@@ -282,11 +331,6 @@ adder := \a. \b.
          b
 nextDefinition := nextExpression
 \end{verbatim*}
-
-\subsubsection{Primitive types}
-\subsubsection{Type checking}
-\subsubsection{Standard library}
-\subsubsection{Compilation errors}
 
 \section{Developer documentation}
 \end{document}

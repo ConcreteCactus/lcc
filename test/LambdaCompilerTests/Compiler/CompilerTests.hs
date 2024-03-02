@@ -49,6 +49,8 @@ spec = do
             outputOf program8 `shouldReturn` TrSuccess "Ac-12B"
         it "list printing program should output abc" $ do
             outputOf program9 `shouldReturn` TrSuccess "abc"
+        it "value of if expressions sould be taken care of by gc" $ do
+            outputOf program10 `shouldReturn` TrSuccess "-11"
 
 program1 :: SourceCode
 program1 =
@@ -143,6 +145,12 @@ program9 =
         ++ "rcompose := \\f.\\g.\\x.g (f x)\n"
         ++ "id := \\x.x\n"
         ++ "main := printList (cons 'a' (cons 'b' (cons 'c' emptyList))) 0i8\n"
+
+program10 :: SourceCode
+program10 =
+    "ifret := gcret (if iseq_i32 1i32 0i32 then (\\x.x) else (\\x.-11i32)) unit\n" ++
+    "gcret := \\x.\\y. tuple x y\n" ++
+    "main := print_i32 ((fst ifret) 0i32) 0i8"
 
 testCompile :: SourceCode -> Either CompilerError CCode
 testCompile sc = do

@@ -3,7 +3,6 @@ module StandardLibrary (standardLibrary, cTypeOf) where
 import qualified Lexer as L
 import qualified SemanticAnalyzer.Type as T
 import AtomicType
-import SyntacticAnalyzer
 import Util
 
 standardLibrary ::
@@ -248,7 +247,7 @@ library' =
       )
       allAtomicTypes
     ++ makeTypedDefs
-      ( ""
+      ( "isge"
       , \t -> a t `to` a t `to` a ABool
       , \t w ->
           sequence
@@ -259,7 +258,7 @@ library' =
             , p "void* s2data = &s2->data"
             , p "s3->data[0] = *("
                 <> p (cTypeOf t)
-                <> p "*)s1data <= *("
+                <> p "*)s1data >= *("
                 <> p (cTypeOf t)
                 <> p "*)s2data"
             , p "s3->gc_data.isInStackSpace = 0"
@@ -286,7 +285,7 @@ library' =
          , \w ->
             sequence
               [ p "product* prod = " <> w 1
-              , p "prod->data_1"
+              , p "gc_clone((gc_type*)prod->data_1)"
               ]
          )
        ,
@@ -295,7 +294,7 @@ library' =
          , \w ->
             sequence
               [ p "product* prod = " <> w 1
-              , p "prod->data_2"
+              , p "gc_clone((gc_type*)prod->data_2)"
               ]
          )
        ,

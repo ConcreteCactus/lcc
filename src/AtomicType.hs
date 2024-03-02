@@ -32,6 +32,7 @@ getTypeFromPostfix name
     | name == "u32" = Just AU32
     | name == "u64" = Just AU64
     | name == "u128" = Just AU128
+    | name == "usize" = Just AUSize
     | name == "f32" = Just AF32
     | name == "f64" = Just AF64
     | name == "char" = Just AChar
@@ -50,6 +51,7 @@ getTypeNameFromStr name
     | name == "U32" = Just AU32
     | name == "U64" = Just AU64
     | name == "U128" = Just AU128
+    | name == "USize" = Just AUSize
     | name == "F32" = Just AF32
     | name == "F64" = Just AF64
     | name == "Char" = Just AChar
