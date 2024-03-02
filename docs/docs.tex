@@ -251,7 +251,7 @@ All expressions consist of six parts:
     \item Lambdas
     \item Applications
     \item Global references
-    \item If-expressions
+    \item If expressions
     \item Literals
 \end{itemize}
 
@@ -273,6 +273,23 @@ called first and the parameter second separated by white-space. For example,
 \verb$func param$ or \verb$func param1 param2$.
 \noindent
 Note that function application is left-associative.
+
+\paragraph{Global references} Global references denote expressions defined
+somewhere else in the file. When evaluated, these references are
+substituted\footnote{On the compiler level, this substitution is implemented as
+    a function call, which happens in a new scope; therefore it is not possible
+    to have, for example, free variables in global definitions.} with the
+corresponding global definitions. Global references are written in the same way
+as local variables; therefore in name-collisions, the local variable will take
+precedence.
+
+\paragraph{If expressions} If expressions represent the control-flow if
+primitive used in procedural languages. If expressions take three expressions:
+one that evaluates to a boolean, one that is used when the boolean is true, and
+one that is used when the boolean is false. If expressions are lazy, which makes
+it possible to use them in recursive functions when other lazy constructs are
+not available or necessary. \\
+For example, \verb$if condition then exprIfTrue else exprIfFalse$
 
 \paragraph{Literals} Literals represent number values in the C back-end, on
 which the standard library provides basic operations. The following table shows
@@ -315,7 +332,7 @@ exception that decimal numbers can not have a fractional part. Decimal numbers
 can be postfixed with all type postfixes except \verb$f32$ and \verb$f64$. For
 example, \verb$42u32$ or \verb$-1i8$.
 
-\subsubsection{Types}
+\subsubsection{The syntax of types}
 \subsubsection{Standard library}
 \subsubsection{Compilation errors}
 
