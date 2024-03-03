@@ -58,6 +58,8 @@ spec = do
                 `shouldReturn` True
         it "logic statement works" $ do
             isCompilableByGCCWoWarning program13 `shouldReturn` Nothing
+        it "div and mul works too" $ do
+            outputOf program14 `shouldReturn` TrSuccess "22.50000010.00000010"
 
 program1 :: SourceCode
 program1 =
@@ -174,6 +176,15 @@ program13 :: SourceCode
 program13 =
     "stmt : a + Empty -> a\n" ++
     "stmt := \\ae.case ae (\\a.a) (\\e. exfalso e)"
+
+program14 :: SourceCode
+program14 = 
+    "let := \\x.\\f. f x\n" ++
+    "main := let (print_i32 (div_i32 5i32 2i32) 0u8)\n" ++
+    "   \\x. let (print_f32 (div_f32 5f32 2f32) 0u8)\n" ++
+    "   \\x. let (print_f64 (mul_f64 5f64 2f64) 0u8)\n" ++
+    "   \\x. (print_u32 (mul_u32 5u32 2u32) 0u8)\n"
+    
 
 hasCompileError ::
     Maybe (Either CompilerError (ExitCode, String, String)) ->

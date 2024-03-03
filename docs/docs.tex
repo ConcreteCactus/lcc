@@ -501,12 +501,27 @@ stmt : a + Empty -> a
 stmt := \ae. case ae (\a. a) (\e. exfalso e)
 \end{lstlisting}
 \textbf{Note:} The function \verb$exfalso$ can be used to return an element of
-any type if an element of the Empty type is present.
+any type if an element of the Empty type is present. (Because there are no
+elements of the empty type, this function will never run.)
 \begin{lstlisting}
 exfalso : Empty -> a
 \end{lstlisting}
 
 \subsubsection{Standard library}
+
+The standard library provides functions that let the programmer interact with
+the underlying C back-end. The functions it provides can be organized into five
+categories:
+\begin{itemize}
+    \item Arithmetic operators
+    \item Comparison operators
+    \item Casts
+    \item IO functions
+    \item Constructors and basic operations on primitives
+\end{itemize}
+
+\paragraph{Arithmetic operators}
+
 \subsubsection{Compilation errors}
 
 \subsubsection{A note on white-space}
