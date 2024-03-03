@@ -243,9 +243,9 @@ globalVariable := expression
 In this case, \verb$globalVariable$ is a function that takes two 32bit signed
 integer parameters, and outputs a 32bit signed integer.
 
-\subsubsection{The syntax of expressions}
+\subsubsection{Expressions}
 
-All expressions consist of six parts:
+All expressions can be created using six parts:
 \begin{itemize}
     \item Variables
     \item Lambdas
@@ -332,7 +332,93 @@ exception that decimal numbers can not have a fractional part. Decimal numbers
 can be postfixed with all type postfixes except \verb$f32$ and \verb$f64$. For
 example, \verb$42u32$ or \verb$-1i8$.
 
-\subsubsection{The syntax of types}
+\subsubsection{Types}
+
+The LC language is statically typed. This means, that all expressions have a
+set type at the end of compilation. The language uses a type inference algorithm
+that runs on all expressions to determine the appropriate type for each
+expression. Because of type inference it is not required for the programmer to
+specify the type of expressions; however, types of global definitions can still 
+be specified for clarification.
+
+When a type is specified for a global definition, the type checker is run. The
+type checker compares the specified type and the inferred type to see if they
+are in line with each other. If the types match, the specified type is used in
+place of the inferred type. By default, the type inference algorithm tries to
+find the widest possible type for a given expression, and the type found by the
+inference algorithm can be narrowed down by specifying the type if desired. For
+example, the following program compiles:
+\begin{lstlisting}
+f1 := \x.x
+main := f1 0i32
+\end{lstlisting}
+while the second one returns a type checker error:
+\begin{lstlisting}
+f1 : I8 -> I8
+f1 := \x.x
+main := f1 0i32
+\end{lstlisting}
+In this example, the type of the \verb$f1$ function was narrowed down when its
+type was specified, and the compiler rejected the expression that tried to apply
+a parameter to the \verb$f1$ function that was outside of its possible parameter
+types.
+
+In the next paragraphs, the key components of the type system are discussed. All
+types in the language can be one of the following kinds:
+\begin{itemize}
+    \item Atomic types
+    \item Function types
+    \item Generic types
+    \item Sum types
+    \item Product types
+    \item List types
+    \item The Unit type
+    \item The Empty type
+\end{itemize}
+
+\paragraph{Atomic types} Atomic types are the types whose elements are the
+language primitives. For example, \verb$I32$ or \verb$Char$. All language
+primitives can be constructed using literal expressions discussed in the
+previous subsection. For a list of possible atomic types, the table shown in the
+Literals paragraph can be used.
+
+\paragraph{Function types} Function types are the types of functions. The
+elements of function types can be constructed using lambda expressions, while
+the function types themselves can be constructed with the arrow (\verb$->$)
+operator. In order to construct a function type, the parameter type is written
+first and the return type is written second infixed with the arrow operator. The
+arrow operator is right-associative. For example, \verb$I32 -> Char$ or 
+\verb$U8 -> a -> a$.
+
+\paragraph{Generic types} Generic types allow function types to be generalized
+to work with any parameter type. They denote that the type of the parameter does
+not matter for the implementation of the function. There are no constructors for
+generic types, as they are not concrete types. When expressions with a concrete
+type are applied to a function with a generic type for a parameter, the generic
+type of the function is substituted for the concrete type of the expression. To
+specify generic types, one can use any string of alphanumeric characters so long
+as it starts with a lowercase letter. For example, \verb$a$ or
+\verb$genericType$.
+
+\paragraph{Sum types} Sum types are types that have two kinds of elements:
+\emph{left} and \emph{right}. \emph{Left} elements always contain an element of
+one type, while \emph{right} elements always contain an element of a different
+type. To specify a sum type with type 
+
+The standard library provides two constructors for sum types; one that
+constructs \emph{left} elements: \verb$inl$, and one that constructs
+\emph{right} elements: \verb$inr$. Both constructors take one parameter, the
+element to be contained. The type of the constructors is the following:
+\begin{lstlisting}
+inl : a -> a + b
+inr : b -> a + b
+\end{lstlisting}
+Because of this, elements of sum types can either be
+\emph{left} or \emph{right} elements. To look into an element of a sum type, one
+would use the \verb$case$ function. This function takes three parameters: the
+element of the sum type, a function in case it is a left element, and a function
+in case it is a right element.
+
 \subsubsection{Standard library}
 \subsubsection{Compilation errors}
 

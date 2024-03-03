@@ -51,6 +51,11 @@ spec = do
             outputOf program9 `shouldReturn` TrSuccess "abc"
         it "value of if expressions sould be taken care of by gc" $ do
             outputOf program10 `shouldReturn` TrSuccess "-11"
+        it "will compile program with unspecified types" $ do
+            isCompilableByGCCWoWarning program11 `shouldReturn` Nothing
+        it "won't compile program with specified types if they don't match" $ do
+            hasCompileError <$> isCompilableByGCCWoWarning program12
+                `shouldReturn` True
 
 program1 :: SourceCode
 program1 =
@@ -77,7 +82,7 @@ program4 =
 
 program5 :: SourceCode
 program5 =
-    "compose : (b -> c) -> (a -> b) -> (a -> c)\n"
+    "compose : (b -> returnType) -> (a -> b) -> (a -> returnType)\n"
         ++ "compose := \\f.\\g.\\x. f (g x)\n"
         ++ "\n"
         ++ "doUntil3 : I32 -> (a -> a) -> (a -> a)\n"
@@ -148,9 +153,27 @@ program9 =
 
 program10 :: SourceCode
 program10 =
-    "ifret := gcret (if iseq_i32 1i32 0i32 then (\\x.x) else (\\x.-11i32)) unit\n" ++
-    "gcret := \\x.\\y. tuple x y\n" ++
-    "main := print_i32 ((fst ifret) 0i32) 0i8"
+    "ifret := gcret (if iseq_i32 1i32 0i32 then (\\x.x) else (\\x.-11i32)) unit\n"
+        ++ "gcret := \\x.\\y. tuple x y\n"
+        ++ "main := print_i32 ((fst ifret) 0i32) 0i8"
+
+program11 :: SourceCode
+program11 =
+    "f1 := \\x.x\n"
+        ++ "main := f1 0i32"
+
+program12 :: SourceCode
+program12 =
+    "f1 : I8 -> I8\n"
+        ++ "f1 := \\x.x\n"
+        ++ "main := f1 0i32"
+
+hasCompileError ::
+    Maybe (Either CompilerError (ExitCode, String, String)) ->
+    Bool
+hasCompileError Nothing = False
+hasCompileError (Just (Right _)) = False
+hasCompileError (Just (Left _)) = True
 
 testCompile :: SourceCode -> Either CompilerError CCode
 testCompile sc = do
