@@ -403,7 +403,9 @@ as it starts with a lowercase letter. For example, \verb$a$ or
 \paragraph{Sum types} Sum types are types that have two kinds of elements:
 \emph{left} and \emph{right}. \emph{Left} elements always contain an element of
 one type, while \emph{right} elements always contain an element of a different
-type. To specify a sum type with type 
+type. To specify a sum type with type \verb$A$ and \verb$B$ as \emph{left} and
+\emph{right} types, one would use the plus-sign (\verb$+$) operator in the
+following way: \verb$A + B$.
 
 The standard library provides two constructors for sum types; one that
 constructs \emph{left} elements: \verb$inl$, and one that constructs
@@ -417,7 +419,92 @@ Because of this, elements of sum types can either be
 \emph{left} or \emph{right} elements. To look into an element of a sum type, one
 would use the \verb$case$ function. This function takes three parameters: the
 element of the sum type, a function in case it is a left element, and a function
-in case it is a right element.
+in case it is a right element. The return value of the \verb$case$ function is
+the return value of the two functions given to it. The \verb$case$ function has
+the following type:
+\begin{lstlisting}
+case : a + b -> (a -> c) -> (b -> c) -> c
+\end{lstlisting}
+
+\paragraph{Product types} Product types are types whose elements contain two
+different elements of two different types: a \emph{first} element and a
+\emph{second} element. To specify that an expression has a product type with
+\verb$A$ and \verb$B$ as the types for its \emph{first} and \emph{second}
+elements, one would use the multiplication (\verb$*$) operator in the following
+way: \verb$A * B$.
+
+The standard library provides one constructor to create elements of product
+types, the \verb$tuple$ function. It takes two parameters and returns an element
+of the product type with those parameters.
+\begin{lstlisting}
+tuple : a -> b -> a * b
+\end{lstlisting}
+To return back the elements used to construct the product type, there are the
+\verb$fst$ and \verb$snd$ functions. \verb$fst$ returns the \emph{first}
+element, and \verb$snd$ returns the \emph{second} element.
+\begin{lstlisting}
+fst : a * b -> a
+snd : a * b -> b
+\end{lstlisting}
+
+\paragraph{List types} List types are the only recursive datatype in the LC
+language as it is not possible to define one using the language primitives. List
+can contain a variable number of elements of a single type. To specify a list
+type, one can write the type of its elements between two square brackets, for
+example, \verb$[I32]$ or \verb$[U8 + Unit]$.
+
+To construct list types, the \verb$emptyList$ and \verb$cons$ functions can be
+used. The \verb$emptyList$ function creates a list with no elements, while the
+\verb$cons$ function takes an element and a list, and creates a new list with
+the element prepended to it.
+\begin{lstlisting}
+emptyList : [a]
+cons      : a -> [a] -> [a]
+\end{lstlisting}
+To get back the elements used to construct a list, the \verb$uncons$ function
+can be used. It takes a list as its parameter, and returns the element of a sum
+type which can be used in a \verb$case$ function. The left element of the sum
+type can contain a product with the head and tail of the list, while the right
+element of the sum type only contains a unit, in case the \verb$uncons$ function
+was used on an empty list.
+\begin{lstlisting}
+uncons : [a] -> a * [a] + Unit
+\end{lstlisting}
+
+\paragraph{The Unit type} The unit type is a type that contains one element, and
+it can be used mostly to return errors. For example, an array index lookup can
+fail if the index given is outside the bounds of the array. When this happens,
+the error can be returned using a unit type. In this case, the type of an 
+array\footnote{In this document and in the language, the words list and array 
+    are used somewhat interchangeably, however to implement the list type, a
+    linked-list is used in the back-end.} index lookup function could look
+    similar to the following:
+\begin{lstlisting}
+arrayIndexLookup : [a] -> I32 -> a + Unit
+\end{lstlisting}
+The function could return an element of a sum type that could either be the
+resulting value of the lookup, or the element of the Unit type, meaning that the
+function failed.
+
+To construct the element of the unit type, the \verb$unit$ function can be used.
+It takes no arguments:
+\begin{lstlisting}
+unit : Unit
+\end{lstlisting}
+
+\paragraph{The Empty type} The Empty type is a type that has no elements. It was
+added to the language to make it possible to define statements in zero-order
+logic. For example, the statement $A \vee \bot \rightarrow A$ would be defined
+with
+\begin{lstlisting}
+stmt : a + Empty -> a
+stmt := \ae. case ae (\a. a) (\e. exfalso e)
+\end{lstlisting}
+\textbf{Note:} The function \verb$exfalso$ can be used to return an element of
+any type if an element of the Empty type is present.
+\begin{lstlisting}
+exfalso : Empty -> a
+\end{lstlisting}
 
 \subsubsection{Standard library}
 \subsubsection{Compilation errors}

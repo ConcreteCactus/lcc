@@ -408,7 +408,7 @@ library' =
             sequence
               [ p "fprintf(stderr, \"exfalso used\\n\")"
               , p "exit(100)"
-              , p "nullptr"
+              , p "NULL"
               ]
          )
        ,

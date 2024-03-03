@@ -56,6 +56,8 @@ spec = do
         it "won't compile program with specified types if they don't match" $ do
             hasCompileError <$> isCompilableByGCCWoWarning program12
                 `shouldReturn` True
+        it "logic statement works" $ do
+            isCompilableByGCCWoWarning program13 `shouldReturn` Nothing
 
 program1 :: SourceCode
 program1 =
@@ -167,6 +169,11 @@ program12 =
     "f1 : I8 -> I8\n"
         ++ "f1 := \\x.x\n"
         ++ "main := f1 0i32"
+
+program13 :: SourceCode
+program13 =
+    "stmt : a + Empty -> a\n" ++
+    "stmt := \\ae.case ae (\\a.a) (\\e. exfalso e)"
 
 hasCompileError ::
     Maybe (Either CompilerError (ExitCode, String, String)) ->
