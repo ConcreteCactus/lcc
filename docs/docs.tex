@@ -520,7 +520,86 @@ categories:
     \item Constructors and basic operations on primitives
 \end{itemize}
 
-\paragraph{Arithmetic operators}
+\paragraph{Arithmetic operators} Addition subtraction multiplication and
+division operations are implemented in the following standard library functions:
+\begin{lstlisting}
+add_u8 : U8 -> U8 -> U8
+sub_u8 : U8 -> U8 -> U8
+mul_u8 : U8 -> U8 -> U8
+div_u8 : U8 -> U8 -> U8
+...
+add_f64 : F64 -> F64 -> F64
+sub_f64 : F64 -> F64 -> F64
+mul_f64 : F64 -> F64 -> F64
+div_f64 : F64 -> F64 -> F64
+\end{lstlisting}
+In other words the \verb$add_$, \verb$sub_$, \verb$mul_$, and \verb$div_$
+functions postfixed with the type postfix are implemented for every type. They
+use the usual \verb$+$, \verb$-$, \verb$*$, and \verb$/$ operators in the C
+back-end. This means, for instance, that the \verb$div_u8$ function would divide
+the same way the C (\verb$/$) operator would. For example, \verb$div_u8 5u8 2u8$
+would return \verb$2u8$.
+
+\paragraph{Comparison operators} The following numeric comparison operators are
+implemented: $=$, $\le$, $<$, $\ge$, $>$, and $\ne$. In the LC language, they
+are named \verb$iseq_$, \verb$isle_$, \verb$islt_$, \verb$isge_$, \verb$isgt_$,
+and \verb$isne_$ respectively. Similarly to the arithmetic functions, the
+function names are postfixed with the type name they operate on.
+\begin{lstlisting}
+iseq_u8 : U8 -> U8 -> Bool
+isle_u8 : U8 -> U8 -> Bool
+islt_u8 : U8 -> U8 -> Bool
+isge_u8 : U8 -> U8 -> Bool
+isgt_u8 : U8 -> U8 -> Bool
+isne_u8 : U8 -> U8 -> Bool
+...
+\end{lstlisting}
+These implementations also use the underlying C comparison operators: \verb$==$,
+\verb$<=$, \verb$<$, \verb$>=$, \verb$>$, and \verb$!=$.
+
+\paragraph{Casts} Every primitive type can be cast to every other primitive type
+with the casting functions provided by the standard library. The name of every
+casting function starts with the name of the type to be cast from, and ends with
+the name of the type to be cast to, infixed with the word \verb$To$. For example
+the function that casts from \verb$F32$ to \verb$U8$ would be named
+\verb$f32Tou8$. All casting functions take a single parameter, the element of
+the type to be cast from, and return the element of the type to be cast to.
+\begin{lstlisting}
+u8Tou16   : U8 -> U16
+i32Tou16  : I32 -> U16
+f32Tochar : F32 -> Char
+...
+\end{lstlisting}
+
+\paragraph{IO functions} The IO functions provided by the standard library are
+impure functions that enable the program to read from standard in, and write to
+standard out. To print to the standard out, one would use one of the
+\verb$print_$ functions postfixed with the type of the value to be printed. Not
+all primitive types have print functions, namely 128bit types are not supported.
+
+Print functions take two parameters. The first parameter is the value to be
+printed to \verb$stdout$ and the second value is the return value, since print
+functions do not return any value in the C language. Therefore the type
+definition of a print function that prints, for example, characters would be the
+following:
+\begin{lstlisting}
+print_char : Char -> a -> a 
+\end{lstlisting}
+\textbf{Note:} Print functions only print the given value to the screen once the
+second parameter is applied to them.
+
+To read from \verb$stdin$, one can use the \verb$getchar$ function provided by
+the standard library. It binds to the \verb$getchar$ function in the C language.
+Similarly to the \verb$getchar$ function in the C language, \verb$getchar$ in
+the LC language return an integer that, along with the \verb$eof$ function, can
+be used to check whether the end of the file is reached.
+\begin{lstlisting}
+getchar : I32
+eof     : I32
+\end{lstlisting}
+% note on the let function
+
+\paragraph{Constructors and basic operations on primitives} 
 
 \subsubsection{Compilation errors}
 
@@ -536,6 +615,8 @@ adder := \a. \b.
          b
 nextDefinition := nextExpression
 \end{verbatim*}
+
+\subsection{Example programs}
 
 \section{Developer documentation}
 \end{document}

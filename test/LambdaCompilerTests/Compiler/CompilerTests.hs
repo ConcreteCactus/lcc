@@ -60,6 +60,9 @@ spec = do
             isCompilableByGCCWoWarning program13 `shouldReturn` Nothing
         it "div and mul works too" $ do
             outputOf program14 `shouldReturn` TrSuccess "22.50000010.00000010"
+        it "comp ops work too" $ do
+            outputOf program15 `shouldReturn` TrSuccess "110100011001011001011001000111011001"
+
 
 program1 :: SourceCode
 program1 =
@@ -184,6 +187,23 @@ program14 =
     "   \\x. let (print_f32 (div_f32 5f32 2f32) 0u8)\n" ++
     "   \\x. let (print_f64 (mul_f64 5f64 2f64) 0u8)\n" ++
     "   \\x. (print_u32 (mul_u32 5u32 2u32) 0u8)\n"
+
+program15 :: SourceCode
+program15 =
+    "let := \\x.\\f. f x\n" ++
+    "printComp := \\x.\\y.\n" ++
+    "   let (print_bool (iseq_i32 x y) 0u8) \\w.\n" ++
+    "   let (print_bool (isle_i32 x y) 0u8) \\w.\n" ++
+    "   let (print_bool (islt_i32 x y) 0u8) \\w.\n" ++
+    "   let (print_bool (isge_i32 x y) 0u8) \\w.\n" ++
+    "   let (print_bool (isgt_i32 x y) 0u8) \\w.\n" ++
+    "   (print_bool (isne_i32 x y) 0u8)\n" ++
+    "main := let (printComp 1i32 1i32) \\w.\n" ++ -- 110100
+    "        let (printComp 1i32 2i32) \\w.\n" ++ -- 011001
+    "        let (printComp -1i32 1i32) \\w.\n" ++ -- 011001
+    "        let (printComp -1i32 0i32) \\w.\n" ++ -- 011001
+    "        let (printComp 20i32 0i32) \\w.\n" ++ -- 000111
+    "        (printComp -10i32 -1i32)\n" -- 011001
     
 
 hasCompileError ::
