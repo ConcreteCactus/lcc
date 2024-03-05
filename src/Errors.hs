@@ -30,7 +30,7 @@ type ColNum = Int
 
 type TextPos = (LineNum, ColNum)
 
-data ProgramError e = ProgramError e TextPos deriving (Show, Eq)
+data ProgramError e = ProgramError e TextPos deriving Eq
 
 type LexicalError = ProgramError LexicalErrorType
 
@@ -51,6 +51,10 @@ data LexicalErrorType
   | LeUnknownTypePostfix
   | LeUnknownTypeName
   deriving (Eq)
+
+instance (Show e) => Show (ProgramError e) where
+    show (ProgramError e (line, col)) = "Error on line (" ++ show line 
+        ++ "," ++ show col ++ "): " ++ show e
 
 instance Show LexicalErrorType where
   show (LeUnexpectedLexicalElement expected) =
