@@ -4,7 +4,7 @@
 \usepackage{listings}
 \usepackage{setspace}
 
-\onehalfspace
+% \onehalfspace
 % Later references:
 % - https://pages.cs.wisc.edu/~horwitz/CS704-NOTES/1.LAMBDA-CALCULUS.html
 % - https://en.wikipedia.org/wiki/Lambda_calculus
@@ -589,17 +589,62 @@ print_char : Char -> a -> a
 second parameter is applied to them.
 
 To read from \verb$stdin$, one can use the \verb$getchar$ function provided by
-the standard library. It binds to the \verb$getchar$ function in the C language.
+the standard library. It binds to the \verb$getchar$ function in the C back-end.
 Similarly to the \verb$getchar$ function in the C language, \verb$getchar$ in
-the LC language return an integer that, along with the \verb$eof$ function, can
+the LC language returns an integer that, along with the \verb$eof$ function, can
 be used to check whether the end of the file is reached.
 \begin{lstlisting}
 getchar : I32
 eof     : I32
 \end{lstlisting}
-% note on the let function
+In practice, using \verb$getchar$ can be unintuitive. For example, to write a 
+\verb$readfile$ function, one might try to do the following:
+\begin{lstlisting}
+readfile : [Char]
+readfile := if iseq_i32 getchar eof 
+    then emptyList 
+    else cons (i32ToChar getchar) readfile
+\end{lstlisting}
+However, using \verb$getchar$ twice in this manner will execute its side-effect
+twice as well, which means that the character appended to the character list
+will be different from the character used in the if condition. This function
+will return only every second character in a file, which is not the expected
+behavior.
 
-\paragraph{Constructors and basic operations on primitives} 
+To overcome this issue, one can define the \verb$let$ function used in some of
+the example programs discussed later. The type and definition of the \verb$let$
+function is
+\begin{lstlisting}
+let : a -> (a -> b) -> b
+let := \x.\f. f x
+\end{lstlisting}
+Using \verb$let$ it is possible to capture the return value of the
+\verb$getchar$ function to be used multiple times.
+\begin{lstlisting}
+readfile : [Char]
+readfile := let getchar \c. if iseq_i32 c eof 
+    then emptyList 
+    else cons (i32ToChar c) readfile
+\end{lstlisting}
+The modified \verb$readfile$ function now returns every character from the
+standard input, and not only every second one.
+
+\paragraph{Constructors and basic operations on primitives} Types and the
+provided basic functions on them are discussed in the Types subsection, so only
+the type definitions are shown here.
+\begin{lstlisting}
+inl       : a -> a + b
+inr       : b -> a + b
+case      : a + b -> (a -> c) -> (b -> c) -> c
+tuple     : a -> b -> a * b
+fst       : a * b -> a
+snd       : a * b -> b
+emptyList : [a]
+cons      : a -> [a] -> [a]
+uncons    : [a] -> a * [a] + Unit
+unit      : Unit
+exfalso   : Empty -> a
+\end{lstlisting}
 
 \subsubsection{Compilation errors}
 
