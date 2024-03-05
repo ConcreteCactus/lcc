@@ -646,20 +646,21 @@ unit      : Unit
 exfalso   : Empty -> a
 \end{lstlisting}
 
-\subsubsection{Compilation errors}
-
 \subsubsection{A note on white-space}
 
-The language is white-space sensitive; therefore a global variable definition
-has to start at the start of the line. An expression can be broken down into
-multiple lines so long as there is at least one white-space character at the
-start of the next line. For example:
+To break an expression down into multiple lines, one would insert endline
+characters inside the whitespace between expression parts. Lines that are part
+of a previous expression have to start with some sort of whitespace, in order
+for the compiler to differenciate between continued expressions and new
+definitions.
 \begin{verbatim*}
 adder := \a. \b.
  add_i32 a
          b
 nextDefinition := nextExpression
 \end{verbatim*}
+
+\subsubsection{Compilation errors}
 
 \subsection{Example programs}
 
