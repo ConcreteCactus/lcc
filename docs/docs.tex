@@ -157,7 +157,8 @@ compiler binary is usually copied to \texttt{\$HOME/.local/bin}. Please, make
 sure the resulting binary is on the \texttt{PATH}. If the installation goes
 correctly, running \texttt{lcc -v} should show a banner similar to the
 following:
-\pagebreak
+
+\noindent\begin{minipage}{\textwidth}
 \begin{lstlisting}
 $ lcc -v
 lambda_compiler v1.0
@@ -171,6 +172,7 @@ ___
  / /  \ \   _/ / \ \_       _/ / \ \_
 /_/    \_\ (__/   \__) (_) (__/   \__)
 \end{lstlisting}
+\end{minipage}
 \textbf{Note:} Throughout this document, the compiler is referred to by the name
 \texttt{lcc} and its input language is referred to by the name LC.
 
@@ -745,13 +747,43 @@ zeroes in the following way:
 \begin{lstlisting}
 <cell>11<cell>11<cell>11...11<cell>
 \end{lstlisting}
-Each cell defines one state transition, and to encode more than one cells, one
-would need to separate them with two ones.
+Where each \verb$<cell>$ defines one state transition. To encode more than one
+cells, one would need to separate them with two ones.
 
-A cell can be encoded in the following way:
+A \verb$<cell>$ can be encoded in the following way:
 \begin{lstlisting}
-<state>1<read>1<new state>1<write>1<direction>
+<state>1<read>1<next state>1<write>1<direction>
 \end{lstlisting}
+Where \verb$<state>$ is the current state, \verb$<next state>$ is the state to
+transition to, \verb$<read>$ is the symbol read from the tape, \verb$<write>$ is
+the symbol to be written to the tape, and \verb$<direction>$ is the direction
+the head should move. All five of these values can be encoded with one or more
+repeating zero characters.
+
+There are three special \verb$<state>$ values. The start state, which can be
+encoded with a single \verb$0$ character, is always the state the machine starts
+with in the beginning of its execution. The accept state, that can be encoded
+with \verb$00$ is the state the machine should transition to if it accepts the
+input. The reject state, that can be encoded with \verb$000$ is the state the
+machine should transition to when it rejects the input. Both the accept and
+reject states are halting states, which means that transitioning to either of
+them ends the execution. All other states can be used without any special 
+restriction.
+
+Both the \verb$<read>$ and \verb$<write>$ values encode symbols that can be on
+the tape including the empty symbol, that the tape is filled with before the
+input is loaded. The empty symbol can be encoded with a single \verb$0$. This
+\verb$0$ is different from an input \verb$0$ character, since the input can not
+contain empty symbols. To encode a \verb$0$ character, one needs to use
+\verb$00$ and to encode a \verb$1$ character, one needs to use \verb$000$. Other
+symbols can be used with four or more consecutive zeros, however the simulator
+might not be able to display them properly.
+
+The \verb$<direction>$ field can have three values. These three values encode
+moving left, moving right, and not moving. \verb$0$ can be used to encode moving
+left, \verb$00$ can be used to encode not moving, and \verb$000$ can be used to
+encode moving right.
+
 \lstset{frame=lines}
 \lstset{numbers=left}
 
