@@ -1,0 +1,33 @@
+false : Bool
+false := 0bool
+
+and : Bool -> Bool -> Bool
+and := \a. \b. if a then b else false
+
+readDigit : U8 + Unit
+readDigit := let (i32Tochar getchar) \c.
+    if and (isge_char c '0') (isle_char c '9')
+    then inl (charTou8 (sub_char c '0'))
+    else inr unit
+
+doCalc : U8 -> U8 -> Char -> U8 + Unit
+doCalc := \a.\b.\c.
+    if iseq_char c '+' then inl (add_u8 a b)
+    else if iseq_char c '-' then inl (sub_u8 a b)
+    else if iseq_char c '*' then inl (mul_u8 a b)
+    else if iseq_char c '/' then inl (div_u8 a b)
+    else inr unit
+
+let : a -> (a -> b) -> b
+let := \x.\f. f x
+
+main := let readDigit \d1M. 
+    let (i32Tochar getchar) \c.
+    let readDigit \d2M.
+        case d1M
+        (\d1. case d2M
+            (\d2. case (doCalc d1 d2 c)
+                (\r. print_u8 r 0u8)
+                (\u. 1u8))
+            (\u. 2u8))
+        (\u. 3u8)

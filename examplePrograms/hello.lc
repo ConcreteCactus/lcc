@@ -1,0 +1,22 @@
+cmp : (a -> b) -> (b -> c) -> a -> c
+cmp := \f. \g. \x. g (f x)
+
+printList : [Char] -> a -> a
+printList := \list. case (uncons list)
+    (\xs. cmp (print_char (fst xs)) (printList (snd xs)))
+    (\u.\x.x)
+
+hello : [Char]
+hello := cons 'h'
+    (cons 'e'
+    (cons 'l'
+    (cons 'l'
+    (cons 'o'
+    (cons ' '
+    (cons 'w'
+    (cons 'o'
+    (cons 'r'
+    (cons 'l'
+    (cons 'd' emptyList))))))))))
+
+main := printList hello 0u8

@@ -4,7 +4,7 @@
 \usepackage{listings}
 \usepackage{setspace}
 
-% \onehalfspace
+\onehalfspace
 % Later references:
 % - https://pages.cs.wisc.edu/~horwitz/CS704-NOTES/1.LAMBDA-CALCULUS.html
 % - https://en.wikipedia.org/wiki/Lambda_calculus
@@ -15,6 +15,8 @@
 
 \lstdefinestyle{mystyle}{
     basicstyle=\ttfamily,
+    frame=lines,
+    numberstyle=\small
 }
 
 \lstset{style=mystyle}
@@ -115,6 +117,7 @@ several input-output functions. \\ \textbf{Note:} The IO functions are not handl
 the way Haskell handles IO. The IO functions in this source language are impure
 functions.
 
+\pagebreak
 \section{User documentation}
 
 \subsection{Building the software}
@@ -127,11 +130,12 @@ To build the program one would require the following packages:
     \item ghc v9.4.8 or later \\ Note that with default settings stack usually
         downloads the appropriate ghc version for the project.
 \end{itemize}
-Note that the compiler was only tested on a few Linux distributions, and it is
-possible that it does not work properly on some others. Using Ubuntu 22.04
-should work. It is also recommended, that the Haskell tools are installed via
-ghcup. Alternatively, the repository is also set up to be built on NixOS, which
-might be a better choice in case it fails on Ubuntu.
+Note that the compiler was only tested on a few Linux distributions; all of them
+on the x86\_64 architecture, and it is possible that it does not work properly
+on some others. Using Ubuntu 22.04 should work. It is also recommended, that the
+Haskell tools are installed via ghcup. Alternatively, the repository is also set
+up to be built on NixOS, which might be a better choice in case it fails on
+Ubuntu.
 
 \subsubsection{Compilation and installation}
 
@@ -153,6 +157,7 @@ compiler binary is usually copied to \texttt{\$HOME/.local/bin}. Please, make
 sure the resulting binary is on the \texttt{PATH}. If the installation goes
 correctly, running \texttt{lcc -v} should show a banner similar to the
 following:
+\pagebreak
 \begin{lstlisting}
 $ lcc -v
 lambda_compiler v1.0
@@ -653,16 +658,103 @@ characters inside the whitespace between expression parts. Lines that are part
 of a previous expression have to start with some sort of whitespace, in order
 for the compiler to differenciate between continued expressions and new
 definitions.
-\begin{verbatim*}
+\lstset{showspaces=true}
+\begin{lstlisting}
 adder := \a. \b.
  add_i32 a
          b
 nextDefinition := nextExpression
-\end{verbatim*}
+\end{lstlisting}
+\lstset{showspaces=false}
+
+\subsubsection{The main function}
 
 \subsubsection{Compilation errors}
 
 \subsection{Example programs}
+\lstset{numbers=left}
 
+In this section, some example programs will be discussed, so that it is easier
+to understand the language.
+
+\subsubsection{A Hello World program}
+
+A simple hello world program would be the following:
+\lstinputlisting{../examplePrograms/hello.lc}
+
+When run, this program would print the string \verb$hello world$ to the standard
+output, then exit. In order to write a string of characters to the standard
+output, one would need to first define a function that can take a list of
+characters, and compose a new function that prints the characters in the list
+one by one. This is the task of the \verb$printList$ function.
+
+The \verb$printList$ function first does a case study on the head of the list.
+If the list is not empty, the first element is printed, then \verb$printList$ is
+called recursively on the remaining list. If the list is empty, the identity
+function is returned to align with the type of the \verb$printList$ function.
+
+\verb$cmp$ is a small utility function that returns the composition of the two
+input functions flipped. It is used in the \verb$printList$ function to compose
+the character printing function first and the recursive call second.
+
+\verb$hello$ is simply the list that gets printed. Since the LC language does
+not support list literals, the list is constructed with the repeated use of the
+\verb$cons$ function.
+
+\subsubsection{A Single-digit calculator}
+
+The next example program is a calculator. For simplicity, the calculator can
+only do arithmetic on single decimal digits.
+
+\lstinputlisting{../examplePrograms/sdc.lc}
+
+The most important functions in the above program are \verb$readDigit$ and
+\verb$doCalc$. \verb$readDigit$ reads a single character from the standard
+input, and returns a value that is either the digit read, or a unit meaning that
+the read digit was not in the 0-9 range. For simplicity, the program assumes
+that it is not the end of the file when reading characters.
+
+\verb$doCalc$ takes three parameters: the two numbers to do an operation on, and
+a character that is the operator between the two numbers. The function then
+checks whether the character is any of the four basic arithmetic operators:
+\verb$+$, \verb$-$, \verb$*$, and \verb$/$. If it is, the function returns the
+result of the corresponding arithmetic operation inside a sum type. If the
+character could not be matched to one of the known operators, the function
+returns a unit that shows that an error has occurred.
+
+The \verb$main$ function uses the \verb$readDigit$ and \verb$doCalc$ functions,
+checks if any of them returns an error, and prints the result of the
+\verb$doCalc$ function if there are no errors. If instead there are any errors,
+the main function does not print to the standard output, instead it exits with
+the exit code 1, meaning the operator was not recognized; 2, meaning the second
+digit was not in the 0-9 range; 3, meaning the first digit was not in the 0-9
+range.
+
+\subsubsection{A Turing-machine simulator}
+
+One way to show that a programming language is Turing-complete is to show that
+it can simulate a Turing machine. A program in the LC language that simulates a
+Turing machine can be found under \verb$examplePrograms/turing.lc$. The source
+code is not included in this document, as it is quite long.
+
+The simulator reads in two lines. One for the state transitions of the Turing
+machine, and one for its input. The state transitions are encoded with ones and
+zeroes in the following way:
+\lstset{frame=none}
+\lstset{numbers=none}
+\begin{lstlisting}
+<cell>11<cell>11<cell>11...11<cell>
+\end{lstlisting}
+Each cell defines one state transition, and to encode more than one cells, one
+would need to separate them with two ones.
+
+A cell can be encoded in the following way:
+\begin{lstlisting}
+<state>1<read>1<new state>1<write>1<direction>
+\end{lstlisting}
+\lstset{frame=lines}
+\lstset{numbers=left}
+
+\pagebreak
 \section{Developer documentation}
 \end{document}
