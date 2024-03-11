@@ -116,7 +116,7 @@ data SemanticErrorType
 
 instance Show SemanticErrorType where
   show SeValueRedefinition = "Value has been redefined."
-  show (SeUndefinedVariable name) = "semantic value is undefined: " ++ name
+  show (SeUndefinedVariable name) = "Value is undefined: " ++ name
   show SeTypeRedeclaration = "The type has been redeclared."
 
 data LexicalElement
