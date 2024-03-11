@@ -630,8 +630,8 @@ The modified \verb$readfile$ function now returns every character from the
 standard input, and not only every second one.
 
 \paragraph{Constructors and basic operations on primitives} Types and the
-provided basic functions on them are discussed in the Types subsection, so only
-the type definitions are shown here.
+provided basic functions on them are discussed in the Types subsection;
+therefore only the type definitions are shown here.
 \begin{lstlisting}
 inl       : a -> a + b
 inr       : b -> a + b
@@ -648,10 +648,10 @@ exfalso   : Empty -> a
 
 \subsubsection{A note on white-space}
 
-To break an expression down into multiple lines, one would insert endline
-characters inside the whitespace between expression parts. Lines that are part
-of a previous expression have to start with some sort of whitespace, in order
-for the compiler to differenciate between continued expressions and new
+To break an expression down into multiple lines, one would insert end of line
+characters inside the white-space between expression parts. Lines that are part
+of a previous expression have to start with some sort of white-space, in order
+for the compiler to differentiate between continued expressions and new
 definitions.
 \begin{verbatim*}
 adder := \a. \b.
@@ -661,6 +661,19 @@ nextDefinition := nextExpression
 \end{verbatim*}
 
 \subsubsection{Compilation errors}
+
+The compiler can show an error message in case the program has errors. The error
+message contains the line and column number of the position the error was found
+on. The precision of the position depends on the type of the error, which
+there are three of:
+\begin{itemize}
+    \item Syntactic and lexical errors
+    \item Semantic errors
+    \item Type errors
+\end{itemize}
+
+\paragraph{Syntactic and lexical errors} 
+
 
 \subsection{Example programs}
 
