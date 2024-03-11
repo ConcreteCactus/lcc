@@ -4,7 +4,7 @@
 \usepackage{listings}
 \usepackage{setspace}
 
-% \onehalfspace
+\onehalfspace
 % Later references:
 % - https://pages.cs.wisc.edu/~horwitz/CS704-NOTES/1.LAMBDA-CALCULUS.html
 % - https://en.wikipedia.org/wiki/Lambda_calculus
@@ -15,6 +15,8 @@
 
 \lstdefinestyle{mystyle}{
     basicstyle=\ttfamily,
+    frame=lines,
+    numberstyle=\small
 }
 
 \lstset{style=mystyle}
@@ -115,6 +117,7 @@ several input-output functions. \\ \textbf{Note:} The IO functions are not handl
 the way Haskell handles IO. The IO functions in this source language are impure
 functions.
 
+\pagebreak
 \section{User documentation}
 
 \subsection{Building the software}
@@ -127,11 +130,12 @@ To build the program one would require the following packages:
     \item ghc v9.4.8 or later \\ Note that with default settings stack usually
         downloads the appropriate ghc version for the project.
 \end{itemize}
-Note that the compiler was only tested on a few Linux distributions, and it is
-possible that it does not work properly on some others. Using Ubuntu 22.04
-should work. It is also recommended, that the Haskell tools are installed via
-ghcup. Alternatively, the repository is also set up to be built on NixOS, which
-might be a better choice in case it fails on Ubuntu.
+Note that the compiler was only tested on a few Linux distributions; all of them
+on the x86\_64 architecture, and it is possible that it does not work properly
+on some others. Using Ubuntu 22.04 should work. It is also recommended, that the
+Haskell tools are installed via ghcup. Alternatively, the repository is also set
+up to be built on NixOS, which might be a better choice in case it fails on
+Ubuntu.
 
 \subsubsection{Compilation and installation}
 
@@ -153,6 +157,8 @@ compiler binary is usually copied to \texttt{\$HOME/.local/bin}. Please, make
 sure the resulting binary is on the \texttt{PATH}. If the installation goes
 correctly, running \texttt{lcc -v} should show a banner similar to the
 following:
+
+\noindent\begin{minipage}{\textwidth}
 \begin{lstlisting}
 $ lcc -v
 lambda_compiler v1.0
@@ -166,6 +172,7 @@ ___
  / /  \ \   _/ / \ \_       _/ / \ \_
 /_/    \_\ (__/   \__) (_) (__/   \__)
 \end{lstlisting}
+\end{minipage}
 \textbf{Note:} Throughout this document, the compiler is referred to by the name
 \texttt{lcc} and its input language is referred to by the name LC.
 
@@ -653,12 +660,16 @@ characters inside the white-space between expression parts. Lines that are part
 of a previous expression have to start with some sort of white-space, in order
 for the compiler to differentiate between continued expressions and new
 definitions.
-\begin{verbatim*}
+\lstset{showspaces=true}
+\begin{lstlisting}
 adder := \a. \b.
  add_i32 a
          b
 nextDefinition := nextExpression
-\end{verbatim*}
+\end{lstlisting}
+\lstset{showspaces=false}
+
+\subsubsection{The main function}
 
 \subsubsection{Compilation errors}
 
@@ -676,6 +687,194 @@ there are three of:
 
 
 \subsection{Example programs}
+\lstset{numbers=left}
 
+In this section, some example programs will be discussed, so that it is easier
+to understand the language.
+
+\subsubsection{A Hello World program}
+
+A simple hello world program would be the following:
+\lstinputlisting{../examplePrograms/hello.lc}
+
+When run, this program would print the string \verb$hello world$ to the standard
+output, then exit. In order to write a string of characters to the standard
+output, one would need to first define a function that can take a list of
+characters, and compose a new function that prints the characters in the list
+one by one. This is the task of the \verb$printList$ function.
+
+The \verb$printList$ function first does a case study on the head of the list.
+If the list is not empty, the first element is printed, then \verb$printList$ is
+called recursively on the remaining list. If the list is empty, the identity
+function is returned to align with the type of the \verb$printList$ function.
+
+\verb$cmp$ is a small utility function that returns the composition of the two
+input functions flipped. It is used in the \verb$printList$ function to compose
+the character printing function first and the recursive call second.
+
+\verb$hello$ is simply the list that gets printed. Since the LC language does
+not support list literals, the list is constructed with the repeated use of the
+\verb$cons$ function.
+
+\subsubsection{A Single-digit calculator}
+
+The next example program is a calculator. For simplicity, the calculator can
+only do arithmetic on single decimal digits.
+
+\lstinputlisting{../examplePrograms/sdc.lc}
+
+The most important functions in the above program are \verb$readDigit$ and
+\verb$doCalc$. \verb$readDigit$ reads a single character from the standard
+input, and returns a value that is either the digit read, or a unit meaning that
+the read digit was not in the 0-9 range. For simplicity, the program assumes
+that it is not the end of the file when reading characters.
+
+\verb$doCalc$ takes three parameters: the two numbers to do an operation on, and
+a character that is the operator between the two numbers. The function then
+checks whether the character is any of the four basic arithmetic operators:
+\verb$+$, \verb$-$, \verb$*$, and \verb$/$. If it is, the function returns the
+result of the corresponding arithmetic operation inside a sum type. If the
+character could not be matched to one of the known operators, the function
+returns a unit that shows that an error has occurred.
+
+The \verb$main$ function uses the \verb$readDigit$ and \verb$doCalc$ functions,
+checks if any of them returns an error, and prints the result of the
+\verb$doCalc$ function if there are no errors. If instead there are any errors,
+the main function does not print to the standard output, instead it exits with
+the exit code 1, meaning the operator was not recognized; 2, meaning the second
+digit was not in the 0-9 range; 3, meaning the first digit was not in the 0-9
+range.
+
+\subsubsection{A Turing-machine simulator}
+
+One way to show that a programming language is Turing-complete is to show that
+it can simulate a Turing machine. A program in the LC language that simulates a
+Turing machine can be found under \verb$examplePrograms/turing.lc$. The source
+code is not included in this document as it is quite long.
+
+The simulator reads in two lines. One for the state transitions of the Turing
+machine, and one for its input. The state transitions are encoded with ones and
+zeroes in the following way:
+\lstset{frame=none}
+\lstset{numbers=none}
+\begin{lstlisting}
+<cell>11<cell>11<cell>11...11<cell>
+\end{lstlisting}
+Where each \verb$<cell>$ defines one state transition. To encode more than one
+cell, one would need to separate them with two ones.
+
+A \verb$<cell>$ can be encoded in the following way:
+\begin{lstlisting}
+<state>1<read>1<next state>1<write>1<direction>
+\end{lstlisting}
+Where \verb$<state>$ is the current state, \verb$<next state>$ is the state to
+transition to, \verb$<read>$ is the symbol read from the tape, \verb$<write>$ is
+the symbol to be written to the tape, and \verb$<direction>$ is the direction
+the head should move. All five of these values can be encoded with one or more
+repeating zero characters.
+
+There are three special \verb$<state>$ values. The start state, which can be
+encoded with a single \verb$0$ character, is always the state the machine starts
+with in the beginning of its execution. The accept state, that can be encoded
+with \verb$00$ is the state the machine should transition to if it accepts the
+input. The reject state, that can be encoded with \verb$000$ is the state the
+machine should transition to when it rejects the input. Both the accept and
+reject states are halting states, which means that transitioning to either of
+them ends the execution. All other states can be used without any special 
+restriction.
+
+Both the \verb$<read>$ and \verb$<write>$ values encode symbols that can be on
+the tape including the empty symbol, a symbol that the tape is filled with
+before the input is loaded. The empty symbol can be encoded with a single
+\verb$0$. This \verb$0$ is different from an input \verb$0$ character, since the
+input can not contain empty symbols. To encode a \verb$0$ character, one needs
+to use \verb$00$ and to encode a \verb$1$ character, one needs to use
+\verb$000$. Other symbols can be used with four or more consecutive zeros,
+however the simulator might not be able to display them properly.
+
+The \verb$<direction>$ field can have three values. These three values encode
+moving left, moving right, and not moving. \verb$0$ can be used to encode moving
+left, \verb$00$ can be used to encode not moving, and \verb$000$ can be used to
+encode moving right.
+
+After receiving the first line, the Turing machine simulator parses the input,
+and either prints an \verb$e$ character indicating that there was an error while
+parsing, or it prints the defined state transitions one by one in a human
+readable way. Note that the machine allows undefined state transitions. During
+execution when it does not find the proper state transition for a specific state
+and symbol combination, it prints \verb$E2$ and stops execution.
+
+After the second line is read, the machine loads the input onto the tape and
+starts execution. Each step of the execution is printed to standard output with
+the current state, tape, and head position.
+
+\lstset{frame=lines}
+
+An example input to the Turing machine can be found in the repository at\\
+\verb$examplePrograms/turing_input.txt$. The file is written in a way to allow
+being piped into the simulator itself. To run the simulator with the example
+input, one can compile its source with
+\begin{lstlisting}
+cd examplePrograms
+stack run turing.lc
+\end{lstlisting}
+The command creates a \verb$a.out$ executable file, that can be used to run the
+simulator. To run the simulator with the given example input directly, one might
+pipe the contents of the file into the program. On \verb$bash$ that is done in
+the following way:
+\begin{lstlisting}
+./a.out < turing_input.txt
+\end{lstlisting}
+The program should then print the state transitions and the execution of the 
+simulated Turing machine:
+\begin{lstlisting}
+q0 _ :> q1 _ --
+q0 0 :> q3 _ ->
+q0 1 :> q4 _ ->
+q3 0 :> q3 0 ->
+q3 _ :> q5 _ <-
+q3 1 :> q3 1 ->
+q4 0 :> q4 0 ->
+q4 1 :> q4 1 ->
+q4 _ :> q6 _ <-
+q5 0 :> q7 _ <-
+q5 _ :> q1 _ --
+q5 1 :> q2 1 --
+q6 1 :> q7 _ <-
+q6 0 :> q2 0 --
+q7 0 :> q7 0 <-
+q7 _ :> q0 _ ->
+q7 1 :> q7 1 <-
+\end{lstlisting}
+This Turing machine accepts the input if it only consists of ones and zeroes,
+and it is symmetrical. If the input is not symmetrical, the Turing machine
+rejects the input. Note that there are some undefined state transitions.
+
+The execution of the Turing machine is:
+\begin{lstlisting}
+q0 0 > 0 0 1 0 1 0 0 0 
+q3 1 > _ 0 1 0 1 0 0 0 
+...
+q3 8 > _ 0 1 0 1 0 0 0 _ 
+...
+q7 6 > _ 0 1 0 1 0 0 _ _ 
+...
+q3 2 > _ _ 1 0 1 0 0 _ _ 
+...
+q7 5 > _ _ 1 0 1 0 _ _ _ 
+...
+q4 3 > _ _ _ 0 1 0 _ _ _ 
+...
+q2 5 > _ _ _ 0 1 0 _ _ _ 
+\end{lstlisting}
+Note that some lines have been removed to keep the output concise.
+
+The result of the execution can be read out from the last state of the Turing
+machine: \verb$q2$. In this case, it has rejected the input because it was not
+symmetrical.
+
+\lstset{numbers=left}
+
+\pagebreak
 \section{Developer documentation}
 \end{document}
