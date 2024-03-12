@@ -37,6 +37,7 @@ module Lexer
     currentPos,
     execParser,
     runParserE,
+    isMain
     -- traceParser
   )
 where

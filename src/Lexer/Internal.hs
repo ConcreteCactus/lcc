@@ -113,6 +113,10 @@ instance Monad ParserE where
                 fa' (textPos', sourceCode')
             )
 
+isMain :: VarIdent -> Bool
+isMain (VarIdent "main") = True
+isMain _ = False
+
 collapseMaybe :: Parser (Maybe a) -> Parser a
 collapseMaybe (Parser fa) =
     Parser

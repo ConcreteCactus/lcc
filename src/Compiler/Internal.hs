@@ -64,15 +64,15 @@ compile program =
             []
             $ S.progDefs program
     programCode = unlines (map genHelper $ S.progDefs program)
-    genHelper def@(S.Definition gname _) = genFunction gname $ mkExpression def
-    predefHelper (S.Definition gname _) =
+    genHelper def@(S.Definition gname _ _) = genFunction gname $ mkExpression def
+    predefHelper (S.Definition gname _ _) =
         "void* "
             ++ show gname
             ++ "_func(void);"
     mainfnHelper =
         isJust $
             Li.find
-                ( \(S.Definition gname _) ->
+                ( \(S.Definition gname _ _) ->
                     show gname == "main"
                 )
                 (S.progDefs program)

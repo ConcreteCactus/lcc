@@ -81,6 +81,7 @@ data TypeErrorType
   | TeCheckError String String
   | TeApplyingToANonFunction String
   | TeIfThenElseConditionIsNotBool
+  | TeMainFunctionIsNotLiteral
   deriving (Eq)
 
 instance Show TypeErrorType where
@@ -107,6 +108,8 @@ instance Show TypeErrorType where
     "Trying to apply to a non-function: " ++ t2
   show TeIfThenElseConditionIsNotBool = 
     "The condition in the if then else expression is not bool"
+  show TeMainFunctionIsNotLiteral = 
+    "The main function is not a number type"
 
 data SemanticErrorType
   = SeValueRedefinition
