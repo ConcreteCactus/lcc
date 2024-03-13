@@ -67,7 +67,7 @@ spec = do
         `shouldReturn` Just
           ( Left $
               mkCompErrTyp $
-                mkTypErr (1, 1) TeMainFunctionIsNotLiteral
+                mkTypErr (1, 1) TeMainFunctionIsNotByte
           )
 
 program1 :: SourceCode
@@ -86,12 +86,12 @@ program3 =
   "true := \\a.\\b.a\n"
     ++ "false := \\a.\\b.b\n"
     ++ "and := \\a.\\b.a b false\n"
-    ++ "main := (and true false) 0bool 1bool\n"
+    ++ "main := (and true false) 0u8 1u8\n"
 
 program4 :: SourceCode
 program4 =
   "one := 1i32\n"
-    ++ "main := add_i32 1i32 one"
+    ++ "main := i32Tou8 (add_i32 1i32 one)"
 
 program5 :: SourceCode
 program5 =
@@ -101,12 +101,12 @@ program5 =
     ++ "doUntil3 : I32 -> (a -> a) -> (a -> a)\n"
     ++ "doUntil3 := \\n.\\f. if (iseq_i32 n 3i32) then f else (compose (doUntil3 (add_i32 n 1i32) f) f)\n"
     ++ "\n"
-    ++ "main : I8\n"
-    ++ "main := doUntil3 0i32 (print_i32 2i32) 0i8\n"
+    ++ "main : U8\n"
+    ++ "main := doUntil3 0i32 (print_i32 2i32) 0u8\n"
 
 program6 :: SourceCode
 program6 =
-  "main := case sumtuple (\\n. print_i32 n) (\\nm. compose (print_i16 (add_i16 1i16 (fst nm))) (print_i8 (snd nm))) 0i8\n"
+  "main := case sumtuple (\\n. print_i32 n) (\\nm. compose (print_i16 (add_i16 1i16 (fst nm))) (print_i8 (snd nm))) 0u8\n"
     ++ "\n"
     ++ "tup : I32 * I16\n"
     ++ "tup := tuple 5i32 2i16\n"
@@ -144,7 +144,7 @@ program7 =
     ++ "v18 := add_u8 1u8 (u16Tou8 v17)\n"
     ++ "v19 := add_f32 1.1f32 (u8Tof32 v18)\n"
     ++ "v20 := add_f64 1.2f64 (f32Tof64 v19)\n"
-    ++ "main := print_f64 v20 0i8\n"
+    ++ "main := print_f64 v20 0u8\n"
 
 program8 :: SourceCode
 program8 =
@@ -155,7 +155,7 @@ program8 =
     ++ "        reverseCompose (print_char 65char)\n"
     ++ "        (print_char 'c')\n"
     ++ "        ) (print_i8 -12i8)\n"
-    ++ "    ) (print_char 0x42_char) 0i8\n"
+    ++ "    ) (print_char 0x42_char) 0u8\n"
 
 program9 :: SourceCode
 program9 =
@@ -163,24 +163,24 @@ program9 =
     ++ "printList := \\list. case (uncons list) (\\cl. rcompose (print_char (fst cl)) (printList (snd cl))) (\\e. id)\n"
     ++ "rcompose := \\f.\\g.\\x.g (f x)\n"
     ++ "id := \\x.x\n"
-    ++ "main := printList (cons 'a' (cons 'b' (cons 'c' emptyList))) 0i8\n"
+    ++ "main := printList (cons 'a' (cons 'b' (cons 'c' emptyList))) 0u8\n"
 
 program10 :: SourceCode
 program10 =
   "ifret := gcret (if iseq_i32 1i32 0i32 then (\\x.x) else (\\x.-11i32)) unit\n"
     ++ "gcret := \\x.\\y. tuple x y\n"
-    ++ "main := print_i32 ((fst ifret) 0i32) 0i8"
+    ++ "main := print_i32 ((fst ifret) 0i32) 0u8"
 
 program11 :: SourceCode
 program11 =
   "f1 := \\x.x\n"
-    ++ "main := f1 0i32"
+    ++ "main := f1 0u8"
 
 program12 :: SourceCode
 program12 =
   "f1 : I8 -> I8\n"
     ++ "f1 := \\x.x\n"
-    ++ "main := f1 0i32"
+    ++ "main := f1 0u8"
 
 program13 :: SourceCode
 program13 =

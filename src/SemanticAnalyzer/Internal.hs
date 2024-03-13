@@ -226,7 +226,8 @@ mkProgInfDeps uiprog@(UninfProg uiDefs) =
 
 mkProgram :: ProgInfDeps -> Either TypeError Program
 mkProgram (ProgInfDeps uprog (DependencyList dList)) = do
-    infdefs <- foldl
+  infdefs <-
+    foldl
       ( \acc item ->
           case item of
             DepListSingle a -> helperTree uprog a acc
@@ -234,8 +235,8 @@ mkProgram (ProgInfDeps uprog (DependencyList dList)) = do
       )
       (Right [])
       dList
-    infdefs' <- checkMainFn infdefs
-    return $ Program infdefs'
+  infdefs' <- checkMainFn infdefs
+  return $ Program infdefs'
   where
     helperTree ::
       UninfProg ->
@@ -258,7 +259,11 @@ mkProgram (ProgInfDeps uprog (DependencyList dList)) = do
     helperCycle _ _ (Left e) = Left e
     helperCycle uprog' as (Right prevDeps) =
       (++ prevDeps)
-        <$> ( zipWith (\udef expr -> Definition (udefName udef) expr (udefPos udef))  udefs
+        <$> ( zipWith
+                ( \udef expr ->
+                    Definition (udefName udef) expr (udefPos udef)
+                )
+                udefs
                 <$> mkTyExprCycle prevDeps (lookupUDefUnsafe uprog' <$> as)
             )
       where
@@ -272,8 +277,8 @@ mkProgram (ProgInfDeps uprog (DependencyList dList)) = do
     checkMainFn defs = case find (L.isMain . defName) defs of
       Nothing -> Right defs
       Just mainDef -> case ntType $ teType $ defExpr mainDef of
-        AtomicType _ -> Right defs
-        _ -> Left $ mkTypErr (defPos mainDef) TeMainFunctionIsNotLiteral
+        AtomicType AU8 -> Right defs
+        _ -> Left $ mkTypErr (defPos mainDef) TeMainFunctionIsNotByte
 
 mkInfExprTree :: [Definition] -> UninfDefinition -> Either TypeError TypedExpr
 mkInfExprTree defs udef =

@@ -671,6 +671,13 @@ nextDefinition := nextExpression
 
 \subsubsection{The main function}
 
+When a program compiled by \verb$lcc$ starts, the \verb$main$ function is
+evaluated. Since the return value of the main function is used as the exit code
+of the program, the main function can only have type \verb$U8$.
+
+It is allowed to compile a program without a main function, however running the
+resulting binary will simply exit with exit code 0.
+
 \subsubsection{Compilation errors}
 
 The compiler can show an error message in case the program has errors. The error
