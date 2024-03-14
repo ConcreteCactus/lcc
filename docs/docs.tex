@@ -3,6 +3,7 @@
 \usepackage[a4paper, top=2.5cm, right=2.5cm, bottom=2.5cm, left=2.5cm]{geometry}
 \usepackage{listings}
 \usepackage{setspace}
+\usepackage{graphicx}
 
 \onehalfspace
 % Later references:
@@ -917,11 +918,15 @@ symmetrical.
 \section{Developer documentation}
 
 This part of the documentation is intended for developers of the compiler, and
-users of the language sould not need to use it.
+users of the language should not need to use it.
 
 \subsection{High level architecture}
 
-
+\begin{figure}[h]
+\includegraphics[width=\textwidth]{high-level-architecture.diag.pdf}
+\centering
+\caption{High level modules in the compiler}
+\end{figure}
 
 \subsection{Lexer and Syntactic analyzer}
 \subsection{Semantic analyzer}

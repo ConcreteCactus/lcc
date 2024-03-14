@@ -9,6 +9,7 @@ docs/*.pdf
 docs/*.synctex.gz
 docs/*.toc
 docs/*.latex
+docs/*.diag.tex
 
 examplePrograms/*.c
 examplePrograms/*.out
