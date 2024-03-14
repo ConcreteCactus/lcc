@@ -8,6 +8,9 @@ docs/*.log
 docs/*.pdf
 docs/*.synctex.gz
 docs/*.toc
+docs/*.latex
 
 examplePrograms/*.c
 examplePrograms/*.out
+
+*.jar
