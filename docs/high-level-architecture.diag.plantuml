@@ -1,15 +1,13 @@
 @startuml
 !theme plain
-package "Syntactic analyzer" {
-    [Lexer]
-    [Syntax checker]
+package "lcc" {
+    package "Syntax checker" {
+        [Lexer]
+        [Syntactic Analyzer]
+        [Lexer] -r[hidden]- [Syntactic Analyzer]
+    }
+    [Lexer] -d[hidden]- [Semantic analyzer]
+    [Semantic analyzer] -r[hidden]- [Code generator]
 }
-package "Semantic analyzer" {
-    [Expression]
-    [Type]
-}
-[Code generator]
-"Syntactic analyzer" -[hidden]- [Code generator]
-"Semantic analyzer" -[hidden]- [Code generator]
 @enduml
 

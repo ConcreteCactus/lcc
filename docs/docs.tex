@@ -919,15 +919,48 @@ symmetrical.
 This part of the documentation is intended for developers of the compiler, and
 users of the language should not need to use it.
 
-\subsection{High level architecture}
+\subsection{Project structure}
+
+The compiler can be broken down into four parts: Lexer, Syntax checker, Semantic
+analyzer, and Code Generator. These four parts represent the four steps in
+compilation, which will be discussed in detail in the following sections.
 
 \begin{figure}[h]
-\includegraphics[width=\textwidth]{high-level-architecture.diag.pdf}
+\includegraphics[width=0.8\textwidth]{high-level-architecture.diag.pdf}
 \centering
-\caption{High level modules in the compiler}
+\caption{High level modules in the compiler.}
 \end{figure}
 
-\subsection{Lexer and Syntactic analyzer}
+\subsubsection{Folder structure}
+
+Most modules in the repository have two files: An internal one that exports all
+external and internal functions and an external one that imports the internal
+file, and only exports the external functions. When this module is imported into
+other modules, the external file is used. In order to unit test the internals of
+a module, it is necessary to expose them to unit tests. Using this two file
+structure allows the proper encapsulation of internal functions, while it also
+enables the programmer to test the module, as in unit tests the internal file
+can be imported.
+
+\lstset{numbers=none}
+\begin{lstlisting}
+src/
+|-MyModule/
+  |-Internal.hs -> All definitions
+|-MyModule.hs -> Exposes external functions
+\end{lstlisting}
+\lstset{numbers=left}
+
+\subsection{Lexer and Syntax checker}
+
+When the compiler is invoked, the given source code is loaded into memory as a
+\verb$String$. This source code is then used by the Lexer and
+Syntax checker to build a syntax tree, which is then given to the
+Semantic analyzer for further processing.
+
+The Lexer is responsible for correctly parsing the individual tokens used in the
+source code.
+
 \subsection{Semantic analyzer}
 \subsection{Type inference and type checking}
 \subsection{Compilation}

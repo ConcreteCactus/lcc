@@ -25,7 +25,9 @@ module Util (
   sndMap,
   leftMap,
   except,
-  maximumM
+  maximumM,
+  Default,
+  def
 )
 where
 
@@ -80,6 +82,18 @@ instance (Monoid w) => Applicative (Writer w) where
 
 instance (Monoid w) => Monad (Writer w) where
   (Writer (a1, w1)) >>= f = let Writer (a2, w2) = f a1 in Writer (a2, w1 <> w2)
+
+class Default a where
+    def :: a
+
+instance (Default a, Default b) => Default (a, b) where
+    def = (def, def)
+
+instance Default Integer where
+    def = 0
+
+instance Default Int where
+    def = 0
 
 get :: State s s
 get = State (\s -> (s, s))

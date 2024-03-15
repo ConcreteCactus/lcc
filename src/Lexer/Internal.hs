@@ -6,6 +6,7 @@ import AtomicType
 import Control.Applicative
 import Control.Monad
 import Data.Char
+import Util
 
 -- import Debug.Trace
 import Errors
@@ -17,17 +18,14 @@ newtype TypIdent = TypIdent String deriving (Eq)
 newtype TypName = TypName String deriving (Eq)
 data Literal = Literal String AtomicType deriving (Eq)
 
-newtype Parser a = Parser
+newtype Parser e a = Parser
     { runParser ::
         (TextPos, SourceCode) ->
-        Either TextPos (TextPos, a, SourceCode)
+        Either e (TextPos, a, SourceCode)
     }
 
-newtype ParserE a = ParserE
-    { runParserE ::
-        (TextPos, SourceCode) ->
-        Either LexicalError (TextPos, a, SourceCode)
-    }
+type ParserP = Parser TextPos
+type ParserE = Parser LexicalError
 
 instance Show VarIdent where
     show (VarIdent i) = i
@@ -36,7 +34,7 @@ instance Show TypIdent where
 instance Show Literal where
     show (Literal n typ) = show n ++ typeNameOf typ
 
-instance Functor Parser where
+instance Functor (Parser e) where
     fmap f (Parser fa) =
         Parser
             ( \(textPos, sourceCode) -> do
@@ -44,7 +42,7 @@ instance Functor Parser where
                 return (textPos', f parsedValue, sourceCode')
             )
 
-instance Applicative Parser where
+instance Applicative (Parser e) where
     pure a = Parser (\(textPos, sourceCode) -> Right (textPos, a, sourceCode))
     (Parser ff) <*> (Parser fa) =
         Parser
@@ -54,16 +52,16 @@ instance Applicative Parser where
                 return (textPos'', f parsedValue, sourceCode'')
             )
 
-instance Alternative Parser where
+instance (Default e) => Alternative (Parser e) where
     (Parser fa) <|> (Parser fb) =
         Parser
             ( \(textPos, sourceCode) -> case fa (textPos, sourceCode) of
                 Right ok -> Right ok
                 Left _ -> fb (textPos, sourceCode)
             )
-    empty = Parser $ const $ Left (0, 0)
+    empty = Parser $ const $ Left def
 
-instance Monad Parser where
+instance Monad (Parser e) where
     (Parser fa) >>= fp =
         Parser
             ( \(textPos, sourceCode) -> do
@@ -72,52 +70,11 @@ instance Monad Parser where
                 fa' (textPos', sourceCode')
             )
 
-instance Functor ParserE where
-    fmap f (ParserE fa) =
-        ParserE
-            ( \(textPos, sourceCode) -> do
-                (textPos', parsedValue, sourceCode') <- fa (textPos, sourceCode)
-                return (textPos', f parsedValue, sourceCode')
-            )
-
-instance Applicative ParserE where
-    pure a = ParserE (\(textPos, sourceCode) -> Right (textPos, a, sourceCode))
-    (ParserE ff) <*> (ParserE fa) =
-        ParserE
-            ( \(textPos, sourceCode) -> do
-                (textPos', f, sourceCode') <- ff (textPos, sourceCode)
-                (textPos'', parsedValue, sourceCode'') <- fa (textPos', sourceCode')
-                return (textPos'', f parsedValue, sourceCode'')
-            )
-
-instance Alternative ParserE where
-    (ParserE fa) <|> (ParserE fb) =
-        ParserE
-            ( \(textPos, sourceCode) -> case fa (textPos, sourceCode) of
-                Right a -> Right a
-                Left _ -> fb (textPos, sourceCode)
-            )
-    empty =
-        ParserE $
-            const $
-                Left $
-                    mkLexErr' (0, 0) $
-                        LeUnexpectedLexicalElement []
-
-instance Monad ParserE where
-    (ParserE fa) >>= fp =
-        ParserE
-            ( \(textPos, sourceCode) -> do
-                (textPos', parsedValue, sourceCode') <- fa (textPos, sourceCode)
-                let (ParserE fa') = fp parsedValue
-                fa' (textPos', sourceCode')
-            )
-
 isMain :: VarIdent -> Bool
 isMain (VarIdent "main") = True
 isMain _ = False
 
-collapseMaybe :: Parser (Maybe a) -> Parser a
+collapseMaybe :: ParserP (Maybe a) -> ParserP a
 collapseMaybe (Parser fa) =
     Parser
         ( \a -> case fa a of
@@ -128,8 +85,8 @@ collapseMaybe (Parser fa) =
         )
 
 collapseEither :: ParserE (Either LexicalErrorType a) -> ParserE a
-collapseEither (ParserE fa) =
-    ParserE
+collapseEither (Parser fa) =
+    Parser
         ( \a -> case fa a of
             Right (textPos, Right parsedValue, sourceCode) ->
                 Right (textPos, parsedValue, sourceCode)
@@ -137,7 +94,7 @@ collapseEither (ParserE fa) =
             Left e -> Left e
         )
 
-satisfy :: (Char -> Bool) -> Parser Char
+satisfy :: (Char -> Bool) -> ParserP Char
 satisfy f =
     Parser
         ( \(textPos, sourceCode) -> case sourceCode of
@@ -145,12 +102,12 @@ satisfy f =
             _otherwise -> Left textPos
         )
 
-satisfy_ :: (Char -> Bool) -> Parser ()
+satisfy_ :: (Char -> Bool) -> ParserP ()
 satisfy_ f = void $ satisfy f
 
-withError :: Parser a -> LexicalErrorType -> ParserE a
+withError :: ParserP a -> LexicalErrorType -> ParserE a
 withError (Parser fa) e =
-    ParserE
+    Parser
         ( \(textPos, sourceCode) ->
             case fa (textPos, sourceCode) of
                 Right (textPos', parsedValue, sourceCode') ->
@@ -160,7 +117,7 @@ withError (Parser fa) e =
 
 infixl 4 `withError`
 
-withExpected :: Parser a -> LexicalElement -> ParserE a
+withExpected :: ParserP a -> LexicalElement -> ParserE a
 withExpected p l = p `withError` LeUnexpectedLexicalElement [l]
 
 infixl 4 `withExpected`
@@ -204,7 +161,7 @@ backSlash = satisfy_ (== '\\') `withExpected` LeBackslash
 dot :: ParserE ()
 dot = satisfy_ (== '.') `withExpected` LeBackslash
 
-exprWhiteSpace' :: Parser ()
+exprWhiteSpace' :: ParserP ()
 exprWhiteSpace' = void $ some (space <|> newln)
   where
     space = satisfy_ (`elem` " \t")
@@ -240,7 +197,7 @@ varIdent =
             )
             `withExpected` LeVarIdent
 
-filterKeywords :: [String] -> Parser String -> Parser String
+filterKeywords :: [String] -> ParserP String -> ParserP String
 filterKeywords ks p =
     collapseMaybe $
         (\w -> if w `elem` ks then Nothing else Just w)
@@ -264,10 +221,10 @@ typName =
             )
             `withExpected` LeTypIdent
 
-nothingParser :: Parser a
+nothingParser :: ParserP a
 nothingParser = Parser (\(textPos, _) -> Left textPos)
 
-litPostfix :: [AtomicType] -> Parser AtomicType
+litPostfix :: [AtomicType] -> ParserP AtomicType
 litPostfix =
     foldr
         ( \typ pars ->
@@ -325,7 +282,7 @@ endOfFile =
         *> optional exprWhiteSpace
         *> (endOfFile' `withExpected` LeEndOfFile)
 
-endOfFile' :: Parser ()
+endOfFile' :: ParserP ()
 endOfFile' =
     Parser
         ( \(textPos, sourceCode) ->
@@ -336,13 +293,13 @@ endOfFile' =
 
 currentPos :: ParserE TextPos
 currentPos =
-    ParserE
+    Parser
         ( \(textPos, sourceCode) ->
             Right (textPos, textPos, sourceCode)
         )
 
 execParser :: ParserE a -> SourceCode -> Either LexicalError a
-execParser (ParserE fa) sc = (\(_, val, _) -> val) <$> fa ((1, 1), sc)
+execParser (Parser fa) sc = (\(_, val, _) -> val) <$> fa ((1, 1), sc)
 
 -- traceParser :: String -> Parser ()
 -- traceParser str =

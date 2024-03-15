@@ -23,6 +23,7 @@ module Errors
 where
 
 import qualified Data.List as Li
+import Util
 
 type LineNum = Int
 
@@ -39,6 +40,9 @@ type SemanticError = ProgramError SemanticErrorType
 type TypeError = ProgramError TypeErrorType
 
 type CompilerError = ProgramError CompilerErrorType
+
+instance (Default e) => Default (ProgramError e) where
+    def = ProgramError def def
 
 data CompilerErrorType
   = CeLexicalErrorType LexicalErrorType
@@ -72,6 +76,9 @@ instance Show LexicalErrorType where
       ++ Li.intercalate ", " (map show expected)
   show LeUnknownTypePostfix = "Unknown type postfix."
   show LeUnknownTypeName = "Unknown type name."
+
+instance Default LexicalErrorType where
+    def = LeUnexpectedLexicalElement []
 
 data TypeErrorType
   = TeReferenceNotFound
