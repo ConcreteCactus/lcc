@@ -837,7 +837,8 @@ This Turing machine accepts the input if it only consists of ones and zeroes,
 and it is symmetrical. If the input is not symmetrical, the Turing machine
 rejects the input. Note that there are some undefined state transitions.
 
-The execution of the Turing machine is:
+The execution of the Turing machine is the following. Note that some lines have
+been removed to keep the output concise.
 \begin{lstlisting}
 q0 0 > 0 0 1 0 1 0 0 0 
 q3 1 > _ 0 1 0 1 0 0 0 
@@ -854,8 +855,6 @@ q4 3 > _ _ _ 0 1 0 _ _ _
 ...
 q2 5 > _ _ _ 0 1 0 _ _ _ 
 \end{lstlisting}
-Note that some lines have been removed to keep the output concise.
-
 The result of the execution can be read out from the last state of the Turing
 machine: \verb$q2$. In this case, it has rejected the input because it was not
 symmetrical.
