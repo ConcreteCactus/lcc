@@ -3,7 +3,7 @@ import qualified LambdaCompilerTests.SemanticAnalyzer.TypeTest as TyTest
 import qualified LambdaCompilerTests.SemanticAnalyzerTests as SmATest
 import qualified LambdaCompilerTests.SyntacticAnalyzerTests as SyATest
 import qualified LambdaCompilerTests.SemanticAnalyzer.DependencyListTests as DLTest
-import qualified LambdaCompilerTests.Compiler.CompilerTests as CTest
+import qualified LambdaCompilerTests.CodeGenerator.CodeGeneratorTests as CTest
 import Test.Hspec
 
 main :: IO ()

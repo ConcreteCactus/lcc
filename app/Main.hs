@@ -1,6 +1,6 @@
 module Main (main) where
 
-import Compiler
+import CodeGenerator
 import Control.Monad
 import Data.Maybe
 import System.Environment

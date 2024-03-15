@@ -23,8 +23,8 @@ source-repository head
 library
   exposed-modules:
       AtomicType
-      Compiler
-      Compiler.Internal
+      CodeGenerator
+      CodeGenerator.Internal
       Errors
       Interpreter
       Lexer
@@ -71,7 +71,7 @@ test-suite lambda-compiler-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
-      LambdaCompilerTests.Compiler.CompilerTests
+      LambdaCompilerTests.CodeGenerator.CodeGeneratorTests
       LambdaCompilerTests.E2E
       LambdaCompilerTests.SemanticAnalyzer.DependencyGraphTest
       LambdaCompilerTests.SemanticAnalyzer.DependencyListTests

@@ -1,7 +1,7 @@
 {-# LANGUAGE ImpredicativeTypes #-}
 {-# OPTIONS_GHC -Wno-missing-export-lists #-}
 
-module Compiler.Internal where
+module CodeGenerator.Internal where
 
 import Control.Monad
 import qualified Data.List as Li

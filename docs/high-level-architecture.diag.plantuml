@@ -8,8 +8,8 @@ package "Semantic analyzer" {
     [Expression]
     [Type]
 }
-[Compiler]
-"Syntactic analyzer" -[hidden]- [Compiler]
-"Semantic analyzer" -[hidden]- [Compiler]
+[Code generator]
+"Syntactic analyzer" -[hidden]- [Code generator]
+"Semantic analyzer" -[hidden]- [Code generator]
 @enduml
 

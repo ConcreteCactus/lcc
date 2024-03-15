@@ -1,6 +1,6 @@
-module LambdaCompilerTests.Compiler.CompilerTests (spec) where
+module LambdaCompilerTests.CodeGenerator.CodeGeneratorTests (spec) where
 
-import Compiler.Internal
+import CodeGenerator.Internal
 import Errors
 import SemanticAnalyzer as S
 import SyntacticAnalyzer as Y
