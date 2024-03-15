@@ -1,0 +1,15 @@
+@startuml
+!theme plain
+package "Syntactic analyzer" {
+    [Lexer]
+    [Syntax checker]
+}
+package "Semantic analyzer" {
+    [Expression]
+    [Type]
+}
+[Compiler]
+"Syntactic analyzer" -[hidden]- [Compiler]
+"Semantic analyzer" -[hidden]- [Compiler]
+@enduml
+

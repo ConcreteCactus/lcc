@@ -2,11 +2,11 @@ module Errors
   ( LexicalError,
     SemanticError,
     TypeError,
-    LexicalElement(..),
-    LexicalErrorType(..),
-    SemanticErrorType(..),
-    TypeErrorType(..),
-    CompilerErrorType(..),
+    LexicalElement (..),
+    LexicalErrorType (..),
+    SemanticErrorType (..),
+    TypeErrorType (..),
+    CompilerErrorType (..),
     CompilerError,
     LineNum,
     ColNum,
@@ -18,7 +18,7 @@ module Errors
     mkCompErrLex,
     mkCompErrSem,
     mkCompErrTyp,
-    incTextPos
+    incTextPos,
   )
 where
 
@@ -30,7 +30,7 @@ type ColNum = Int
 
 type TextPos = (LineNum, ColNum)
 
-data ProgramError e = ProgramError e TextPos deriving Eq
+data ProgramError e = ProgramError e TextPos deriving (Eq)
 
 type LexicalError = ProgramError LexicalErrorType
 
@@ -44,7 +44,12 @@ data CompilerErrorType
   = CeLexicalErrorType LexicalErrorType
   | CeSemanticErrorType SemanticErrorType
   | CeTypeErrorType TypeErrorType
-  deriving (Eq, Show)
+  deriving Eq
+
+instance Show CompilerErrorType where
+    show (CeLexicalErrorType t) = "lexical error: " ++ show t
+    show (CeSemanticErrorType t) = "semantic error: " ++ show t
+    show (CeTypeErrorType t) = "type error: " ++ show t
 
 data LexicalErrorType
   = LeUnexpectedLexicalElement [LexicalElement]
@@ -53,8 +58,13 @@ data LexicalErrorType
   deriving (Eq)
 
 instance (Show e) => Show (ProgramError e) where
-    show (ProgramError e (line, col)) = "Error on line (" ++ show line 
-        ++ "," ++ show col ++ "): " ++ show e
+  show (ProgramError e (line, col)) =
+    "Error on line ("
+      ++ show line
+      ++ ","
+      ++ show col
+      ++ "): "
+      ++ show e
 
 instance Show LexicalErrorType where
   show (LeUnexpectedLexicalElement expected) =
@@ -71,13 +81,46 @@ data TypeErrorType
   | TeCheckError String String
   | TeApplyingToANonFunction String
   | TeIfThenElseConditionIsNotBool
-  deriving (Show, Eq)
+  | TeMainFunctionIsNotByte
+  deriving (Eq)
+
+instance Show TypeErrorType where
+  show TeReferenceNotFound = "The reference was not found"
+  show (TeSelfReferenceFound _ typ) =
+    "Self reference found: "
+      ++ typ
+  show (TeAtomicTypeMismatch at bt) =
+    "Atomic type don't match: "
+      ++ at
+      ++ ", "
+      ++ bt
+  show (TeTypeMismatch t1 t2) =
+    "Types couldn't be reconciled: "
+      ++ t1
+      ++ ", "
+      ++ t2
+  show (TeCheckError t1 t2) =
+    "Type wish couldn't be applied: "
+      ++ t1
+      ++ ", "
+      ++ t2
+  show (TeApplyingToANonFunction t2) =
+    "Trying to apply to a non-function: " ++ t2
+  show TeIfThenElseConditionIsNotBool = 
+    "The condition in the if then else expression is not bool"
+  show TeMainFunctionIsNotByte =
+    "The main function is not U8"
 
 data SemanticErrorType
   = SeValueRedefinition
   | SeUndefinedVariable String
   | SeTypeRedeclaration
-  deriving (Show, Eq)
+  deriving (Eq)
+
+instance Show SemanticErrorType where
+  show SeValueRedefinition = "Value has been redefined."
+  show (SeUndefinedVariable name) = "Value is undefined: " ++ name
+  show SeTypeRedeclaration = "The type has been redeclared."
 
 data LexicalElement
   = LeColon
@@ -103,26 +146,26 @@ data LexicalElement
   deriving (Eq)
 
 instance Show LexicalElement where
-    show LeColon = "colon (:)"
-    show LeStar = "star (*)"
-    show LePlus = "plus (+)"
-    show LeArrow = "->"
-    show LeColonEquals = ":="
-    show LeBackslash = "\\"
-    show LeDot = "."
-    show LeExprWhiteSpace = "white space"
-    show LeStmtWhiteSpace = "white space with a following new statement"
-    show LeIf = "if"
-    show LeThen = "then"
-    show LeElse = "else"
-    show LeVarIdent = "variable name (eg. x)"
-    show LeTypIdent = "type name (eg. I32)"
-    show LeLiteral = "a literal (eg. 42i32)"
-    show LeOpeningBracket = "opening bracket"
-    show LeClosingBracket = "closing bracket"
-    show LeOpeningSquareBracket = "opening square bracket"
-    show LeClosingSquareBracket = "closing square bracket"
-    show LeEndOfFile = "end of file"
+  show LeColon = "colon (:)"
+  show LeStar = "star (*)"
+  show LePlus = "plus (+)"
+  show LeArrow = "->"
+  show LeColonEquals = ":="
+  show LeBackslash = "\\"
+  show LeDot = "."
+  show LeExprWhiteSpace = "white space"
+  show LeStmtWhiteSpace = "white space with a following new statement"
+  show LeIf = "if"
+  show LeThen = "then"
+  show LeElse = "else"
+  show LeVarIdent = "variable name (eg. x)"
+  show LeTypIdent = "type name (eg. I32)"
+  show LeLiteral = "a literal (eg. 42i32)"
+  show LeOpeningBracket = "opening bracket"
+  show LeClosingBracket = "closing bracket"
+  show LeOpeningSquareBracket = "opening square bracket"
+  show LeClosingSquareBracket = "closing square bracket"
+  show LeEndOfFile = "end of file"
 
 mkLexErr :: TextPos -> [LexicalElement] -> LexicalError
 mkLexErr pos expect = ProgramError (LeUnexpectedLexicalElement expect) pos
@@ -138,8 +181,10 @@ mkTypErr pos typ = ProgramError typ pos
 
 mkCompErrLex :: LexicalError -> CompilerError
 mkCompErrLex (ProgramError et pos) = ProgramError (CeLexicalErrorType et) pos
+
 mkCompErrSem :: SemanticError -> CompilerError
 mkCompErrSem (ProgramError et pos) = ProgramError (CeSemanticErrorType et) pos
+
 mkCompErrTyp :: TypeError -> CompilerError
 mkCompErrTyp (ProgramError et pos) = ProgramError (CeTypeErrorType et) pos
 

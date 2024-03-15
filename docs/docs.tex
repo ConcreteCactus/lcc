@@ -3,6 +3,7 @@
 \usepackage[a4paper, top=2.5cm, right=2.5cm, bottom=2.5cm, left=2.5cm]{geometry}
 \usepackage{listings}
 \usepackage{setspace}
+\usepackage{graphicx}
 
 \onehalfspace
 % Later references:
@@ -637,8 +638,8 @@ The modified \verb$readfile$ function now returns every character from the
 standard input, and not only every second one.
 
 \paragraph{Constructors and basic operations on primitives} Types and the
-provided basic functions on them are discussed in the Types subsection, so only
-the type definitions are shown here.
+provided basic functions on them are discussed in the Types subsection;
+therefore only the type definitions are shown here.
 \begin{lstlisting}
 inl       : a -> a + b
 inr       : b -> a + b
@@ -655,10 +656,10 @@ exfalso   : Empty -> a
 
 \subsubsection{A note on white-space}
 
-To break an expression down into multiple lines, one would insert endline
-characters inside the whitespace between expression parts. Lines that are part
-of a previous expression have to start with some sort of whitespace, in order
-for the compiler to differenciate between continued expressions and new
+To break an expression down into multiple lines, one would insert end of line
+characters inside the white-space between expression parts. Lines that are part
+of a previous expression have to start with some sort of white-space, in order
+for the compiler to differentiate between continued expressions and new
 definitions.
 \lstset{showspaces=true}
 \begin{lstlisting}
@@ -671,7 +672,58 @@ nextDefinition := nextExpression
 
 \subsubsection{The main function}
 
+When a program compiled by \verb$lcc$ starts, the \verb$main$ function is
+evaluated. Since the return value of the main function is used as the exit code
+of the program, the main function can only have type \verb$U8$.
+
+It is allowed to compile a program without a main function, however running the
+resulting binary will simply exit with exit code 0.
+
 \subsubsection{Compilation errors}
+
+The compiler can show an error message in case the program has errors. The error
+message contains the line and column number of the position the error was found
+on. The precision of the position depends on the type of the error, which
+there are three of:
+\begin{itemize}
+    \item Syntactic and lexical errors
+    \item Semantic errors
+    \item Type errors
+\end{itemize}
+
+Syntactic and lexical errors show the position the error was found at, while
+semantic and type errors only show the start of the declaration or definition
+the error was found at.
+
+\paragraph{Syntactic and lexical errors} Syntactic and lexical errors are
+reported with the message \verb$lexical error$. These errors can occur due to
+the following reasons:
+\begin{itemize}
+    \item Mistyped operators (e.g. \verb$=$ instead of \verb$:=$)
+    \item Mismatched brackets 
+    \item Bad syntax (e.g. \verb$\x x$ instead of \verb$\x.x$)
+\end{itemize}
+
+\paragraph{Semantic errors} Semantic errors are reported with the message
+\verb$semantic error$. Semantic errors can only occur in syntactically correct
+source codes. Semantic errors can be one of the following:
+\begin{itemize}
+    \item When a global variable is redefined.
+    \item When the type wish of a global variable is redefined.
+    \item When there is a reference to an undefined global variable. 
+\end{itemize}
+
+\paragraph{Type errors} Type errors are reported with the message
+\verb$type error$. Type errors can only occur in semantically correct source
+codes. A type error can have one of the following kinds:
+\begin{itemize}
+    \item When the type of an expression could not be inferred due to a self
+        reference.
+    \item When two types could not be matched.
+    \item When a type wish did not match the inferred type of an expression.
+    \item When a value is applied to an expression whose type is not a function.
+    \item When a condition of an if expression is not a boolean.
+\end{itemize}
 
 \subsection{Example programs}
 \lstset{numbers=left}
@@ -863,4 +915,21 @@ symmetrical.
 
 \pagebreak
 \section{Developer documentation}
+
+This part of the documentation is intended for developers of the compiler, and
+users of the language should not need to use it.
+
+\subsection{High level architecture}
+
+\begin{figure}[h]
+\includegraphics[width=\textwidth]{high-level-architecture.diag.pdf}
+\centering
+\caption{High level modules in the compiler}
+\end{figure}
+
+\subsection{Lexer and Syntactic analyzer}
+\subsection{Semantic analyzer}
+\subsection{Type inference and type checking}
+\subsection{Compilation}
+\subsection{Tests}
 \end{document}
