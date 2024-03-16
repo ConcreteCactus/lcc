@@ -36,7 +36,6 @@ module Lexer
     collapseEither,
     currentPos,
     execParser,
-    runParserE,
     isMain
     -- traceParser
   )

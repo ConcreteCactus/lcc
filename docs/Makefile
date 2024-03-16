@@ -1,17 +1,17 @@
 .PHONY: docs
 
-docs: docs.pdf high-level-architecture.diag.pdf
+docs: docs.pdf
 
-docs.pdf: high-level-architecture.diag.pdf docs.tex
+docs.pdf: high-level-architecture.diag.pdf syntax-checker.diag.pdf docs.tex
 	latexmk -pdf docs.tex
 	latexmk -c
 
-high-level-architecture.diag.pdf: high-level-architecture.diag.tex
-	latexmk -pdf high-level-architecture.diag.tex
+%.diag.pdf: %.diag.tex
+	latexmk -pdf $<
 	latexmk -c
 
-high-level-architecture.diag.tex: high-level-architecture.diag.plantuml
-	plantuml -tlatex high-level-architecture.diag.plantuml
+%.diag.tex: %.diag.plantuml
+	plantuml -tlatex $<
 
 clean:
 	latexmk -c

@@ -1,0 +1,13 @@
+@startuml
+!theme plain
+package "Syntax checker" {
+    [Lexer]
+    [Syntactic Analyzer]
+    [Lexer] <-r- [Syntactic Analyzer] : Token parsers
+}
+[Errors] <-d- [Lexer] : Lexical error definitions
+[Errors] <-d- [Syntactic Analyzer] : Syntactic error definitions
+[Syntactic Analyzer] <-d- [Semantic Analyzer] : Syntax tree
+[Lexer] <-d- [Semantic Analyzer] : Syntax tree subtypes
+@enduml
+

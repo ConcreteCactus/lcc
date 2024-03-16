@@ -12,7 +12,8 @@
 % - https://en.wikipedia.org/wiki/De_Bruijn_index
 
 \title{A lambda calculus compiler}
-\author{Áron Hárnási \\ \normalsize Eötvös Lóránd University, Faculty of Informatics}
+\author{Áron Hárnási \\
+    \normalsize Eötvös Lóránd University, Faculty of Informatics}
 
 \lstdefinestyle{mystyle}{
     basicstyle=\ttfamily,
@@ -32,7 +33,9 @@
 \section{Introduction}
 
 This is the user and development documentation of a compiler that compiles a
-language inspired by simply typed lambda calculus, and produces C source code.
+language inspired by simply typed lambda calculus and produces C source code.
+
+\subsection{Motivation} % todo
 
 \subsection{Lambda calculus}
 
@@ -69,7 +72,7 @@ previous example $((\lambda x. (\lambda y. x)) y) z$ replacing $y$ with $w$ in
 the inner lambda term will result in $((\lambda x. (\lambda w. x)) y) z$, which
 does not have naming collisions.
 
-\subsubsection{De Bruijn indexing}
+\subsubsection{De Bruijn indexing} % todo: split and move to user and dev doc
 
 One other way of eliminating naming collisions is the use of De Bruijn indexing.
 Bound variables can be represented not with names given to them at the start of
@@ -82,20 +85,20 @@ z))$, part of which was used in the previous paragraph, would be $\lambda
 collisions, and it is used in this thesis as an alternative to
 $\alpha$-reduction.
 
-\subsection{This implementation}
+\subsection{This implementation} % todo: split and move to user and dev doc
 
 In this section, we will touch on the most important differences between the
 formal system of lambda calculus, and this implementation. There have been a lot
 of ideas borrowed from C, Rust, and Haskell in order to make the language usable
 from a non-theoretical standpoint.
 
-\subsubsection{Global variables}
+\subsubsection{Global variables} % todo: split and move to user and dev doc
 
 In order to make the language more usable, much like in Haskell, it is possible
 to create global definitions for terms, that can be used in other parts of the
 program. This introduces recursion as the main fix-point combinator.
 
-\subsubsection{Static typing}
+\subsubsection{Static typing} % todo: split and move to user and dev doc
 
 It was decided, that the code this compiler compiles from was going to be
 statically typed. Each term has a type that is assigned to it at compile time by
@@ -103,13 +106,13 @@ a type inference algorithm. Types of global variables can also be specified, in
 which case the compiler checks if it matches the inferred type of the same
 variable.
 
-\subsubsection{Garbage collection}
+\subsubsection{Garbage collection} % todo: split and move to user and dev doc
 
 There is a simple garbage collection algorithm built into the runtime of the
 generated code. The algorithm uses a mark-and-sweep style method to find and
 free allocated memory that is not used.
 
-\subsubsection{Impure C back-end}
+\subsubsection{Impure C back-end} % todo: split and move to user and dev doc
 
 The target language of the compiler is C; therefore there are functions and
 primitive types in the source language that have a corresponding pair in the
@@ -120,6 +123,9 @@ functions.
 
 \pagebreak
 \section{User documentation}
+
+\subsection{The goal of the project} % todo
+\subsection{Methods used} % todo
 
 \subsection{Building the software}
 \subsubsection{Dependencies}
@@ -953,16 +959,72 @@ src/
 
 \subsection{Lexer and Syntax checker}
 
+\begin{figure}[t]
+\includegraphics[width=0.8\textwidth]{syntax-checker.diag.pdf}
+\centering
+\caption{Module imports related to the Syntax checker}
+\end{figure}
+
 When the compiler is invoked, the given source code is loaded into memory as a
 \verb$String$. This source code is then used by the Lexer and
 Syntax checker to build a syntax tree, which is then given to the
 Semantic analyzer for further processing.
 
+\subsubsection{The method of parsing lexical tokens}
+
 The Lexer is responsible for correctly parsing the individual tokens used in the
-source code.
+source code. It defines an applicative functor named Parser that is used
+extensively throughout the Lexer and Syntactic analyzer modules. 
+
+The most used functions that can be used to define parsers are the
+\verb$satisfy$ and \verb$satify_$ functions. These functions take a predicate on
+a character, and return a parser that parses characters for which the predicate
+returns true. By chaining together parsers returned by the \verb$satisfy$
+functions, it is possible to define parsers for longer strings.
+
+To define a parser for a lexical token, the \verb$satisfy$ and \verb$satisfy_$
+functions are used along with the \verb$Applicative$ and \verb$Alternative$
+utility functions, for example, \verb$some$, \verb$many$, and the \verb$<|>$
+(alternative) operator. These primitives allow the creation of regex-like
+parsers, for example, the parser for hexadecimal number literals is defined in
+the following way:
+\\\noindent\begin{minipage}{\textwidth}
+\begin{lstlisting}
+( satisfy_ (== '0')
+    *> (satisfy_ (== 'x') <|> satisfy_ (== 'X'))
+    *> some (satisfy isHexDigit)
+    <* satisfy (== '_')
+) <*> litPostfix unsignedIntAtomicTypes
+\end{lstlisting}
+\end{minipage}
+First, the \verb$0$ and \verb$x$ characters are parsed allowing upper and
+lowercase \verb$x$ characters. Then, one or more hexadecimal digits ending with
+an underscore are parsed. Because hexadecimal literals need to be postfixed with
+a type postfix, the postfix is parsed using the \verb$litPostfix$ function. This
+example also shows that hexadecimal literals can only encode unsigned integers.
+
+\subsubsection{The structure of the Syntactic analyzer}
+
+The main goal of the Syntactic Analyzer is to process the input string using the
+tokens defined in the lexer, return a syntax-tree to be used in the semantic
+analyzer, and error on failure. The syntactic analyzer completes most of these
+tasks by using the \verb$Parser$ defined in the Lexer.
+
+The Syntactic Analyzer exports the \verb$parseProgram$ function, that directly
+turns an input string into either a correct syntax-tree or an error message
+depending on whether the input source code was syntactically correct or not. The
+type of the syntax-tree is named \verb$Program$, which is an alias for a list of
+\verb$ProgramPart$ elements. A \verb$ProgramPart$ contains the name of a global
+variable and either a \verb$Declaration$ containing a type wish (or simply
+\verb$Type$), or a \verb$Definition$ containing an \verb$Expression$.
+
+All \verb$Program$, \verb$ProgramPart$, \verb$Expression$, and \verb$Type$ have
+a corresponding parser defined in the Syntactic Analyzer along with all
+constructors of expression and type.
 
 \subsection{Semantic analyzer}
 \subsection{Type inference and type checking}
 \subsection{Compilation}
 \subsection{Tests}
+\subsection{The Utility module}
 \end{document}
