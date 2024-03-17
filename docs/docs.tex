@@ -1087,7 +1087,37 @@ single step.
 
 \subsubsection{Type inference}
 
+The type inference algorithm is a stateful function, which mostly keeps track of
+a dictionary called \verb$ReconcileEnv$, where the keys are the indices of
+generic types, and the values are the types the generics should be substituted
+with. Types related to this \verb$ReconcileEnv$ (i.e. types that contain or can
+contain a generic index present in \verb$ReconcileEnv$) are part of the same
+context, and therefore they have the type \verb$Type$ instead of
+\verb$NormType$. 
 
+There are two important invariant rules of \verb$ReconcileEnv$. First, there can
+not be any keys that are present in any of the values as generic ids. Second,
+if the values of two keys are different, then the keys have to be different as
+well. These invariant rules help the type inference algorithm in a way that type
+substitutions can be done in a single step.
+
+There are two important helper functions:
+\verb$reconcileTypesS$ and \\\verb$updateWithSubstitutions$. These functions
+also use the same \verb$ReconcileEnv$ state.
+
+\verb$reconcileTypesS$ is a helper function that can be given two types in the
+same context. It returns either a new type that can be used in place of the two
+given, or it returns an error, meaning that the two types can not be reconciled.
+This function changes the \verb$ReconcileEnv$ context, therefore it is
+important to update the necessary types with the changes using the
+\verb$updateWithSubstitutions$ function.
+
+The \verb$updateWithSubstitutions$ function takes a type and returns a possibly
+different type. It reads the \verb$ReconcileEnv$ and if there are any generic
+indices in the given type that also exist in the dictionary as keys, it
+substitutes the generic types in the given type with the values of the keys
+found in the \verb$ReconcileEnv$. This function does not change the state,
+therefore it is safe to use without requiring an update.
 
 \subsubsection{Type checking}
 \subsection{Code Generation}
