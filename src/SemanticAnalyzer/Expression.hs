@@ -1,7 +1,6 @@
 module SemanticAnalyzer.Expression
   ( Expression (..),
     ConvertEnv (..),
-    convertExpression,
     convertExpressionS,
     addGlobal,
     findGlobal,

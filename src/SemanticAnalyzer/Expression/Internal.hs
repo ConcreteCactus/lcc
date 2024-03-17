@@ -56,10 +56,6 @@ showHelper names (IfThenElse cond expr1 expr2) =
     ++ " else "
     ++ showHelper names expr2
 
-convertExpression :: Y.Expression -> Expression
-convertExpression expr = 
-  execState (convertExpressionS expr) $ ConvertEnv [] [] []
-
 convertExpressionS ::
   Y.Expression -> State ConvertEnv Expression
 convertExpressionS (Y.Id name) = do

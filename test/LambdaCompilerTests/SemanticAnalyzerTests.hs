@@ -114,6 +114,10 @@ isRight :: Either a b -> Bool
 isRight (Right _) = True
 isRight _ = False
 
+convertExpression :: Y.Expression -> Expression
+convertExpression expr = 
+  execState (convertExpressionS expr) $ ConvertEnv [] [] []
+
 parseExpression :: L.SourceCode -> Either LexicalError Y.Expression
 parseExpression = L.execParser Y.expression
 

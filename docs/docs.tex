@@ -72,18 +72,6 @@ previous example $((\lambda x. (\lambda y. x)) y) z$ replacing $y$ with $w$ in
 the inner lambda term will result in $((\lambda x. (\lambda w. x)) y) z$, which
 does not have naming collisions.
 
-\subsubsection{De Bruijn indexing} % todo: split and move to user and dev doc
-
-One other way of eliminating naming collisions is the use of De Bruijn indexing.
-Bound variables can be represented not with names given to them at the start of
-a lambda term, but instead with numbers denoting how far the variable occurrence
-is compared to the lambda term that the variable is bound to. For example, the
-term $(\lambda x. (\lambda y. x))$ with De Bruijn indices would be $\lambda
-\lambda 2$, or the term $(\lambda y. (\lambda z. ((\lambda x. (\lambda y. x)) y)
-z))$, part of which was used in the previous paragraph, would be $\lambda
-\lambda ((\lambda \lambda 2) 2) 1$. Using De Bruijn indexing eliminates naming
-collisions, and it is used in this thesis as an alternative to
-$\alpha$-reduction.
 
 \subsection{This implementation} % todo: split and move to user and dev doc
 
@@ -1020,11 +1008,89 @@ variable and either a \verb$Declaration$ containing a type wish (or simply
 
 All \verb$Program$, \verb$ProgramPart$, \verb$Expression$, and \verb$Type$ have
 a corresponding parser defined in the Syntactic Analyzer along with all
-constructors of expression and type.
+constructors of Expression and Type.
 
 \subsection{Semantic analyzer}
-\subsection{Type inference and type checking}
-\subsection{Compilation}
+
+Once the syntax-tree is created, the Semantic Analyzer can start processing it.
+The Semantic Analyzer is responsible for six tasks:
+\begin{itemize}
+    \item Assign De-Bruijn indices to function parameters.
+    \item Assign incremental indices to generic types.
+    \item Check that there are no duplicate or undefined global definitions.
+    \item Build a dependency list of the definitions in the order they need to
+        be type inferred.
+    \item Run the type inference algorithm and apply type wishes.
+    \item Check that the \verb$main$ function has the correct type.
+\end{itemize}
+
+\begin{figure}[t]
+\includegraphics[width=\textwidth]{semantic-analyzer.diag.pdf}
+\centering
+\caption{Module imports related to the Semantic Analyzer}
+\end{figure}
+
+If any of the above tasks fail, an error is produced, and the compilation stops.
+If all tasks finish successfully, the processed code is then sent to the Code
+Generator, which can start generating the C source code.
+
+\subsubsection{De Bruijn indexing}
+
+One way of eliminating naming collisions is the use of De Bruijn indexing. Bound
+variables can be represented not with names given to them at the start of a
+lambda term, but instead with numbers denoting how far the variable occurrence
+is compared to the lambda term that the variable is bound to. For example, the
+term $(\lambda x. (\lambda y. x))$ with De Bruijn indices would be $\lambda
+\lambda 2$, or the term $(\lambda y. (\lambda z. ((\lambda x. (\lambda y. x)) y)
+z))$, would be $\lambda \lambda ((\lambda \lambda 2) 2) 1$. De-Bruijn indexing
+is used by the Semantic Analyzer as a way of eliminating naming collisions.
+
+Expressions in the syntax-tree returned by the syntactic analyzer are not
+De-Bruijn indexed, and variables need to have their index assigned for
+processing to continue. The \verb$convertExpressionS$ function is responsible
+for this. It recursively walks the expression; when it finds a variable, it
+searches for the closest lambda definition with the same name. If it finds the
+lambda, it assigns the \emph{distance} of the lambda to the variable as the
+index. If no such lambda expression is found, the algorithm assumes that the
+variable is a global reference. \\
+\textbf{Note:} The above algorithm is what allows name shadowing in the LC
+language.
+
+\subsubsection{Representing generic types}
+
+Along with expression variables, generic types also use an indexed
+representation, as it makes type inference easier. When the types are converted
+from the representation of the syntax checker to the representation of the
+semantic analyzer, generic types with the same name get the same index, and
+generic types with different names get different indices.
+
+There are two different \verb$Type$ types in the semantic analyzer: \verb$Type$
+and \verb$NormType$. \verb$Type$ is used prominently in the type inference
+algorithm, as \verb$Type$ represents a type that is part of a larger
+\emph{context,} while \verb$NormType$ is a type that has no \emph{context;} it
+contains all the type information of a global definition in itself. This will be
+discussed in the type inference section in more detail.
+
+\subsubsection{Dependency List}
+
+A dependency list is a list in which the elements are ordered such that no
+elements \emph{depend} on any of the ones that are ordered later in the list. It
+is a datatype that can be constructed using a list and a dependency function
+which given an element of the list returns all the elements that the given
+element depends on. The dependency list allows dependency cycles, in which case
+it arranges all the elements in a cycle into a single node.
+
+The dependency list is used by the Semantic Analyzer to determine the order in
+which the global definitions need to be type inferred. If there are any
+dependency cycles, it infers the type of all definitions in the cycle in a
+single step.
+
+\subsubsection{Type inference}
+
+
+
+\subsubsection{Type checking}
+\subsection{Code Generation}
 \subsection{Tests}
 \subsection{The Utility module}
 \end{document}

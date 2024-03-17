@@ -27,7 +27,7 @@ module Util (
   except,
   maximumM,
   Default,
-  def
+  def,
 )
 where
 

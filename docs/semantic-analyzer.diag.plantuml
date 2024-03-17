@@ -1,0 +1,22 @@
+@startuml
+!theme plain
+package "Syntax checker" {
+    [Lexer]
+    [Syntactic Analyzer]
+}
+package "Semantics Checker" {
+    [Semantic Analyzer]
+    [Expression]
+    [Type]
+    [Dependency List]
+    [Semantic Analyzer] -l-> [Expression]
+    [Semantic Analyzer] -d-> [Type]
+    [Semantic Analyzer] -d-> [Dependency List]
+}
+[Syntactic Analyzer] <-d- [Semantic Analyzer] : Syntax tree
+[Lexer] <-d- [Semantic Analyzer] : Syntax tree subtypes
+[Errors] <-d- [Semantic Analyzer] : Semantic error types
+[Semantic Analyzer] -r-> [Standard Library] : Declarations
+[Compiler] -u-> [Semantic Analyzer] : Type-safe program
+@enduml
+

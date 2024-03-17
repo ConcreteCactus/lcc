@@ -2,7 +2,10 @@
 
 docs: docs.pdf
 
-docs.pdf: high-level-architecture.diag.pdf syntax-checker.diag.pdf docs.tex
+docs.pdf: high-level-architecture.diag.pdf \
+		  syntax-checker.diag.pdf \
+		  semantic-analyzer.diag.pdf \
+		  docs.tex
 	latexmk -pdf docs.tex
 	latexmk -c
 
