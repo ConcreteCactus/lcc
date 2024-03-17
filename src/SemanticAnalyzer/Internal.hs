@@ -293,11 +293,12 @@ mkTyExprTreeS defs udef = do
   case itypE of
     Left e -> return $ Left $ mkTypErr (udefPos udef) e
     Right (ityp, _) -> do
-      InferEnv _ _ globs <- get
+      InferEnv _ _ globs <- get -- is this really necessary? todo: find out
+      -- Types are inferred in an order that has no undefined references
       case lookup (udefName udef) globs of
         Nothing -> do
           let infExpr = InfExpr (udefExpr udef) $ mkNormType ityp
-          return $ addWish udef infExpr
+          return $ toTypedExpr udef infExpr
         Just _ -> do
           defTyp <- getTypeOfGlobal (udefName udef)
           mergedDefTypE <- reconcileTypesIS ityp defTyp
@@ -305,10 +306,10 @@ mkTyExprTreeS defs udef = do
             Left e -> return $ Left $ mkTypErr (udefPos udef) e
             Right mergedDefTyp -> do
               let infExpr = InfExpr (udefExpr udef) (mkNormType mergedDefTyp)
-              return $ addWish udef infExpr
+              return $ toTypedExpr udef infExpr
   where
-    addWish :: UninfDefinition -> InfExpr -> Either TypeError TypedExpr
-    addWish udef' infExpr@(InfExpr _ _) =
+    toTypedExpr :: UninfDefinition -> InfExpr -> Either TypeError TypedExpr
+    toTypedExpr udef' infExpr@(InfExpr _ _) =
       case udefWish udef' of
         Nothing -> Right $ mkTypedExprInf infExpr
         Just wish ->
@@ -376,7 +377,7 @@ inferTypeExprCycleS defs (udef : udefs) = do
   case infTypE of
     Left e -> return $ Left $ mkTypErr (udefPos udef) e
     Right (ityp, _) -> do
-      selfTyp <- getTypeOfGlobal (udefName udef)
+      selfTyp <- getTypeOfGlobal (udefName udef) -- Here, it makes sense
       selfRecE <- reconcileTypesIS ityp selfTyp
       case selfRecE of
         Left e -> return $ Left $ mkTypErr (udefPos udef) e

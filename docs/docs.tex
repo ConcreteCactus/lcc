@@ -234,10 +234,10 @@ variables can be defined with the \texttt{:=} operator in the following way.
 \begin{lstlisting}
 globalVariable := expression
 \end{lstlisting}
-Optionally, any global variable can have its type specified. For each specified
-type, the compiler checks if it can be used in place of the inferred type. To
-specify the type of a global variable, one would use the \texttt{:} operator in
-the following way:
+Optionally, a type wish or declaration can be added to a global definition,
+(i.e., its intended type can be specified.) For each type wish, the compiler
+checks if it can be used in place of the inferred type. To specify a type wish,
+one can use the colon (\verb$:$) operator in the following way:
 \begin{lstlisting}
 globalVariable : I32 -> I32 -> I32
 globalVariable := expression
@@ -1127,6 +1127,18 @@ therefore it is safe to use without requiring an update.
 
 \subsubsection{Type inference}
 
+The most important function related to type inference is \verb$inferFromExprS$.
+It is a stateful function, that takes a list of already resolved definitions,
+an expression, and either returns a type error, or a type with an additional
+list of inferred types from the function parameters whose lambda expressions are
+outside of the given expression. This function is run recursively on an
+expression and its sub-expressions, where it can find variables that are
+declared outside of the expression the function is called on. The function keeps
+track of all variables and their inferred types in the state, where each new
+variable is assigned a generic type with a unique id. When more information is
+found related to the variable, the stored type is updated using the
+\verb$reconcileTypesS$ function.
+
 Type inference is run on every global definition in the source code in the order
 in which there are no unresolved dependencies. Because cyclic dependencies can
 occur in the code, all definitions in a cycle are type inferred at the same
@@ -1138,7 +1150,37 @@ dependencies, type wishes need to be applied right after the type of a
 definition is inferred, since it has an effect on the definitions depending on
 it.
 
+\verb$mkInfExprTree$ is a function that takes the list of already resolved
+definitions, one still unresolved expression, and returns either an error if a
+type error has occurred or the expression with the inferred type or applied type
+wish. Internally, it infers the type with \verb$inferFromExprS$, checks if there
+are any type wishes added to the definition, and runs the type checking
+algorithm if there are any.
+
+While \verb$mkInfExprTree$ only infers the type of a single global variable,
+\verb$mkInfExprCycle$ can infer any number of variable types. It takes the list
+of already resolved definitions, a list of unresolved definitions, and it
+returns either an error, if there are any, or a list of resolved definitions.
+Internally, it walks the given list of to be inferred definitions and runs
+\verb$inferFromExprS$ on each variable. After this, the type information
+computed by the inference of the definitions on each other is taken into
+account. Then all types are updated with \verb$updateWithSubstitutions$. After
+the updating step, the type wishes can checked and substituted.
+
 \subsubsection{Type checking}
+
+Type checking is a comparatively small part of the type inference algorithm. It
+can be understood as a stricter algorithm for type reconciliation. A type check
+succeeds when two conditions are met: 
+\begin{itemize}
+    \item The type wish and the inferred type can be reconciled.
+    \item The type wish is stricter than the inferred type.
+\end{itemize}
+Because of this, the function \verb$reconcileTypesS$ and \verb$checkTypeS$
+(i.e., the function used for type checking) have a lot in common. The two main
+differences are that \verb$checkTypeS$ does not substitute generic types that
+originate from the type wish, and \verb$checkTypeS$ returns a unit on success.
+
 \subsection{Code Generation}
 \subsection{Tests}
 \subsection{The Utility module}
