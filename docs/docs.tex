@@ -1085,14 +1085,14 @@ which the global definitions need to be type inferred. If there are any
 dependency cycles, it infers the type of all definitions in the cycle in a
 single step.
 
-\subsubsection{Type inference}
+\subsubsection{The framework of type inference and type checking}
 
-The type inference algorithm is a stateful function, which mostly keeps track of
-a dictionary called \verb$ReconcileEnv$, where the keys are the indices of
-generic types, and the values are the types the generics should be substituted
-with. Types related to this \verb$ReconcileEnv$ (i.e. types that contain or can
-contain a generic index present in \verb$ReconcileEnv$) are part of the same
-context, and therefore they have the type \verb$Type$ instead of
+The type inference and type checking algorithms are stateful functions, which
+mostly keep track of a dictionary called \verb$ReconcileEnv$, where the keys are
+the indices of generic types, and the values are the types the generics should
+be substituted with. Types related to this \verb$ReconcileEnv$ (i.e. types that
+contain or can contain a generic index present in \verb$ReconcileEnv$) are part
+of the same context, and therefore they have the type \verb$Type$ instead of
 \verb$NormType$. 
 
 There are two important invariant rules of \verb$ReconcileEnv$. First, there can
@@ -1108,8 +1108,14 @@ also use the same \verb$ReconcileEnv$ state.
 \verb$reconcileTypesS$ is a helper function that can be given two types in the
 same context. It returns either a new type that can be used in place of the two
 given, or it returns an error, meaning that the two types can not be reconciled.
-This function changes the \verb$ReconcileEnv$ context, therefore it is
-important to update the necessary types with the changes using the
+The function is used to assert type constraints, for example, when an \verb$I32$
+is applied to an expression of type \verb$a -> b$, \verb$a$ can be reconciled
+with \verb$I32$ to get \verb$I32 -> b$ as a new type for the function. As a
+side-effect, the \verb$ReconcileEnv$ will contain the new key \verb$a$ with the
+value \verb$I32$ to signify that the \verb$a$ generic type has to be replaced
+with \verb$I32$ in subsequent calls to update. The \verb$reconcileTypesS$
+function changes the \verb$ReconcileEnv$ context, therefore it is important to
+update the related types with the changes using the
 \verb$updateWithSubstitutions$ function.
 
 The \verb$updateWithSubstitutions$ function takes a type and returns a possibly
@@ -1118,6 +1124,19 @@ indices in the given type that also exist in the dictionary as keys, it
 substitutes the generic types in the given type with the values of the keys
 found in the \verb$ReconcileEnv$. This function does not change the state,
 therefore it is safe to use without requiring an update.
+
+\subsubsection{Type inference}
+
+Type inference is run on every global definition in the source code in the order
+in which there are no unresolved dependencies. Because cyclic dependencies can
+occur in the code, all definitions in a cycle are type inferred at the same
+time; therefore cycles need to be treated differently from regular definitions.
+There are two different functions to handle the two cases: \verb$mkInfExprCycle$
+and \verb$mkInfExprTree$. Note that regular definitions are named \emph{trees}
+in the code. To complicate matters, especially in the case of cyclic
+dependencies, type wishes need to be applied right after the type of a
+definition is inferred, since it has an effect on the definitions depending on
+it.
 
 \subsubsection{Type checking}
 \subsection{Code Generation}
