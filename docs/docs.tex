@@ -1242,10 +1242,18 @@ created objects. That part of the code has been omitted for simplicity.
 
 \subsubsection{The standard library}
 \subsubsection{Literals}
+
+
+
 \subsubsection{Sums}
 \subsubsection{Tuples}
 \subsubsection{Unit}
-\subsubsection{A note on the Void type}
+\subsubsection{A note on the Empty type}
+
+While the Empty type is a valid type in the LC language, it is not necessary to
+implement it into the generated C code. It is impossible to create an instance
+of this type, and therefore functions on such an instance are unnecessary to
+implement.
 
 \subsection{Tests}
 \subsection{The Utility module}
