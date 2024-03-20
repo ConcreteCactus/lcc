@@ -113,8 +113,7 @@ library' =
             p (cTypeOf at) <> p "* s1datai = s1data",
             p (cTypeOf bt) <> p " s2temp = (" <> p (cTypeOf bt) <> p ")*s1datai",
             p "literal* s2 = new_literal(sizeof(" <> p (cTypeOf bt) <> p "))",
-            p "void* s2data = &s2->data",
-            p (cTypeOf bt) <> p "* s2datai = s2data",
+            p (cTypeOf bt) <> p "* s2datai = (" <> p (cTypeOf bt) <> p "*) &s2->data",
             p "*s2datai = s2temp",
             p "s2"
           ]
