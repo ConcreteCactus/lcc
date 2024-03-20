@@ -1,0 +1,8 @@
+@startuml
+!theme plain
+[Lexer] <-d- [Code Generator] : Syntax tree subtypes
+[Semantic Analyzer] <-d- [Code Generator] : Internal program representation
+[Standard Library] <-d- [Code Generator] : StdLib C definitions
+[Main] -u-> [Code Generator] : Compile functions
+@enduml
+
