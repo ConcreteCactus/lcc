@@ -1188,16 +1188,64 @@ originate from the type wish, and \verb$checkTypeS$ returns a unit on success.
 \centering
 \caption{Module imports related to the Code Generator}
 \end{figure}
+\subsubsection{Pre-processing}
 
-\subsubsection{Preprocessing}
-\subsubsection{The standard library}
+After all the semantic checks are completed, the code generation process can
+start. The Code Generator needs to turn the representation of the code used in
+the Semantic Analyzer into the more usable representation of the Code Generator.
+During this process, all type information is discarded, as it is no longer
+needed, as well as lambda expressions are renamed to closures, and they acquire
+a depth field used to determine the number of captured values they hold.
+
+\subsubsection{Garbage collection}
+
+In the C source code that the Code Generator generates, there are different
+types of objects: Closures, Literals, Sums, Products, and Units. All of them
+will be discussed in the later sections. All objects occupy memory on the heap,
+which has to be allocated and deallocated manually. To simplify the LC language,
+there is a garbage collector built into its runtime which can automatically
+allocate and deallocate memory for objects. 
+
+The garbage collector employs a simple mark-and-sweep algorithm. All objects
+have a boolean flag indicating whether there is a pointer on the stack pointing
+to them. This flag is managed by the generated code, and is used by the garbage
+collector. Additionally, objects are stored in a linked list for easier access.
+When the garbage collector is invoked, it walks the linked list storing all the
+objects, and if one of them has the stack flag turned on, it recursively walks
+it and the objects it refers to and marks them with a separate flag. Once the
+whole linked list is walked, the garbage collector walks the list again,
+discarding the objects that are not marked.
+
 \subsubsection{Closures}
+
+Closures are objects in the generated C source code that represent a function.
+All closures have a field named \verb$clfunc$, that holds a function pointer.
+All \verb$clfunc$ function pointers take two pointers as arguments. Their first
+argument should always point to the closure object and their second argument
+should always point to the parameter the closure (or lambda) is being called
+with. 
+
+Alongside \verb$clfunc$, all closures have a variable length array that holds
+pointers to the objects the closure captures. These objects can be used in the
+body of the \verb$clfunc$ call, to reference the values that are created outside
+of the lambda definition.
+
+Having the function pointer in the structure of the object makes it simple to
+call a closure during runtime. When a closure is called, its \verb$clfunc$ field
+is used in the following way:
+\begin{lstlisting}
+void* cl_param = some_other_function();
+void* cl_ret = cl->clfunc(cl, cl_param); 
+\end{lstlisting}
+\textbf{Note:} The above code listing does not manage the stack flag of the
+created objects. That part of the code has been omitted for simplicity.
+
+\subsubsection{The standard library}
 \subsubsection{Literals}
 \subsubsection{Sums}
 \subsubsection{Tuples}
 \subsubsection{Unit}
 \subsubsection{A note on the Void type}
-\subsubsection{Garbage collection}
 
 \subsection{Tests}
 \subsection{The Utility module}
