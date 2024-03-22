@@ -36,6 +36,7 @@ This is the user and development documentation of a compiler that compiles a
 language inspired by simply typed lambda calculus and produces C source code.
 
 \subsection{Motivation} % todo
+\subsection{Terminology} % todo: define lcc and LC
 
 \subsection{Lambda calculus}
 
@@ -104,9 +105,9 @@ free allocated memory that is not used.
 
 The target language of the compiler is C; therefore there are functions and
 primitive types in the source language that have a corresponding pair in the
-target language. For example, number types, certain operations on them, and
-several input-output functions. \\ \textbf{Note:} The IO functions are not handled in
-the way Haskell handles IO. The IO functions in this source language are impure
+target language. For example, number types, basic operations on them, and
+several input-output functions. Note that the IO functions are not handled in
+the way Haskell handles IO. The IO functions in the LC language are impure
 functions.
 
 \pagebreak
@@ -170,6 +171,7 @@ ___
 \end{minipage}
 \textbf{Note:} Throughout this document, the compiler is referred to by the name
 \texttt{lcc} and its input language is referred to by the name LC.
+% todo: move to terminology
 
 \subsubsection{Runtime dependency}
 
@@ -1294,9 +1296,6 @@ Note that because global definitions are not necessarily lambdas, to call them,
 one needs to postfix \verb$_func$ to the name of the global definition, and call
 it as a function with no arguments.
 
-\subsubsection{The standard library}
-
-
 
 \subsubsection{Literals}
 
@@ -1334,6 +1333,74 @@ While the Empty type is a valid type in the LC language, it is not necessary to
 implement it into the generated C code. It is impossible to create an instance
 of this type, and therefore functions on such an instance are unnecessary to
 implement.
+
+\subsubsection{The standard library}
+
+The standard library defines types and definitions for functions that are
+available to the programmer by default. These functions provide a way to execute
+C library calls, construct primitive types, and run basic operations on
+primitive types.
+
+The standard library is a list of entries. Each entry consists of a name, a type
+definition used in the Semantic Analyzer, and a function that can be used to
+generate the C source code for that standard library definition. In this
+subsection, the process of generating C source for a definition is discussed.
+
+The type definition of C source generators of an entry is
+\begin{lstlisting}
+(Int -> Writer a String) -> Writer a [String]
+\end{lstlisting}
+where \verb$(Writer a)$ is a monoid. It is a function that can be given a
+function parameter that is used to generate variable names in a flexible way by
+allowing an arbitrary type \verb$a$ to be retained after every call to the
+parameter function. This method of using a \verb$Writer$ allows, for example, to
+keep a record of the integer values the parameter function was called with,
+which is used to determine how many parameters a standard library definition
+requires.
+
+Once the number of parameters necessary for a standard library function to work
+is determined, the Code Generator generates several closures that gather the
+parameters, (i.e., for each parameter, one closure is generated which captures
+the given parameter and returns a closure that captures the next parameter
+etc.). The body of the last closure function is filled in with the C code
+returned by the generator function from the Standard Library.
+
+The generator function in the Standard Library returns a 
+\verb$Writer a [String]$. \verb$a$ can be used arbitrarily, while the
+\verb$[String]$ holds the lines for the actual C code to be inserted. It is
+expected that all lines in the list are postfixed with a semi-colon (\verb$;$)
+and the last line to be prefixed with a \verb$return$ keyword.
+
+As an example, the standard library definition of the \verb$cons$ function is
+the following:
+\lstset{numbers=left}
+\begin{lstlisting}
+( "cons",
+  g 1 `to` T.ListType (g 1) `to` T.ListType (g 1),
+  \w ->
+    sequence
+      [ p "sum* list = new_sum()",
+        p "list->gc_data.isInStackSpace = 1",
+        p "list->kind = 1",
+        p "product* list_internal = new_product()",
+        p "list_internal->gc_data.isInStackSpace = 1",
+        p "list_internal->data_1 = " <> w 1,
+        p "list_internal->data_2 = " <> w 2,
+        p "list->data = list_internal",
+        p "list->gc_data.isInStackSpace = 0",
+        p "list_internal->gc_data.isInStackSpace = 0",
+        p "list"
+      ]
+)
+\end{lstlisting}
+Lines 1 and 2 define the name and type of the \verb$cons$ function, while the
+rest of the lines define the generator function. \verb$p$ is a shorthand for
+\verb$pure$ to turn simple strings into \verb$(Writer a String)$ elements, while
+\verb$w$ is the function that generates the variable names. The \verb$<>$
+operator is used to concatenate the writers, and \verb$sequence$ is used for
+simpler code, as it is easier to define a \verb$[Writer a b]$ element and turn
+it into \verb$Writer a [b]$ than to define a \verb$Writer a [b]$ element
+directly.
 
 \subsection{Tests}
 
