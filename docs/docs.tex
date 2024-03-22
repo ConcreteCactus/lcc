@@ -1211,10 +1211,21 @@ have a boolean flag indicating whether there is a pointer on the stack pointing
 to them. This flag is managed by the generated code, and is used by the garbage
 collector. Additionally, objects are stored in a linked list for easier access.
 When the garbage collector is invoked, it walks the linked list storing all the
-objects, and if one of them has the stack flag turned on, it recursively walks
+objects and if one of them has the stack flag turned on, it recursively walks
 it and the objects it refers to and marks them with a separate flag. Once the
 whole linked list is walked, the garbage collector walks the list again,
 discarding the objects that are not marked.
+
+All objects can be cast to \verb$gc_type$. \verb$gc_type$ is a structure that
+has the same memory layout for its garbage collection information as any other
+object, however it does not have any other fields specified. \verb$gc_type$ is
+used as a generic type in the garbage collector in order to more efficiently
+manage objects.
+
+All objects including \verb$gc_type$ share a common field called
+\verb$gc_data$. It is a structure that holds all information necessary for
+garbage collection: linked list primitives, object size and kind, and marker
+flags.
 
 \subsubsection{Closures}
 
@@ -1302,12 +1313,6 @@ object respectively.
 A unit object does not store any data besides garbage collection information,
 and therefore there is no dedicated structure definition for units, only
 \verb$gc_type$ is used. 
-% todo: move this to gc
-\verb$gc_type$ is a structure that has the same memory
-layout for its garbage collection information as any other object, however it
-does not have any other fields specified. \verb$gc_type$ is used as a generic
-type in the garbage collector, as any object can be cast to it without losing
-garbage collection information.
 
 \subsubsection{A note on the Empty type}
 
