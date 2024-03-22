@@ -1182,15 +1182,21 @@ originate from the type wish, and \verb$checkTypeS$ returns a unit on success.
 
 \subsection{Code Generation}
 
+\begin{figure}[h]
+\includegraphics[width=\textwidth]{code-generator.diag.pdf}
+\centering
+\caption{Module imports related to the Code Generator}
+\end{figure}
 \subsubsection{Pre-processing}
 
 After all the semantic checks are completed, the code generation process can
 start. The Code Generator needs to turn the representation of the code used in
 the Semantic Analyzer into the more usable representation of the Code Generator.
-During this process, all type information is discarded, as it is no longer
-needed, as well as lambda expressions are renamed to closures, and they acquire
+During this process all type information is discarded, as it is no longer
+needed as well as lambda expressions are renamed to closures, and they acquire
 a depth field used to determine the number of captured values they hold.
 
+% todo: add info about gc_data
 \subsubsection{Garbage collection}
 
 In the C source code that the Code Generator generates, there are different
@@ -1241,7 +1247,6 @@ Having the function pointer in the structure of the object makes it simple to
 call a closure during runtime. When a closure is called, its \verb$clfunc$ field
 is used in the following way:
 \begin{lstlisting}
-closure* cl = some_function();
 void* cl_param = some_other_function();
 void* cl_ret = cl->clfunc(cl, cl_param); 
 \end{lstlisting}
@@ -1269,11 +1274,80 @@ it as a function with no arguments.
 
 \subsubsection{The standard library}
 \subsubsection{Literals}
+
+While closures represent functions, literal objects stand for primitive values
+in the generated code. The only field alongside \verb$gc_data$ in their
+structures are \verb$data$. It is a variable length \verb$char$ array that can
+be sized according to the size of the data type contained in the object. This
+approach allows literals to only consume the memory necessary, with the drawback
+of having to do pointer casts to be able to read and write to this field.
+
 \subsubsection{Sums}
+
+Sum objects object represent an element of a Sum type in the LC language. They
+can contain an object that is one of two different types. Internally, sum
+objects store a pointer to the stored object named \verb$data$ as well as a
+boolean flag indicating which type the stored object is the element of with the
+name \verb$kind$.
+
 \subsubsection{Tuples}
+
+Tuple objects are similar to sums. While sums store only a single object, tuples
+store two. The structure of a tuple object has a \verb$data_1$ and a
+\verb$data_2$ field; both of them are pointers to the first and second stored
+object respectively.
+
 \subsubsection{Unit}
-\subsubsection{A note on the Void type}
+
+A unit object does not store any data besides garbage collection information,
+and therefore there is no dedicated structure definition for units, only
+\verb$gc_type$ is used. 
+% todo: move this to gc
+\verb$gc_type$ is a structure that has the same memory
+layout for its garbage collection information as any other object, however it
+does not have any other fields specified. \verb$gc_type$ is used as a generic
+type in the garbage collector, as any object can be cast to it without losing
+garbage collection information.
+
+\subsubsection{A note on the Empty type}
+
+While the Empty type is a valid type in the LC language, it is not necessary to
+implement it into the generated C code. It is impossible to create an instance
+of this type, and therefore functions on such an instance are unnecessary to
+implement.
 
 \subsection{Tests}
+
+To validate that the compiler is working as expected automated tests are used.
+There are two types of tests for \verb$lcc$.
+\begin{itemize}
+    \item \textbf{Unit tests} are designed to focus on single parts of the program.
+        They are used to test non-trivial features.
+    \item \textbf{End-to-end tests} are designed to test every part of the
+        system, (e.g. parsing, syntax checking, semantics checking, and code
+        generation). 
+\end{itemize}
+
+\subsubsection{Unit tests}
+
+
+
+\subsubsection{End-to-end tests}
+
+End-to-end tests are used to check every step of the compilation. It uses
+example programs written in a way to invoke specific features of the language,
+thereby allowing them to be validated. End-to-end tests use the system installed
+\verb$gcc$ and \verb$valgrind$ to also check the resulting binary of an example
+program. These tests can only pass if
+\begin{itemize}
+    \item The program can be compiled by \verb$lcc$.
+    \item The generated code can be compiled by \verb$gcc$ without warnings.
+    \item The resulting binary runs correctly, and produces the expected result.
+    \item During execution of the resulting binary, there are no memory errors
+        detected by \verb$valgrind$.
+\end{itemize}
+\textbf{Note:} Some tests test for compilation errors. Those tests pass if there
+\emph{is} a compilation error.
+
 \subsection{The Utility module}
 \end{document}

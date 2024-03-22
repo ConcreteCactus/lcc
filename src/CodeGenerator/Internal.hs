@@ -99,8 +99,7 @@ showExpressionS :: L.VarIdent -> Expression -> State ExpressionBuilder CCode
 showExpressionS _ ParamRef = return "param"
 showExpressionS _ (Literal (L.Literal lit typ)) = do
   litName <- addObject (Just MoLiteral) $ "new_literal(sizeof(" ++ cTypeOf typ ++ "))"
-  addStatement $ "void* " ++ litName ++ "_data = &" ++ litName ++ "->data;"
-  addStatement $ cTypeOf typ ++ "* " ++ litName ++ "_datai = " ++ litName ++ "_data;"
+  addStatement $ cTypeOf typ ++ "* " ++ litName ++ "_datai = (" ++ cTypeOf typ ++ "*)&" ++ litName ++ "->data;"
   addStatement $ "*" ++ litName ++ "_datai = " ++ lit ++ ";"
   return litName
 showExpressionS _ (CaptureRef n) = return $ "self->captures[" ++ show (n - 2) ++ "]"
