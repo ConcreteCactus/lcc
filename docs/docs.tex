@@ -943,7 +943,6 @@ src/
   |-Internal.hs -> All definitions
 |-MyModule.hs -> Exposes external functions
 \end{lstlisting}
-\lstset{numbers=left}
 
 \subsection{Lexer and Syntax checker}
 
@@ -1220,10 +1219,23 @@ argument should always point to the closure object and their second argument
 should always point to the parameter the closure (or lambda) is being called
 with. 
 
+\begin{lstlisting}
+void* cl_1_clfunc(closure* self, void* param) {
+    // the code generated for the lambda expression body
+}
+\end{lstlisting}
+
 Alongside \verb$clfunc$, all closures have a variable length array that holds
 pointers to the objects the closure captures. These objects can be used in the
 body of the \verb$clfunc$ call, to reference the values that are created outside
 of the lambda definition.
+
+\begin{lstlisting}
+typedef struct {
+    cl_func_t clfunc;
+    void* captures[];
+} closure;
+\end{lstlisting}
 
 Having the function pointer in the structure of the object makes it simple to
 call a closure during runtime. When a closure is called, its \verb$clfunc$ field
@@ -1235,6 +1247,25 @@ void* cl_ret = cl->clfunc(cl, cl_param);
 \end{lstlisting}
 \textbf{Note:} The above code listing does not manage the stack flag of the
 created objects. That part of the code has been omitted for simplicity.
+
+As an example, the \verb$test$ definition of the following LC code
+\begin{lstlisting}
+a := <some definition>
+b := <some definition>
+test := a b
+\end{lstlisting}
+would compile to
+\begin{lstlisting}
+void* test_func() {
+    closure* v1 = a_func();
+    void* v2 = b_func();
+    void* v3 = v1->clfunc(v1, v2);
+    return v3;
+}
+\end{lstlisting}
+Note that because global definitions are not necessarily lambdas, to call them,
+one needs to postfix \verb$_func$ to the name of the global definition, and call
+it as a function with no arguments.
 
 \subsubsection{The standard library}
 \subsubsection{Literals}
