@@ -1192,14 +1192,18 @@ originate from the type wish, and \verb$checkTypeS$ returns a unit on success.
 After all the semantic checks are completed, the code generation process can
 start. The Code Generator needs to turn the representation of the code used in
 the Semantic Analyzer into the more usable representation of the Code Generator.
-During this process all type information is discarded, as it is no longer
-needed as well as lambda expressions are renamed to closures, and they acquire
-a depth field used to determine the number of captured values they hold.
+This process does two main things:
+\begin{itemize}
+    \item All type information is discarded as the program is proven to be
+        type-safe.
+    \item Lambdas are represented with closures and closures acquire a
+        \verb$depth$ value which is used to determine the number of captured
+        values inside the closure.
+\end{itemize}
 
-% todo: add info about gc_data
 \subsubsection{Garbage collection}
 
-In the C source code that the Code Generator generates, there are different
+In the C source code that the Code Generator generates, there are five different
 types of objects: Closures, Literals, Sums, Products, and Units. All of them
 will be discussed in the later sections. All objects occupy memory on the heap,
 which has to be allocated and deallocated manually. To simplify the LC language,
@@ -1212,9 +1216,9 @@ to them. This flag is managed by the generated code, and is used by the garbage
 collector. Additionally, objects are stored in a linked list for easier access.
 When the garbage collector is invoked, it walks the linked list storing all the
 objects and if one of them has the stack flag turned on, it recursively walks
-it and the objects it refers to and marks them with a separate flag. Once the
-whole linked list is walked, the garbage collector walks the list again,
-discarding the objects that are not marked.
+the object and the objects it refers to and marks them with a separate flag.
+Once the whole linked list is walked, the garbage collector walks the list
+again, discarding the objects that are not marked.
 
 All objects can be cast to \verb$gc_type$. \verb$gc_type$ is a structure that
 has the same memory layout for its garbage collection information as any other
@@ -1229,18 +1233,25 @@ flags.
 
 \subsubsection{Closures}
 
-Closures are objects in the generated C source code that represent a function.
-All closures have a field named \verb$clfunc$, that holds a function pointer.
-All \verb$clfunc$ function pointers take two pointers as arguments. Their first
-argument should always point to the closure object and their second argument
-should always point to the parameter the closure (or lambda) is being called
-with. 
+Closures are objects in the generated C source code that represent a function
+(or lambda). They have two\footnote{All objects include the field
+\texttt{gc\_data}, however it is not counted, as it is not necessary for a
+closure to function.} fields: \verb$clfunc$ and \verb$captures$. \verb$clfunc$
+holds a function pointer, while \verb$captures$ is a variable length array
+holding a number of captured values to be used when \verb$clfunc$ is called.
 
+All \verb$clfunc$ function pointers take two pointers as arguments. Their first
+argument should always point to the closure object while their second argument
+should always point to the parameter the closure (or lambda) is being called
+with.
+\vspace{1em}
+\\\noindent\begin{minipage}{\textwidth}
 \begin{lstlisting}
 void* cl_1_clfunc(closure* self, void* param) {
     // the code generated for the lambda expression body
 }
 \end{lstlisting}
+\end{minipage}
 
 Alongside \verb$clfunc$, all closures have a variable length array that holds
 pointers to the objects the closure captures. These objects can be used in the
@@ -1284,6 +1295,9 @@ one needs to postfix \verb$_func$ to the name of the global definition, and call
 it as a function with no arguments.
 
 \subsubsection{The standard library}
+
+
+
 \subsubsection{Literals}
 
 While closures represent functions, literal objects stand for primitive values
