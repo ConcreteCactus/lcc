@@ -13,7 +13,7 @@ import Util
 spec :: Spec
 spec = do
   describe "convertExpression" $ do
-    it "can convert simple expressions" $ do
+    it "sanity check that it can convert simple expressions" $ do
       test "1i32" `shouldBe` Right (Lit (L.Literal "1" AI32))
       test "\\a.a" `shouldBe` Right (lam "a" (Ident 1))
       test "\\a.\\b.a b"
@@ -28,7 +28,7 @@ spec = do
               (lam "a" $ lam "b" $ Ident 1)
           )
   describe "convertType" $ do
-    it "can convert simple types" $ do
+    it "sanity check that it can convert simple types" $ do
       testT "a" `shouldBe` Right (mkn (GenericType 1))
       testT "a -> a"
         `shouldBe` Right (mkn $ funt (GenericType 1) (GenericType 1))

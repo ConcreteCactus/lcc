@@ -1433,38 +1433,11 @@ tests:
 
 Unit tests are divided into four categories: syntactic analyzer tests, semantic
 analyzer tests, dependency list tests, and type tests. The unit tests can only
-pass if all tests from all categories pass. In this subsection all unit tests
-present at the time of writing will be listed.
-\begin{itemize}
-    \item Syntactic analyzer tests. The tests pass if:
-    \begin{itemize}
-        \item Simple function types can be parsed.
-        \item Simple product types can be parsed.
-        \item Simple sum types can be parsed.
-        \item Multiple nested product types can be parsed, and they are right
-            associative.
-        \item Sum types have higher precedence than function types.
-        \item Product types have higher precedence that function types.
-        \item Product types have higher precedence that sum types.
-        \item Simple lambda expressions can be parsed.
-        \item Simple applications can be parsed.
-        \item Chained applications are left-associative.
-        \item Simple if-then-else expressions can be parsed.
-        \item Nested if-then-else expressions nested after then can be parsed.
-        \item Nested if-then-else expressions nested after else can be parsed.
-        \item Expressions with correct line-break can be parsed.
-        \item Expressions with incorrect line-break can not be parsed.
-        \item Lambda expressions are right-associative.
-    \end{itemize}
-    \item Semantic analyzer tests. The tests pass if:
-    \begin{itemize}
-        \item Multiple chained product types can be parsed.
-    \end{itemize}
-\end{itemize}
+pass if all tests from all categories pass.
 
 \subsubsection{End-to-end tests}
 
-End-to-end tests are used to check every step of the compilation. It uses
+End-to-end tests are used to check every step of the compilation. They use
 example programs written in a way to invoke specific features of the language,
 thereby allowing them to be validated. End-to-end tests use the system installed
 \verb$gcc$ and \verb$valgrind$ to also check the resulting binary of an example
@@ -1480,4 +1453,11 @@ program. These tests can only pass if
 \emph{is} a compilation error.
 
 \subsection{The Utility module}
+
+There is a Utility module imported into most other modules. The Utility module
+defines utility functions and data-types that are either not specific to any module, or they
+are used in more than one module. (e.g. \verb$State$ is used in the Semantic
+Analyzer and the Code Generator, however it is not specific to either of the two
+modules.)
+
 \end{document}
