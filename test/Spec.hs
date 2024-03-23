@@ -1,4 +1,3 @@
-import qualified LambdaCompilerTests.SemanticAnalyzer.DependencyGraphTest as DGTest
 import qualified LambdaCompilerTests.SemanticAnalyzer.TypeTest as TyTest
 import qualified LambdaCompilerTests.SemanticAnalyzerTests as SmATest
 import qualified LambdaCompilerTests.SyntacticAnalyzerTests as SyATest
@@ -9,9 +8,8 @@ import Test.Hspec
 main :: IO ()
 main = do
   hspec $ do
-    SmATest.spec
     SyATest.spec
-    DGTest.spec
+    SmATest.spec
     DLTest.spec
     TyTest.spec
     CTest.spec

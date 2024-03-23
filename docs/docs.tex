@@ -1396,27 +1396,71 @@ the following:
 Lines 1 and 2 define the name and type of the \verb$cons$ function, while the
 rest of the lines define the generator function. \verb$p$ is a shorthand for
 \verb$pure$ to turn simple strings into \verb$(Writer a String)$ elements, while
-\verb$w$ is the function that generates the variable names. The \verb$<>$
+\verb$w$ is the function that generates the variable names. The \verb$(<>)$
 operator is used to concatenate the writers, and \verb$sequence$ is used for
 simpler code, as it is easier to define a \verb$[Writer a b]$ element and turn
 it into \verb$Writer a [b]$ than to define a \verb$Writer a [b]$ element
 directly.
 
+Writing standard library definitions in the above way abstracts away the details
+of how closures are used to gather arguments, thereby reducing the size of the
+Standard Library module and allowing the programmer to focus on the definition.
+
 \subsection{Tests}
 
-To validate that the compiler is working as expected automated tests are used.
+To validate that the compiler is working as expected, automated tests are used.
 There are two types of tests for \verb$lcc$.
 \begin{itemize}
     \item \textbf{Unit tests} are designed to focus on single parts of the program.
-        They are used to test non-trivial features.
+        They are used to test small but non-trivial features.
     \item \textbf{End-to-end tests} are designed to test every part of the
-        system, (e.g. parsing, syntax checking, semantics checking, and code
+        system, (i.e. parsing, syntax checking, semantics checking, and code
         generation). 
+\end{itemize}
+Note that the following Haskell dependencies are required to compile and run
+tests:
+\begin{itemize}
+    \item \verb$hspec$ is the testing framework.
+    \item \verb$hspec-expectations$ is required for some utility functions.
+    \item \verb$process$ is used to run \verb$gcc$, \verb$valgrind$, and the
+        compiled binary.
+    \item \verb$temporary$ is used to create temporary directories to store
+        compilation results.
+    \item \verb$QuickCheck$ is used for some random tests.
 \end{itemize}
 
 \subsubsection{Unit tests}
 
-
+Unit tests are divided into four categories: syntactic analyzer tests, semantic
+analyzer tests, dependency list tests, and type tests. The unit tests can only
+pass if all tests from all categories pass. In this subsection all unit tests
+present at the time of writing will be listed.
+\begin{itemize}
+    \item Syntactic analyzer tests. The tests pass if:
+    \begin{itemize}
+        \item Simple function types can be parsed.
+        \item Simple product types can be parsed.
+        \item Simple sum types can be parsed.
+        \item Multiple nested product types can be parsed, and they are right
+            associative.
+        \item Sum types have higher precedence than function types.
+        \item Product types have higher precedence that function types.
+        \item Product types have higher precedence that sum types.
+        \item Simple lambda expressions can be parsed.
+        \item Simple applications can be parsed.
+        \item Chained applications are left-associative.
+        \item Simple if-then-else expressions can be parsed.
+        \item Nested if-then-else expressions nested after then can be parsed.
+        \item Nested if-then-else expressions nested after else can be parsed.
+        \item Expressions with correct line-break can be parsed.
+        \item Expressions with incorrect line-break can not be parsed.
+        \item Lambda expressions are right-associative.
+    \end{itemize}
+    \item Semantic analyzer tests. The tests pass if:
+    \begin{itemize}
+        \item Multiple chained product types can be parsed.
+    \end{itemize}
+\end{itemize}
 
 \subsubsection{End-to-end tests}
 
