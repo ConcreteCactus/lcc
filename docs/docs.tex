@@ -35,8 +35,21 @@
 This is the user and development documentation of a compiler that compiles a
 language inspired by simply typed lambda calculus and produces C source code.
 
-\subsection{Motivation} % todo
-\subsection{Terminology} % todo: define lcc and LC
+\subsection{Motivation}
+
+Most, if not all languages are based on lambda calculus, however it is not
+widely understood. This project is an attempt to gain insight on how functional
+languages are translated to imperative code, as well as to outline some of the
+difficulties of writing a type system based on simply typed lambda calculus.
+
+\subsection{Terminology}
+
+The name of the compiler described in this document is referred to by the name
+\verb$lcc$, while its source language is named LC, or the LC language. It is
+important to make the distinction between lambda calculus and the LC language,
+as the LC language is designed to be evaluated using physical hardware with
+limited resources, and as a result, LC has features that are not present in
+lambda calculus and vice versa.
 
 \subsection{Lambda calculus}
 
