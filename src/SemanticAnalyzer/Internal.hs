@@ -278,7 +278,7 @@ mkProgram (ProgInfDeps uprog (DependencyList dList)) = do
       Nothing -> Right defs
       Just mainDef -> case ntType $ teType $ defExpr mainDef of
         AtomicType AU8 -> Right defs
-        _ -> Left $ mkTypErr (defPos mainDef) TeMainFunctionIsNotByte
+        t -> Left $ mkTypErr (defPos mainDef) (TeMainFunctionIsNotByte $ show t)
 
 mkInfExprTree :: [Definition] -> UninfDefinition -> Either TypeError TypedExpr
 mkInfExprTree defs udef =

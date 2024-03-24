@@ -51,7 +51,8 @@ library
       src
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -Wincomplete-patterns -Wno-unrecognised-pragmas
   build-depends:
-      base >=4.7 && <5
+      array
+    , base >=4.7 && <5
   default-language: Haskell2010
 
 executable lcc
@@ -62,7 +63,8 @@ executable lcc
       app
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -Wincomplete-patterns -Wno-unrecognised-pragmas -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      base >=4.7 && <5
+      array
+    , base >=4.7 && <5
     , lambda-compiler
     , process
   default-language: Haskell2010
@@ -84,6 +86,7 @@ test-suite lambda-compiler-test
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -Wincomplete-patterns -Wno-unrecognised-pragmas -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       QuickCheck
+    , array
     , base >=4.7 && <5
     , hspec
     , hspec-expectations

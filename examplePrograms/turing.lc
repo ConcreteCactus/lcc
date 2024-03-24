@@ -283,10 +283,10 @@ getTuringInput := let getLine \line.
 
 main := let getLine \l. 
     case (parseTuringMachine l)
-    (\tm. let (print_u32 (arrLength tm) 0i8) 
+    (\tm. let (print_u32 (arrLength tm) 0u8) 
         \ll. let (printLn ll)
         \ll. let (printTuringMachine tm ll)
         \ll. case (turingRun tm getTuringInput)
-            (\tst. printTuringState tst 0i8)
-            (\e. cmp (print_char 'E') (print_u8 e) 0i8))
-    (\u. print_char 'e' 0i8)
+            (\tst. printTuringState tst 0u8)
+            (\e. cmp (print_char 'E') (print_u8 e) 0u8))
+    (\u. print_char 'e' 0u8)

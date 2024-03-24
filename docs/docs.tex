@@ -90,8 +90,8 @@ does not have naming collisions.
 \subsection{This implementation} % todo: split and move to user and dev doc
 
 In this section, we will touch on the most important differences between the
-formal system of lambda calculus, and this implementation. There have been a lot
-of ideas borrowed from C, Rust, and Haskell in order to make the language usable
+formal system of lambda calculus, and this implementation. There have been some
+ideas borrowed from C, Rust, and Haskell in order to make the language usable
 from a non-theoretical standpoint.
 
 \subsubsection{Global variables} % todo: split and move to user and dev doc
@@ -108,35 +108,53 @@ a type inference algorithm. Types of global variables can also be specified, in
 which case the compiler checks if it matches the inferred type of the same
 variable.
 
-\subsubsection{Garbage collection} % todo: split and move to user and dev doc
+\pagebreak
+\section{User documentation}
+
+\subsection{The goal of the project}
+
+The main goal of the project is to implement a compiler for a language based on
+simply typed lambda calculus. It should be able to infer as well as check the
+types of expressions. Resource and time limitations aside, the language should
+be Turing-complete. Additionally, the language should have some way of
+communicating with the outside world and therefore some input-output system is
+necessary.
+
+\subsection{Methods used} % todo
+
+\subsubsection{Garbage collection}
 
 There is a simple garbage collection algorithm built into the runtime of the
 generated code. The algorithm uses a mark-and-sweep style method to find and
 free allocated memory that is not used.
 
-\subsubsection{Impure C back-end} % todo: split and move to user and dev doc
+\subsubsection{C back-end}
 
-The target language of the compiler is C; therefore there are functions and
-primitive types in the source language that have a corresponding pair in the
-target language. For example, number types, basic operations on them, and
-several input-output functions. Note that the IO functions are not handled in
-the way Haskell handles IO. The IO functions in the LC language are impure
-functions.
+The target language of the compiler is C. There are types and functions in the
+LC language that use the C definitions, for example, all number types and
+input-output functions.
 
-\pagebreak
-\section{User documentation}
+\subsubsection{Impure functions}
 
-\subsection{The goal of the project} % todo
-\subsection{Methods used} % todo
+The LC language solves input and output with impure functions, as they make
+troubleshooting programs easier. Allowing impure functions also makes
+implementation easier, as pure IO functions require a more complex type system.
+
+\subsubsection{Recursive functions}
+
+The language is eagerly evaluated, however for recursion to work, LC is required
+to have lazily evaluated constructs. The two main ways to get lazy evaluation,
+are if-expressions, and the \verb$case$ function, both of which can be used for
+recursion.
 
 \subsection{Building the software}
 \subsubsection{Dependencies}
 
-To build the program one would require the following packages:
+To build the program, one would require the following packages:
 \begin{itemize}
     \item git
     \item stack v2.11.1 or later
-    \item ghc v9.4.8 or later \\ Note that with default settings stack usually
+    \item ghc v9.4.8 or later \\ Note that with default settings, stack usually
         downloads the appropriate ghc version for the project.
 \end{itemize}
 Note that the compiler was only tested on a few Linux distributions; all of them
@@ -153,12 +171,12 @@ require two steps. To build the project, execute the following commands in an
 appropriate directory.
 \begin{lstlisting}
 $ git clone --depth=1 \
-    https://github.com/ConcreteCactus/lambda-compiler.git
+    https://github.com/ConcreteCactus/lcc.git
 \end{lstlisting}
 This will clone the repository, which is hosted on GitHub. In order to build and
 install the compiler, one would run the following:
 \begin{lstlisting}
-$ cd lambda-compiler
+$ cd lcc
 $ stack install
 \end{lstlisting}
 This will build and install the required dependencies, including ghc. The
@@ -167,7 +185,7 @@ sure the resulting binary is on the \texttt{PATH}. If the installation goes
 correctly, running \texttt{lcc -v} should show a banner similar to the
 following:
 
-\noindent\begin{minipage}{\textwidth}
+\vspace{1em}\noindent\begin{minipage}{\textwidth}
 \begin{lstlisting}
 $ lcc -v
 lambda_compiler v1.0
@@ -182,9 +200,6 @@ ___
 /_/    \_\ (__/   \__) (_) (__/   \__)
 \end{lstlisting}
 \end{minipage}
-\textbf{Note:} Throughout this document, the compiler is referred to by the name
-\texttt{lcc} and its input language is referred to by the name LC.
-% todo: move to terminology
 
 \subsubsection{Runtime dependency}
 
@@ -1243,14 +1258,23 @@ manage objects.
 
 All objects including \verb$gc_type$ share a common field called
 \verb$gc_data$. It is a structure that holds all information necessary for
-garbage collection: linked list primitives, object size and kind, and marker
-flags.
+garbage collection: linked list primitives, object size and kind, the marker
+flag, and the stack flag.
+
+The stack flag is used to determine if an object is referenced directly from the
+execution stack. Such objects, and objects referred to by objects on the stack
+are considered to be in-use and therefore they are not freed by the garbage
+collector. Managing the stack flag is the responsibility of the generated code.
+When an object is in scope, its stack flag should be turned on, and when it goes
+out of scope, its stack flag should be turned off. The two functions in the
+program runtime that set and unset the stack flag are \verb$gc_set_stack$ and
+\verb$gc_unset_stack$.
 
 \subsubsection{Closures}
 
 Closures are objects in the generated C source code that represent a function
 (or lambda). They have two\footnote{All objects include the field
-\texttt{gc\_data}, however it is not counted, as it is not necessary for a
+\texttt{gc\_data}, however it is not counted here, as it is not necessary for a
 closure to function.} fields: \verb$clfunc$ and \verb$captures$. \verb$clfunc$
 holds a function pointer, while \verb$captures$ is a variable length array
 holding a number of captured values to be used when \verb$clfunc$ is called.
@@ -1310,7 +1334,7 @@ one needs to postfix \verb$_func$ to the name of the global definition, and call
 it as a function with no arguments.
 
 
-\subsubsection{Literals}
+\subsubsection{Literals} % todo: assignment
 
 While closures represent functions, literal objects stand for primitive values
 in the generated code. The only field alongside \verb$gc_data$ in their
@@ -1346,6 +1370,8 @@ While the Empty type is a valid type in the LC language, it is not necessary to
 implement it into the generated C code. It is impossible to create an instance
 of this type, and therefore functions on such an instance are unnecessary to
 implement.
+
+\subsubsection{If-expressions} % todo
 
 \subsubsection{The standard library}
 
@@ -1441,6 +1467,7 @@ tests:
         compilation results.
     \item \verb$QuickCheck$ is used for some random tests.
 \end{itemize}
+At the time of writing, all tests are passing.
 
 \subsubsection{Unit tests}
 
@@ -1469,7 +1496,7 @@ program. These tests can only pass if
 
 There is a Utility module imported into most other modules. The Utility module
 defines utility functions and data-types that are either not specific to any module, or they
-are used in more than one module. (e.g. \verb$State$ is used in the Semantic
+are used in more than one modules. (e.g. \verb$State$ is used in the Semantic
 Analyzer and the Code Generator, however it is not specific to either of the two
 modules.)
 

@@ -16,6 +16,7 @@ copyright:           "2023 Áron Hárnási"
 description:         Please see the README on GitHub at <https://github.com/ConcreteCactus/lambda-compiler>
 
 dependencies:
+- array
 - base >= 4.7 && < 5
 
 ghc-options:
@@ -61,3 +62,4 @@ tests:
     - process
     - temporary
     - QuickCheck
+    - array

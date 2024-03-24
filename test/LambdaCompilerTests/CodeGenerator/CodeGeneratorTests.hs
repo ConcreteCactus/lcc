@@ -63,12 +63,14 @@ spec = do
     it "comp ops work too" $ do
       outputOf program15 `shouldReturn` TrSuccess "110100011001011001011001000111011001"
     it "won't compile if main is a function type" $ do
-      isCompilableByGCCWoWarning program16
-        `shouldReturn` Just
-          ( Left $
-              mkCompErrTyp $
-                mkTypErr (1, 1) TeMainFunctionIsNotByte
-          )
+      errorIsTeMainFunctionIsNotByte <$> isCompilableByGCCWoWarning program16
+        `shouldReturn` True
+    it "compiles and runs hello world program" $ do
+      outputOf program17 `shouldReturn` TrSuccess "hello world"
+
+errorIsTeMainFunctionIsNotByte :: Maybe (Either CompilerError a) -> Bool
+errorIsTeMainFunctionIsNotByte (Just (Left (ProgramError (CeTypeErrorType (TeMainFunctionIsNotByte _)) _))) = True
+errorIsTeMainFunctionIsNotByte _ = False
 
 program1 :: SourceCode
 program1 =
@@ -214,6 +216,32 @@ program15 =
 
 program16 :: SourceCode
 program16 = "main := add_i32 1i32"
+
+program17 :: SourceCode
+program17 =
+    "cmp : (a -> b) -> (b -> c) -> a -> c\n"
+    ++ "cmp := \\f. \\g. \\x. g (f x)\n"
+    ++ "\n"
+    ++ "hello : [Char]\n"
+    ++ "hello := cons 'h'\n"
+    ++ "    (cons 'e'\n"
+    ++ "    (cons 'l'\n"
+    ++ "    (cons 'l'\n"
+    ++ "    (cons 'o'\n"
+    ++ "    (cons ' '\n"
+    ++ "    (cons 'w'\n"
+    ++ "    (cons 'o'\n"
+    ++ "    (cons 'r'\n"
+    ++ "    (cons 'l'\n"
+    ++ "    (cons 'd' emptyList))))))))))\n"
+    ++ "\n"
+    ++ "main := printList hello 0u8\n"
+    ++ "\n"
+    ++ "printList : [Char] -> U8 -> U8\n"
+    ++ "printList := \\list. case (uncons list)\n"
+    ++ "    (\\xs. cmp (print_char (fst xs)) (printList (snd xs)))\n"
+    ++ "    (\\u.\\x.x)\n"
+
 
 hasCompileError ::
   Maybe (Either CompilerError (ExitCode, String, String)) ->

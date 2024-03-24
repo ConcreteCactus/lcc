@@ -1,10 +1,8 @@
 cmp : (a -> b) -> (b -> c) -> a -> c
 cmp := \f. \g. \x. g (f x)
 
-printList : [Char] -> a -> a
-printList := \list. case (uncons list)
-    (\xs. cmp (print_char (fst xs)) (printList (snd xs)))
-    (\u.\x.x)
+let : a -> (a -> b) -> b
+let := \x.\f. f x
 
 hello : [Char]
 hello := cons 'h'
@@ -19,4 +17,19 @@ hello := cons 'h'
     (cons 'l'
     (cons 'd' emptyList))))))))))
 
-main := printList hello 0u8
+
+bleh : [Char] -> U8 -> U8
+bleh := \list. case (uncons list)
+    (\xs. let (print_char (fst xs) 0u8) \u. (bleh (snd xs)))
+    (\u.\x.x)
+
+main := tuple bleh (tuple printList testFunc)
+
+printList : [Char] -> U8 -> U8
+printList := \list. case (uncons list)
+    (\xs. cmp (print_char (fst xs)) (printList (snd xs)))
+    (\u.\x.x)
+
+testFunc := \x. case (uncons x)
+    (\xs. testFunc (snd xs))
+    (\u.\y.y)

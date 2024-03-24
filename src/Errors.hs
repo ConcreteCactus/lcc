@@ -2,6 +2,7 @@ module Errors
   ( LexicalError,
     SemanticError,
     TypeError,
+    ProgramError(..),
     LexicalElement (..),
     LexicalErrorType (..),
     SemanticErrorType (..),
@@ -88,7 +89,7 @@ data TypeErrorType
   | TeCheckError String String
   | TeApplyingToANonFunction String
   | TeIfThenElseConditionIsNotBool
-  | TeMainFunctionIsNotByte
+  | TeMainFunctionIsNotByte String
   deriving (Eq)
 
 instance Show TypeErrorType where
@@ -115,8 +116,8 @@ instance Show TypeErrorType where
     "Trying to apply to a non-function: " ++ t2
   show TeIfThenElseConditionIsNotBool = 
     "The condition in the if then else expression is not bool"
-  show TeMainFunctionIsNotByte =
-    "The main function is not U8"
+  show (TeMainFunctionIsNotByte t) =
+    "The main function is not U8, it is: " ++ show t
 
 data SemanticErrorType
   = SeValueRedefinition
