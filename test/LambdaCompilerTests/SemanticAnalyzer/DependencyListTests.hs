@@ -41,10 +41,24 @@ spec = do
                         , j <- [1 .. 5]
                         ]
             it "can build a dependency matrix on a graph with one cycle" $ do
-                mkDependencyMatrix ['A'..'E'] testConns2
+                mkDependencyMatrix "ABCDE" testConns2
                     `shouldBe` DependencyMatrix 
-                        [DepListCycle ['A'..'E']]
+                        [DepListCycle "EDCAB"]
                         (array ((1, 1), (1, 1)) [((1, 1), True)])
+            it ("can build a dependency matrix on a graph with one cycle and a" 
+                ++ " single") $ do
+                mkDependencyMatrix "ABCDE" testConns3
+                    `shouldBe` DependencyMatrix 
+                        [DepListCycle "EDCAB"]
+                        (array ((1, 1), (1, 1)) [((1, 1), True)])
+            -- it "can find a proper ordering on a grap with one cycle" $ do
+            --     createOrdering (mkDependencyMatrix "ABCDE" testConns3)
+            --         `shouldBe` DependencyList 
+            --             [DepListCycle "EBC"
+            --             , DepListSingle 'D'
+            --             , DepListSingle 'A'
+            --             ]
+                
 
 testConns1 :: Char -> Char -> Bool
 testConns1 'A' 'D' = True
@@ -60,6 +74,14 @@ testConns2 'B' 'C' = True
 testConns2 'C' 'E' = True
 testConns2 'E' 'A' = True
 testConns2 _ _ = False
+
+testConns3 :: Char -> Char -> Bool
+testConns3 'A' 'D' = True
+testConns3 'D' 'B' = True
+testConns3 'B' 'C' = True
+testConns3 'C' 'E' = True
+testConns3 'E' 'B' = True
+testConns3 _ _ = False
 
 {- FOURMOLU_DISABLE -}
 returnArr :: [[Int]]

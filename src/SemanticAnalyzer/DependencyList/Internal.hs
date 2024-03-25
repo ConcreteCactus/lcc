@@ -5,6 +5,7 @@ module SemanticAnalyzer.DependencyList.Internal where
 
 import Data.Array
 import Util
+import Debug.Trace
 
 data DependencyListItem a = DepListSingle a | DepListCycle [a]
     deriving (Eq, Show)
@@ -25,7 +26,7 @@ instance (Show a) => Show (DependencyMatrix a) where
                    | j <- [1..n]
                    ]
 
-mkDependencyMatrix :: (Eq a) => [a] -> (a -> a -> Bool) -> DependencyMatrix a
+mkDependencyMatrix :: (Eq a, Show a) => [a] -> (a -> a -> Bool) -> DependencyMatrix a
 mkDependencyMatrix items dependsOn
     = mergeCycles $ DependencyMatrix (map DepListSingle items) allConnections
   where
@@ -54,8 +55,8 @@ mkDependencyMatrix items dependsOn
             dropWhile ((< n) . snd) $
                 map (\m -> (m, (m ^ (2 :: Int) + m) `div` 2)) [1 ..]
 
-mergeCycles :: (Eq a) => DependencyMatrix a -> DependencyMatrix a
-mergeCycles depMat = mergeCyclesIter depMat startingN 1 2
+mergeCycles :: (Eq a, Show a) => DependencyMatrix a -> DependencyMatrix a
+mergeCycles depMat = mergeCyclesIter (traceShowId depMat) startingN 1 2
   where
     startingN = snd $ snd $ bounds $ dmMatrix depMat
     -- it's assumed that x < y
@@ -65,8 +66,8 @@ mergeCycles depMat = mergeCyclesIter depMat startingN 1 2
         in  array ((1, 1), (n - 1, n - 1)) 
             [ ((i, j), 
                 if i == j           then True                         else
-                if i == (y - 1)     then mat ! (x, j) && mat ! (y, j) else
-                if j == (y - 1)     then mat ! (i, x) && mat ! (i, y) else
+                if i == (y - 1)     then mat ! (x, j) || mat ! (y, j) else
+                if j == (y - 1)     then mat ! (i, x) || mat ! (i, y) else
                 if i >= x && j >= x then mat ! (i + 1, j + 1)         else
                 if i >= x           then mat ! (i + 1, j)             else
                 if j >= x           then mat ! (i, j + 1)             else
@@ -78,32 +79,69 @@ mergeCycles depMat = mergeCyclesIter depMat startingN 1 2
     mergeItems 
         :: (Eq a) => Int -> Int -> [DependencyListItem a] 
         -> [DependencyListItem a]
-    mergeItems 0 y (a:as) = mergeItemWith a (y - 1) as
+    mergeItems 1 y (a:as) = mergeItemWith a (y - 1) as
     mergeItems x y (a:as) = a : mergeItems (x - 1) (y - 1) as
-    mergeItems _ 0 _      = error "index error in mergeItems"
+    mergeItems _ 1 _      = error "index error in mergeItems"
     mergeItems _ _ []     = error "element not found error in mergeItems"
     mergeItemWith
         :: (Eq a) => DependencyListItem a -> Int 
         -> [DependencyListItem a] -> [DependencyListItem a]
-    mergeItemWith a 0 (b:bs) = (a `itMerge` b) : bs
+    mergeItemWith a 1 (b:bs) = (a `itMerge` b) : bs
     mergeItemWith a y (b:bs) = b : mergeItemWith a (y-1) bs
     mergeItemWith _ _ []     = []
     mergeCyclesIter 
-        :: (Eq a) => DependencyMatrix a -> Int -> Int -> Int 
+        :: (Eq a, Show a) => DependencyMatrix a -> Int -> Int -> Int 
         -> DependencyMatrix a
     mergeCyclesIter depMat'@(DependencyMatrix items matrix) n x y
         | x >= n = depMat'
         -- cycle detected
         | matrix ! (x, y) && matrix ! (y, x)
             = mergeCyclesIter 
-            ( DependencyMatrix 
+            (traceShowId ( DependencyMatrix 
                 (mergeItems x y items) (mergeRowCols x y matrix)
-            ) (n - 1) x (x + 1)
+            )) (n - 1) x (x + 1)
         | y >= n    = mergeCyclesIter depMat' n (x + 1) (x + 2)
         | otherwise = mergeCyclesIter depMat' n x (y + 1)
 
+createOrdering :: DependencyMatrix a -> DependencyList a
+createOrdering depMat 
+    = DependencyList 
+    $ createOrderingIter initialN 1 depMat
+  where
+    initialN = snd $ snd $ bounds $ dmMatrix depMat
+    deleteRowCols :: Int -> Array (Int, Int) a -> Array (Int, Int) a
+    deleteRowCols x mat = let n = snd $ snd $ bounds mat
+        in array ((1, 1),(n - 1, n - 1))
+           [ ((i, j), 
+             if i >= x && j >= x then mat ! (i + 1, j + 1) else
+             if i >= x           then mat ! (i + 1, j)     else
+             if j >= x           then mat ! (i, j + 1)     else
+                                      mat ! (i, j))
+           | i <- [1..n-1]
+           , j <- [1..n-1]
+           ]
+    deleteItem :: Int -> [a] -> [a]
+    deleteItem 1 (_:as) = as
+    deleteItem x (a:as) = a : deleteItem (x - 1) as
+    deleteItem _ []     = error "deleteItem: Index out of bounds"
+    isLeaf :: Int -> Int -> Array (Int, Int) Bool -> Bool
+    isLeaf n x mat 
+        = sum [if mat ! (x, j) then 1 else 0 | j <- [1..n]] == (1 :: Int)
+    createOrderingIter 
+        :: Int -> Int -> DependencyMatrix a -> [DependencyListItem a]
+    createOrderingIter n x depMat'@(DependencyMatrix items matrix)
+        | n == 0 = []
+        | x > n = createOrderingIter n 1 depMat'
+        | isLeaf n x matrix 
+            = (items !! (x - 1)) 
+            : createOrderingIter (n - 1) x 
+                (DependencyMatrix (deleteItem x items) (deleteRowCols x matrix))
+        | otherwise = createOrderingIter n (x + 1) depMat'
+
+
 -- A list whose elements don't 'depend' on the ones coming after them
-newtype DependencyList a = DependencyList [DependencyListItem a] deriving (Show)
+newtype DependencyList a = DependencyList [DependencyListItem a] 
+    deriving (Show, Eq)
 
 mkDependencyList :: (Eq a) => [a] -> (a -> [a]) -> DependencyList a
 mkDependencyList vals depf =
