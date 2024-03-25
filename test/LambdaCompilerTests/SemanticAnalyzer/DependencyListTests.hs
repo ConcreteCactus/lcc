@@ -32,18 +32,34 @@ spec = do
                                 as
                 )
         describe "DependencyMatrix" $ do
-            it "test" $ do
-                mkDependencyMatrix ['A' .. 'E'] testConns
+            it "can build a dependency matrix on a graph with no cycles" $ do
+                dmMatrix (mkDependencyMatrix ['A' .. 'E'] testConns1)
                     `shouldBe` array
                         ((1, 1), (5, 5))
-                        [((i, j), returnArr !! (i - 1) !! (j - 1) == 1) | i <- [1 .. 5], j <- [1 .. 5]]
+                        [ ((i, j), returnArr !! (i - 1) !! (j - 1) == 1)
+                        | i <- [1 .. 5]
+                        , j <- [1 .. 5]
+                        ]
+            it "can build a dependency matrix on a graph with one cycle" $ do
+                mkDependencyMatrix ['A'..'E'] testConns2
+                    `shouldBe` DependencyMatrix 
+                        [DepListCycle ['A'..'E']]
+                        (array ((1, 1), (1, 1)) [((1, 1), True)])
 
-testConns :: Char -> Char -> Bool
-testConns 'A' 'D' = True
-testConns 'D' 'B' = True
-testConns 'B' 'C' = True
-testConns 'C' 'E' = True
-testConns _ _ = False
+testConns1 :: Char -> Char -> Bool
+testConns1 'A' 'D' = True
+testConns1 'D' 'B' = True
+testConns1 'B' 'C' = True
+testConns1 'C' 'E' = True
+testConns1 _ _ = False
+
+testConns2 :: Char -> Char -> Bool
+testConns2 'A' 'D' = True
+testConns2 'D' 'B' = True
+testConns2 'B' 'C' = True
+testConns2 'C' 'E' = True
+testConns2 'E' 'A' = True
+testConns2 _ _ = False
 
 {- FOURMOLU_DISABLE -}
 returnArr :: [[Int]]
