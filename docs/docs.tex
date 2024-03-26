@@ -4,6 +4,7 @@
 \usepackage{listings}
 \usepackage{setspace}
 \usepackage{graphicx}
+\usepackage{tikz}
 
 \onehalfspace
 % Later references:
@@ -1114,6 +1115,29 @@ which the global definitions need to be type inferred. If there are any
 dependency cycles, it infers the type of all definitions in the cycle in a
 single step.
 
+The algorithm behind a dependency list can be thought of as an algorithm whose
+input is a directed graph, and whose output is a list of nodes in the input
+graph, in an order where there is no arrow pointing forward in the list. In case
+cycles are present in the input graph, the nodes in the cycle are merged into a
+single node, thereby removing the cycle from the graph. For example, the input
+and corresponding output of an acyclic graph would be the following.
+\begin{center}
+\begin{tikzpicture}[->]
+    \node (a) at (1,3) {A};
+    \node (b) at (3,3) {B};
+    \node (c) at (3,1) {C};
+    \node (d) at (1,1) {D};
+    \draw (a) to (b);
+    \draw (b) to (c);
+    \draw (c) to (d);
+
+    \node (o) at (8,2) {$A,B,C,D$};
+    \node (h1) at (4,2) {};
+    \node (h2) at (6,2) {};
+    \draw (h1) to (h2);
+\end{tikzpicture}
+\end{center}
+
 \subsubsection{The framework of type inference and type checking}
 
 The type inference and type checking algorithms are stateful functions, which
@@ -1212,7 +1236,7 @@ originate from the type wish, and \verb$checkTypeS$ returns a unit on success.
 
 \subsection{Code Generation}
 
-\begin{figure}[h]
+\begin{figure}[ht]
 \includegraphics[width=\textwidth]{code-generator.diag.pdf}
 \centering
 \caption{Module imports related to the Code Generator}
