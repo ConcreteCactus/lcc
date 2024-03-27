@@ -5,6 +5,7 @@
 \usepackage{setspace}
 \usepackage{graphicx}
 \usepackage{tikz}
+\usetikzlibrary{matrix}
 
 \onehalfspace
 % Later references:
@@ -1159,7 +1160,79 @@ While for an input graph with cycles the algorithm would return
 \end{tikzpicture}
 \end{center}
 In this case, the nodes $D$,$C$, and $B$ are merged into one cycle. In order to
-compute
+compute the output, three steps are taken:
+\begin{enumerate}
+    \item Build an $n \times n$ binary $G$ matrix, where $n$ is the number of
+        nodes in the graph, and $G_{i,j}$ is $1$ if there is an arrow pointing
+        from the $i$th node to the $j$th node, $0$ otherwise. (There are only
+        $1$s on the diagonal.) The matrix of the above graph would be the
+        following:
+\begin{center}
+\begin{tikzpicture}[->]
+    \node (a) at (1,3) {A};
+    \node (b) at (3,3) {B};
+    \node (c) at (3,1) {C};
+    \node (d) at (1,1) {D};
+    \draw (a) to (b);
+    \draw (b) to (c);
+    \draw (c) to (d);
+    \draw (d) to (b);
+
+    \node[matrix of math nodes] at (9, 2.2) {
+          &[.5em] A & B & C & D\\[.5em]
+        A & 1 & 1 & 0 & 0\\
+        B & 0 & 1 & 1 & 0\\
+        C & 0 & 0 & 1 & 1\\
+        D & 0 & 1 & 0 & 1\\
+    };
+    \node (h1) at (4,2) {};
+    \node (h2) at (7,2) {};
+    \draw (h1) to (h2);
+    \node (h3) at (5.5,2.3) {matrix};
+\end{tikzpicture}
+\end{center}
+    \item Using repeated matrix multiplications\footnote{In this case, the
+        formula for a matrix multiplication is $G'_{i,j} = \lor^n_{k=1} (G_{i,k}
+    \land G_{k,j})$}, compute the $G'$
+    \emph{composition matrix}; that is, the matrix where all the arrow
+    compositions are present with the initial arrows. The composition matrix
+    and the corresponding graph of the above example is the following:
+\begin{center}
+\begin{tikzpicture}[->]
+    \node (a) at (7,3) {A};
+    \node (b) at (9,3) {B};
+    \node (c) at (9,1) {C};
+    \node (d) at (7,1) {D};
+    \draw (a) to (b);
+    \draw[line width=0.4mm] (a) to (c);
+    \draw[line width=0.4mm] (a) to (d);
+    \draw (9.07,2.7) to (9.07,1.3);
+    \draw[<-, line width=0.4mm] (8.93,2.7) to (8.93,1.3);
+    \draw (8.7,1.07) to (7.3, 1.07);
+    \draw[<-, line width=0.44mm] (8.7,0.93) to (7.3,0.93);
+    \draw (7.25, 1.35) to (8.65, 2.75);
+    \draw[<-, line width=0.4mm] (7.35, 1.25) to (8.75, 2.65);
+
+    \node[matrix of math nodes] at (1, 2.2) {
+          &[.5em] A & B & C & D\\[.5em]
+        A & 1 & 1 & \mathbf1 & \mathbf1\\
+        B & 0 & 1 & 1 & \mathbf1\\
+        C & 0 & \mathbf1 & 1 & 1\\
+        D & 0 & 1 & \mathbf1 & 1\\
+    };
+    \node (h1) at (3.2,2) {};
+    \node (h2) at (6.2,2) {};
+    \draw (h1) to (h2);
+    \node (h3) at (4.7,2.3) {graph};
+\end{tikzpicture}
+\end{center}
+    The composition matrix has an important property: it shows not just the
+    direct dependencies of a node, but all the subsequent dependencies resulting
+    from the direct dependencies. This can be used to efficiently find
+    dependency cycles. The $i$th and $j$th nodes are in a cycle if and only if
+    $G'_{i,j} \land G'_{j,i}$.
+    \item Merge all the nodes that are in a dependency cycle.
+\end{enumerate}
 
 \subsubsection{The framework of type inference and type checking}
 
