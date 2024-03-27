@@ -9,6 +9,7 @@ import SemanticAnalyzer.Type
 import qualified SyntacticAnalyzer.Internal as Y
 import Test.Hspec
 import Util
+import Debug.Trace
 
 spec :: Spec
 spec = do
@@ -46,11 +47,11 @@ spec = do
     it "can infer simple types correctly" $ do
       teType . defExpr . head . progDefs <$> testP program1
         `shouldBe` Right
-          ( mkn $ funt (GenericType 1) (funt (GenericType 2) (GenericType 1))
+          ( mkn $ funt (GenericType 1) (funt (GenericType 2) (GenericType 2))
           )
       teType . defExpr . head . tail . progDefs <$> testP program1
         `shouldBe` Right
-          ( mkn $ funt (GenericType 1) (funt (GenericType 2) (GenericType 2))
+          ( mkn $ funt (GenericType 1) (funt (GenericType 2) (GenericType 1))
           )
     it "can work with type wishes correctly" $ do
       teType . defExpr . head . progDefs <$> testP program6

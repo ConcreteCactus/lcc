@@ -26,7 +26,7 @@ instance (Show a) => Show (DependencyMatrix a) where
                    | j <- [1..n]
                    ]
 
-mkDependencyMatrix :: (Eq a, Show a) => [a] -> (a -> a -> Bool) -> DependencyMatrix a
+mkDependencyMatrix :: (Eq a) => [a] -> (a -> a -> Bool) -> DependencyMatrix a
 mkDependencyMatrix items dependsOn
     = mergeCycles $ DependencyMatrix (map DepListSingle items) allConnections
   where
@@ -55,23 +55,27 @@ mkDependencyMatrix items dependsOn
             dropWhile ((< n) . snd) $
                 map (\m -> (m, (m ^ (2 :: Int) + m) `div` 2)) [1 ..]
 
-mergeCycles :: (Eq a, Show a) => DependencyMatrix a -> DependencyMatrix a
-mergeCycles depMat = mergeCyclesIter (traceShowId depMat) startingN 1 2
+mergeCycles :: (Eq a) => DependencyMatrix a -> DependencyMatrix a
+mergeCycles depMat = mergeCyclesIter depMat startingN 1 2
   where
     startingN = snd $ snd $ bounds $ dmMatrix depMat
     -- it's assumed that x < y
     mergeRowCols :: Int -> Int -> Array (Int, Int) Bool -> Array (Int, Int) Bool
-    mergeRowCols x y mat = 
+    mergeRowCols x y mat =
         let n = snd $ snd $ bounds mat
         in  array ((1, 1), (n - 1, n - 1)) 
             [ ((i, j), 
-                if i == j           then True                         else
-                if i == (y - 1)     then mat ! (x, j) || mat ! (y, j) else
-                if j == (y - 1)     then mat ! (i, x) || mat ! (i, y) else
-                if i >= x && j >= x then mat ! (i + 1, j + 1)         else
-                if i >= x           then mat ! (i + 1, j)             else
-                if j >= x           then mat ! (i, j + 1)             else
-                                         mat ! (i, j)
+                if i == j                 then True                         else
+                if i == (y - 1) && j >= x then 
+                    mat ! (x, j + 1) || mat ! (y, j + 1)                    else
+                if i == (y - 1)           then mat ! (x, j) || mat ! (y, j) else
+                if j == (y - 1) && i >= x then 
+                    mat ! (i + 1, x) || mat ! (i + 1, y)                    else
+                if j == (y - 1)           then mat ! (i, x) || mat ! (i, y) else
+                if i >= x && j >= x       then mat ! (i + 1, j + 1)         else
+                if i >= x                 then mat ! (i + 1, j)             else
+                if j >= x                 then mat ! (i, j + 1)             else
+                                               mat ! (i, j)
               )
             | i <- [1..n-1]
             , j <- [1..n-1]
@@ -90,16 +94,16 @@ mergeCycles depMat = mergeCyclesIter (traceShowId depMat) startingN 1 2
     mergeItemWith a y (b:bs) = b : mergeItemWith a (y-1) bs
     mergeItemWith _ _ []     = []
     mergeCyclesIter 
-        :: (Eq a, Show a) => DependencyMatrix a -> Int -> Int -> Int 
+        :: (Eq a) => DependencyMatrix a -> Int -> Int -> Int 
         -> DependencyMatrix a
     mergeCyclesIter depMat'@(DependencyMatrix items matrix) n x y
         | x >= n = depMat'
         -- cycle detected
         | matrix ! (x, y) && matrix ! (y, x)
             = mergeCyclesIter 
-            (traceShowId ( DependencyMatrix 
+            ( DependencyMatrix 
                 (mergeItems x y items) (mergeRowCols x y matrix)
-            )) (n - 1) x (x + 1)
+            ) (n - 1) x (x + 1)
         | y >= n    = mergeCyclesIter depMat' n (x + 1) (x + 2)
         | otherwise = mergeCyclesIter depMat' n x (y + 1)
 
@@ -145,7 +149,8 @@ newtype DependencyList a = DependencyList [DependencyListItem a]
 
 mkDependencyList :: (Eq a) => [a] -> (a -> [a]) -> DependencyList a
 mkDependencyList vals depf =
-    DependencyList $ foldr (helper [] . DepListSingle) [] vals
+    -- DependencyList $ foldr (helper [] . DepListSingle) [] vals
+    createOrdering $ mkDependencyMatrix vals (matDependsFn depf)
   where
     helper aft a [] = a : aft
     helper aft a (b : bs)
@@ -167,6 +172,9 @@ dependsFn depf (DepListSingle a) (DepListCycle bs) = any (`elem` depf a) bs
 dependsFn depf (DepListCycle as) (DepListSingle b) = any ((b `elem`) . depf) as
 dependsFn depf (DepListCycle as) (DepListCycle bs) =
     or [b `elem` depf a | a <- as, b <- bs]
+
+matDependsFn :: (Eq a) => (a -> [a]) -> a -> a -> Bool
+matDependsFn depf a b = b `elem` depf a
 
 itMerge ::
     (Eq a) =>

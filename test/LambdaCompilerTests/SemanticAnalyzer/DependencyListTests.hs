@@ -45,19 +45,13 @@ spec = do
                     `shouldBe` DependencyMatrix 
                         [DepListCycle "EDCAB"]
                         (array ((1, 1), (1, 1)) [((1, 1), True)])
-            it ("can build a dependency matrix on a graph with one cycle and a" 
-                ++ " single") $ do
-                mkDependencyMatrix "ABCDE" testConns3
-                    `shouldBe` DependencyMatrix 
-                        [DepListCycle "EDCAB"]
-                        (array ((1, 1), (1, 1)) [((1, 1), True)])
-            -- it "can find a proper ordering on a grap with one cycle" $ do
-            --     createOrdering (mkDependencyMatrix "ABCDE" testConns3)
-            --         `shouldBe` DependencyList 
-            --             [DepListCycle "EBC"
-            --             , DepListSingle 'D'
-            --             , DepListSingle 'A'
-            --             ]
+            it "can find a proper ordering on a grap with one cycle" $ do
+                createOrdering (mkDependencyMatrix "ABCDE" testConns3)
+                    `shouldBe` DependencyList 
+                        [DepListCycle "EBC"
+                        , DepListSingle 'D'
+                        , DepListSingle 'A'
+                        ]
                 
 
 testConns1 :: Char -> Char -> Bool
