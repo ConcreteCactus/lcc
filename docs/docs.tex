@@ -122,18 +122,20 @@ be Turing-complete. Additionally, the language should have some way of
 communicating with the outside world and therefore some input-output system is
 necessary.
 
-\subsection{Methods used} % todo
+\subsection{Methods used}
 
 \subsubsection{Garbage collection}
 
 There is a simple garbage collection algorithm built into the runtime of the
-generated code. The algorithm uses a mark-and-sweep style method to find and
-free allocated memory that is not used.
+language. Garbage collection makes functional languages more robust by removing
+the need for manual memory management. The algorithm uses a mark-and-sweep style
+method to find and free allocated memory that is not used.
 
 \subsubsection{C back-end}
 
-The target language of the compiler is C. There are types and functions in the
-LC language that use the C definitions, for example, all number types and
+The source code of the LC language is first compiled to C, then to machine code
+using the C compiler of the programmer's choice. There are types and functions
+in the LC language that use the C definitions, for example, all number types and
 input-output functions.
 
 \subsubsection{Impure functions}
@@ -148,6 +150,17 @@ The language is eagerly evaluated, however for recursion to work, LC is required
 to have lazily evaluated constructs. The two main ways to get lazy evaluation,
 are if-expressions, and the \verb$case$ function, both of which can be used for
 recursion.
+
+\subsubsection{Type inference}
+
+The types of expressions are inferred during compilation time to ensure
+type-safety. Type inference makes the code more concise by removing the need
+to specify types. Type inference can also make the code less understandable, as
+it can remove the specification of important properties of functions. For this
+reason it was decided that writers of the LC language will be allowed to specify
+types if it seems important. Specifying types also has the benefit of
+constraining the domains of functions, as the type inference system might infer
+a type that is too general.
 
 \subsection{Building the software}
 \subsubsection{Dependencies}
@@ -1229,7 +1242,7 @@ compute the output, three steps are taken:
     The composition matrix has an important property: it shows not just the
     direct dependencies of a node, but all the subsequent dependencies resulting
     from the direct dependencies. This can be used to efficiently find
-    dependency cycles. The $i$th and $j$th nodes are in a cycle if and only if
+    dependency cycles: The $i$th and $j$th nodes are in a cycle if and only if
     $G'_{i,j} \land G'_{j,i}$.
     \item Merge all the nodes that are in a dependency cycle.
 \end{enumerate}
@@ -1454,14 +1467,26 @@ one needs to postfix \verb$_func$ to the name of the global definition, and call
 it as a function with no arguments.
 
 
-\subsubsection{Literals} % todo: assignment
+\subsubsection{Literals}
 
 While closures represent functions, literal objects stand for primitive values
 in the generated code. The only field alongside \verb$gc_data$ in their
-structures are \verb$data$. It is a variable length \verb$char$ array that can
+structures are \verb$data$. It is a variable length byte array that can
 be sized according to the size of the data type contained in the object. This
 approach allows literals to only consume the memory necessary, with the drawback
 of having to do pointer casts to be able to read and write to this field.
+
+In order to write data into a literal, the generated code first creates the
+literal object, then it has to create a pointer with the type of the data to be
+written pointing to the data field in the created literal. Then, the data can be
+written using the newly created pointer.
+\begin{lstlisting}
+literal* lit = new_literal(sizeof(uint8_t));
+uint8_t* lit_datai = (uint8_t*)&lit->data;
+*lit_datai = 3;
+\end{lstlisting}
+This method of assigning values to literals is used because \verb$gcc$ does not
+allow \verb$lvalue$ casts.
 
 \subsubsection{Sums}
 
