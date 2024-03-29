@@ -180,9 +180,9 @@ program11 =
 
 program12 :: SourceCode
 program12 =
-  "f1 : I8 -> I8\n"
+  "f1 : U8 -> U8\n"
     ++ "f1 := \\x.x\n"
-    ++ "main := f1 0u8"
+    ++ "main := f1 0i8"
 
 program13 :: SourceCode
 program13 =

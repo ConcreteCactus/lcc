@@ -4,14 +4,11 @@
 \usepackage{listings}
 \usepackage{setspace}
 \usepackage{graphicx}
+\usepackage{titling}
 \usepackage{tikz}
 \usetikzlibrary{matrix}
 
 \onehalfspace
-% Later references:
-% - https://pages.cs.wisc.edu/~horwitz/CS704-NOTES/1.LAMBDA-CALCULUS.html
-% - https://en.wikipedia.org/wiki/Lambda_calculus
-% - https://en.wikipedia.org/wiki/De_Bruijn_index
 
 \title{A lambda calculus compiler}
 \author{Áron Hárnási \\
@@ -27,7 +24,45 @@
 
 \begin{document}
 \linespread{1}
-\maketitle
+\begin{titlingpage}
+\begin{center}
+\begin{minipage}{0.25\textwidth}
+    \includegraphics[width=\textwidth]{elte-logo.pdf}
+\end{minipage}
+\hspace{2em}
+\begin{minipage}{0.65\textwidth}
+    Eötvös Lóránd University\\
+    Faculty of Informatics\\
+    Department of Programming Languages and Compilers
+\end{minipage}
+\end{center}
+\begin{minipage}[c][37em][c]{\textwidth}
+    \begin{center}
+    \huge Lambda Calculus Implementation
+    \end{center}
+\end{minipage}
+
+\begin{minipage}[t]{0.45\textwidth}
+    \textbf{Author:}
+    \begin{itemize}
+        \item Áron Hárnási\\
+        computer science BSc.
+    \end{itemize}
+\end{minipage}
+\begin{minipage}[t]{0.50\textwidth}
+    \textbf{Supervisors:}
+    \begin{itemize}
+        \item Internal supervisor: Ambrus Kaposi\\
+        docent, PhD
+        \item External supervisor: András Kovács\\
+        postdoc, PhD
+    \end{itemize}
+\end{minipage}
+\vspace{1em}
+\begin{center}
+    March of 2024, Budapest
+\end{center}
+\end{titlingpage}
 \pagebreak
 \tableofcontents
 \pagebreak
@@ -787,10 +822,11 @@ output, one would need to first define a function that can take a list of
 characters, and compose a new function that prints the characters in the list
 one by one. This is the task of the \verb$printList$ function.
 
-The \verb$printList$ function first does a case study on the head of the list.
-If the list is not empty, the first element is printed, then \verb$printList$ is
-called recursively on the remaining list. If the list is empty, the identity
-function is returned to align with the type of the \verb$printList$ function.
+The \verb$printList$ function first does a case study on the head of the input
+list. If the list is not empty, the first element is printed, then
+\verb$printList$ is called recursively on the remaining list. If the list is
+empty, the identity function is returned to align with the type of the
+\verb$printList$ function.
 
 \verb$cmp$ is a small utility function that returns the composition of the two
 input functions flipped. It is used in the \verb$printList$ function to compose
@@ -826,7 +862,7 @@ checks if any of them returns an error, and prints the result of the
 \verb$doCalc$ function if there are no errors. If instead there are any errors,
 the main function does not print to the standard output, instead it exits with
 the exit code 1, meaning the operator was not recognized; 2, meaning the second
-digit was not in the 0-9 range; 3, meaning the first digit was not in the 0-9
+digit was not in the 0-9 range; or 3, meaning the first digit was not in the 0-9
 range.
 
 \subsubsection{A Turing-machine simulator}
@@ -868,8 +904,8 @@ them ends the execution. All other states can be used without any special
 restriction.
 
 Both the \verb$<read>$ and \verb$<write>$ values encode symbols that can be on
-the tape including the empty symbol, a symbol that the tape is filled with
-before the input is loaded. The empty symbol can be encoded with a single
+the tape including the empty symbol, which is a symbol that the tape is filled
+with before the input is loaded. The empty symbol can be encoded with a single
 \verb$0$. This \verb$0$ is different from an input \verb$0$ character, since the
 input can not contain empty symbols. To encode a \verb$0$ character, one needs
 to use \verb$00$ and to encode a \verb$1$ character, one needs to use
@@ -885,8 +921,8 @@ After receiving the first line, the Turing machine simulator parses the input,
 and either prints an \verb$e$ character indicating that there was an error while
 parsing, or it prints the defined state transitions one by one in a human
 readable way. Note that the machine allows undefined state transitions. During
-execution when it does not find the proper state transition for a specific state
-and symbol combination, it prints \verb$E2$ and stops execution.
+execution, when it does not find the proper state transition for a specific
+state and symbol combination, it prints \verb$E2$ and stops execution.
 
 After the second line is read, the machine loads the input onto the tape and
 starts execution. Each step of the execution is printed to standard output with
@@ -902,9 +938,9 @@ input, one can compile its source with
 cd examplePrograms
 stack run turing.lc
 \end{lstlisting}
-The command creates a \verb$a.out$ executable file, that can be used to run the
+The command creates an \verb$a.out$ executable file that can be used to run the
 simulator. To run the simulator with the given example input directly, one might
-pipe the contents of the file into the program. On \verb$bash$ that is done in
+pipe the contents of the file into the program. On \verb$bash$, this is done in
 the following way:
 \begin{lstlisting}
 ./a.out < turing_input.txt
@@ -934,8 +970,11 @@ This Turing machine accepts the input if it only consists of ones and zeroes,
 and it is symmetrical. If the input is not symmetrical, the Turing machine
 rejects the input. Note that there are some undefined state transitions.
 
-The execution of the Turing machine is the following. Note that some lines have
-been removed to keep the output concise.
+The execution of the Turing machine is the following. Each line corresponds to
+one step of the execution. First, the current state is written prefixed with the
+letter \verb$q$, then the current position of the head, then a greater than
+(\verb$>$) character, then the tape symbols separated by spaces. Note that some
+lines have been removed to keep the output concise.
 \begin{lstlisting}
 q0 0 > 0 0 1 0 1 0 0 0 
 q3 1 > _ 0 1 0 1 0 0 0 
@@ -962,7 +1001,7 @@ symmetrical.
 \section{Developer documentation}
 
 This part of the documentation is intended for developers of the compiler, and
-users of the language should not need to use it.
+users of the language should not need to use the developer documentation.
 
 \subsection{Project structure}
 
@@ -978,8 +1017,8 @@ compilation, which will be discussed in detail in the following sections.
 
 \subsubsection{Folder structure}
 
-Most modules in the repository have two files: An internal one that exports all
-external and internal functions and an external one that imports the internal
+Most modules in the repository have two files: An internal file that exports all
+external and internal functions and an external file that imports the internal
 file, and only exports the external functions. When this module is imported into
 other modules, the external file is used. In order to unit test the internals of
 a module, it is necessary to expose them to unit tests. Using this two file
@@ -1024,7 +1063,7 @@ To define a parser for a lexical token, the \verb$satisfy$ and \verb$satisfy_$
 functions are used along with the \verb$Applicative$ and \verb$Alternative$
 utility functions, for example, \verb$some$, \verb$many$, and the \verb$<|>$
 (alternative) operator. These primitives allow the creation of regex-like
-parsers, for example, the parser for hexadecimal number literals is defined in
+parsers. For example, the parser for hexadecimal number literals is defined in
 the following way:
 \\\noindent\begin{minipage}{\textwidth}
 \begin{lstlisting}
@@ -1132,7 +1171,7 @@ it arranges all the elements in a cycle into a single node.
 
 The dependency list is used by the Semantic Analyzer to determine the order in
 which the global definitions need to be type inferred. If there are any
-dependency cycles, it infers the type of all definitions in the cycle in a
+dependency cycles, it infers the type of all definitions in each cycle in a
 single step.
 
 The algorithm behind a dependency list can be thought of as an algorithm whose
@@ -1140,8 +1179,7 @@ input is a directed graph, and whose output is a list of nodes in the input
 graph, in an order where there is no \emph{arrow} pointing forward in the list.
 In case cycles are present in the input graph, the nodes in the cycle are
 merged into a single node, thereby removing the cycle from the graph. For
-example, the input and corresponding output of an acyclic graph would be the
-following.
+example, when the input is an acyclic graph, the output would be the following. 
 \begin{center}
 \begin{tikzpicture}[->]
     \node (a) at (1,3) {A};
@@ -1159,7 +1197,7 @@ following.
     \node (h3) at (5,2.3) {output};
 \end{tikzpicture}
 \end{center}
-While for an input graph with cycles the algorithm would return
+While for an input graph with a cycle, the algorithm would return
 \begin{center}
 \begin{tikzpicture}[->]
     \node (a) at (1,3) {A};
@@ -1182,9 +1220,9 @@ In this case, the nodes $D$,$C$, and $B$ are merged into one cycle. In order to
 compute the output, three steps are taken:
 \begin{enumerate}
     \item Build an $n \times n$ binary $G$ matrix, where $n$ is the number of
-        nodes in the graph, and $G_{i,j}$ is $1$ if there is an arrow pointing
-        from the $i$th node to the $j$th node, $0$ otherwise. (There are only
-        $1$s on the diagonal.) The matrix of the above graph would be the
+        nodes in the graph, and $G_{i,j}$ is $1$, if there is an arrow pointing
+        from the $i$th node to the $j$th node, $0$ otherwise. (The diagonal only
+        contains ones.) The matrix of the above graph would be the
         following:
 \begin{center}
 \begin{tikzpicture}[->]
@@ -1296,9 +1334,9 @@ therefore it is safe to use without requiring an update.
 \subsubsection{Type inference}
 
 The most important function related to type inference is \verb$inferFromExprS$.
-It is a stateful function, that takes a list of already resolved definitions,
-an expression, and either returns a type error, or a type with an additional
-list of inferred types from the function parameters whose lambda expressions are
+It is a stateful function, that takes a list of already resolved definitions, an
+expression, and either returns a type error, or a type with an additional list
+of inferred types from the function parameters, whose lambda expressions are
 outside of the given expression. This function is run recursively on an
 expression and its sub-expressions, where it can find variables that are
 declared outside of the expression the function is called on. The function keeps
@@ -1315,8 +1353,8 @@ There are two different functions to handle the two cases: \verb$mkInfExprCycle$
 and \verb$mkInfExprTree$. Note that regular definitions are named \emph{trees}
 in the code. To complicate matters, especially in the case of cyclic
 dependencies, type wishes need to be applied right after the type of a
-definition is inferred, since it has an effect on the definitions depending on
-it.
+definition is inferred, since the definition effects the type of the definitions
+depending on it.
 
 \verb$mkInfExprTree$ is a function that takes the list of already resolved
 definitions, one still unresolved expression, and returns either an error if a
@@ -1329,11 +1367,11 @@ While \verb$mkInfExprTree$ only infers the type of a single global variable,
 \verb$mkInfExprCycle$ can infer any number of variable types. It takes the list
 of already resolved definitions, a list of unresolved definitions, and it
 returns either an error, if there are any, or a list of resolved definitions.
-Internally, it walks the given list of to be inferred definitions and runs
-\verb$inferFromExprS$ on each variable. After this, the type information
+Internally, it walks the given list of the to be inferred definitions, and it
+runs \verb$inferFromExprS$ on each variable. After this, the type information
 computed by the inference of the definitions on each other is taken into
-account. Then all types are updated with \verb$updateWithSubstitutions$. After
-the updating step, the type wishes can checked and substituted.
+account. Then, all types are updated with \verb$updateWithSubstitutions$. After
+the updating step, the type wishes can be checked and substituted.
 
 \subsubsection{Type checking}
 
@@ -1363,7 +1401,7 @@ start. The Code Generator needs to turn the representation of the code used in
 the Semantic Analyzer into the more usable representation of the Code Generator.
 This process does two main things:
 \begin{itemize}
-    \item All type information is discarded as the program is proven to be
+    \item All type information is discarded, as the program is proven to be
         type-safe.
     \item Lambdas are represented with closures and closures acquire a
         \verb$depth$ value which is used to determine the number of captured
@@ -1372,12 +1410,12 @@ This process does two main things:
 
 \subsubsection{Garbage collection}
 
-In the C source code that the Code Generator generates, there are five different
-types of objects: Closures, Literals, Sums, Products, and Units. All of them
-will be discussed in the later sections. All objects occupy memory on the heap,
-which has to be allocated and deallocated manually. To simplify the LC language,
-there is a garbage collector built into its runtime which can automatically
-allocate and deallocate memory for objects. 
+In the C source code, that the Code Generator generates, there are five
+different types of objects: Closures, Literals, Sums, Products, and Units. All
+of them will be discussed in the later sections. All objects occupy memory on
+the heap, which has to be allocated and deallocated manually. To simplify the LC
+language, there is a garbage collector built into its runtime which can
+automatically allocate and deallocate memory for objects. 
 
 The garbage collector employs a simple mark-and-sweep algorithm. All objects
 have a boolean flag indicating whether there is a pointer on the stack pointing
@@ -1406,7 +1444,7 @@ are considered to be in-use and therefore they are not freed by the garbage
 collector. Managing the stack flag is the responsibility of the generated code.
 When an object is in scope, its stack flag should be turned on, and when it goes
 out of scope, its stack flag should be turned off. The two functions in the
-program runtime that set and unset the stack flag are \verb$gc_set_stack$ and
+program runtime, that set and unset the stack flag, are \verb$gc_set_stack$ and
 \verb$gc_unset_stack$.
 
 \subsubsection{Closures}
@@ -1479,7 +1517,7 @@ generated code. To bridge the gap between statement and expression, an empty
 pointer value is created before the if statement to hold the result. Because if
 statements create new scope, the stack flag of the objects created in if
 statements has to be unset on the boundary of the scope, while setting the stack
-flag of the return object of the if expression, as it is used outside of the
+flag of the return object of the if expression on, as it is used outside of the
 scope of the if statement.
 \begin{lstlisting}
 void* ifr;
@@ -1505,7 +1543,7 @@ in the generated code. The only field alongside \verb$gc_data$ in their
 structures are \verb$data$. It is a variable length byte array that can
 be sized according to the size of the data type contained in the object. This
 approach allows literals to only consume the memory necessary, with the drawback
-of having to do pointer casts to be able to read and write to this field.
+of having to do pointer casts to be able to read and write to the data field.
 
 In order to write data into a literal, the generated code first creates the
 literal object, then it has to create a pointer with the type of the data to be
@@ -1521,11 +1559,11 @@ allow \verb$lvalue$ casts.
 
 \subsubsection{Sums}
 
-Sum objects object represent an element of a Sum type in the LC language. They
-can contain an object that is one of two different types. Internally, sum
-objects store a pointer to the stored object named \verb$data$ as well as a
-boolean flag indicating which type the stored object is the element of with the
-name \verb$kind$.
+Sum objects represent elements of a Sum type in the LC language. They can
+contain an object that has one of two different types. Internally, sum objects
+store a pointer to the stored object named \verb$data$ as well as a boolean flag
+indicating which type the stored object is the element of with the name
+\verb$kind$.
 
 \subsubsection{Tuples}
 
@@ -1544,8 +1582,7 @@ and therefore there is no dedicated structure definition for units, only
 
 While the Empty type is a valid type in the LC language, it is not necessary to
 implement it into the generated C code. It is impossible to create an instance
-of this type, and therefore functions on such an instance are unnecessary to
-implement.
+of this type, and therefore functions on such an instance are unnecessary.
 
 \subsubsection{The standard library}
 
@@ -1559,7 +1596,7 @@ definition used in the Semantic Analyzer, and a function that can be used to
 generate the C source code for that standard library definition. In this
 subsection, the process of generating C source for a definition is discussed.
 
-The type definition of C source generators of an entry is
+The type definition of the C source generator of an entry is
 \begin{lstlisting}
 (Int -> Writer a String) -> Writer a [String]
 \end{lstlisting}
@@ -1580,9 +1617,9 @@ returned by the generator function from the Standard Library.
 
 The generator function in the Standard Library returns a 
 \verb$Writer a [String]$. \verb$a$ can be used arbitrarily, while the
-\verb$[String]$ holds the lines for the actual C code to be inserted. It is
+\verb$[String]$ holds the lines for the actual C code to be inserted. It can be
 expected that all lines in the list are postfixed with a semi-colon (\verb$;$)
-and the last line to be prefixed with a \verb$return$ keyword.
+and the last line to be prefixed with a \verb$return$ keyword during generation.
 
 As an example, the standard library definition of the \verb$cons$ function is
 the following:
@@ -1621,8 +1658,8 @@ Standard Library module and allowing the programmer to focus on the definition.
 
 \subsection{Tests}
 
-To validate that the compiler is working as expected, automated tests are used.
-There are two types of tests for \verb$lcc$.
+To validate that the compiler works as expected, automated tests are used. There
+are two types of tests for \verb$lcc$.
 \begin{itemize}
     \item \textbf{Unit tests} are designed to focus on single parts of the program.
         They are used to test small but non-trivial features.
@@ -1646,8 +1683,7 @@ At the time of writing, all tests are passing.
 \subsubsection{Unit tests}
 
 Unit tests are divided into four categories: syntactic analyzer tests, semantic
-analyzer tests, dependency list tests, and type tests. The unit tests can only
-pass if all tests from all categories pass.
+analyzer tests, dependency list tests, and type tests.
 
 \subsubsection{End-to-end tests}
 
@@ -1670,8 +1706,45 @@ program. These tests can only pass if
 
 There is a Utility module imported into most other modules. The Utility module
 defines utility functions and data-types that are either not specific to any module, or they
-are used in more than one modules. (e.g. \verb$State$ is used in the Semantic
+are used in more than one module. (e.g. \verb$State$ is used in the Semantic
 Analyzer and the Code Generator, however it is not specific to either of the two
 modules.)
+
+\section{References}
+\begin{itemize}
+    \item Lambda calculus in general:
+        \small\begin{itemize}
+        \item\verb$https://en.wikipedia.org/wiki/Lambda_calculus $
+        \item\verb$https://pages.cs.wisc.edu/~horwitz/CS704-NOTES/1.LAMBDA-CALCULUS.html $
+        \normalsize\end{itemize}
+    \item De-Bruijn indexing:
+        \small
+        \verb$https://en.wikipedia.org/wiki/De_Bruijn_index $
+        \normalsize
+    \item Haskell library and documentation search engine:
+        \small
+        \verb$https://hoogle.haskell.org/ $
+        \normalsize
+    \item The \verb$process$ library:
+        \small
+        \verb$https://hackage.haskell.org/package/process $
+        \normalsize
+    \item The \verb$array$ library:
+        \small
+        \verb$https://hackage.haskell.org/package/array $
+        \normalsize
+    \item The \verb$hspec$ testing library:
+        \small
+        \verb$https://hackage.haskell.org/package/hspec $
+        \normalsize
+    \item The \verb$temporary$ library:
+        \small
+        \verb$https://hackage.haskell.org/package/temporary $
+        \normalsize
+    \item The \verb$QuickCheck$ testing library: \\
+        \small
+        \verb$https://hackage.haskell.org/package/QuickCheck $
+        \normalsize
+\end{itemize}
 
 \end{document}
