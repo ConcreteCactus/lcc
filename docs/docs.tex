@@ -35,7 +35,7 @@
 \section{Introduction}
 
 This is the user and development documentation of a compiler that compiles a
-language inspired by simply typed lambda calculus and produces C source code.
+language inspired by simply typed lambda calculus into C code.
 
 \subsection{Motivation}
 
@@ -47,11 +47,15 @@ difficulties of writing a type system based on simply typed lambda calculus.
 \subsection{Terminology}
 
 The name of the compiler described in this document is referred to by the name
-\verb$lcc$, while its source language is named LC, or the LC language. It is
+\verb$lcc$, while its source language is named LC or the LC language. It is
 important to make the distinction between lambda calculus and the LC language,
 as the LC language is designed to be evaluated using physical hardware with
-limited resources, and as a result, LC has features that are not present in
-lambda calculus and vice versa.
+limited resources, and as a result, LC has properties that are not present in
+lambda calculus.
+
+Throughout this document, new concepts will be described the first time they are
+used. To introduce new names for specific concepts, the new names will be
+written with an \emph{italic font} for emphasis.
 
 \subsection{Lambda calculus}
 
@@ -60,11 +64,11 @@ computation that can be defined with a Turing machine. This is achieved using
 function application and substitution on lambda terms. A lambda term in the
 simplest form of lambda calculus is built up of three parts:
 \begin{itemize}
-    \item $(x)$ A variable that can hold a value.
-    \item $(\lambda x. F)$ A lambda that can represent a function, where $x$
-        is the function parameter and $F$ is another term, that may or 
+    \item $(x)$ is a variable that can hold a value.
+    \item $(\lambda x. F)$ is a lambda that can represent a function, where $x$
+        is the function parameter and $F$ is another term that may or 
         may not contain $x$.
-    \item $(f\:a)$ A function application where $f$ is the function $a$ is
+    \item $(f\:a)$ is a function application where $f$ is the function $a$ is
         applied to. Both $f$ and $a$ are terms. \\ \textbf{Note:} Since variable
         terms can also be denoted with a string of characters, it is important
         to put a space between the two terms to distinguish between a function
@@ -83,16 +87,16 @@ y) z$ and then $y$, which is different from the first scenario.
 
 In order to avoid naming collisions, we can use the $\alpha$-reduction rule.
 With $\alpha$-reduction, we can rename variables in a given lambda calculus
-term. Renaming can be used before a $\beta$-reduction, for example, in the
-previous example $((\lambda x. (\lambda y. x)) y) z$ replacing $y$ with $w$ in
-the inner lambda term will result in $((\lambda x. (\lambda w. x)) y) z$, which
-does not have naming collisions.
+term. Renaming can be used before a $\beta$-reduction to make sure no naming
+collisions occur. For example, in the previous case: $((\lambda x. (\lambda y.
+x)) y) z$. Replacing $y$ with $w$ in the inner lambda term will result in
+$((\lambda x. (\lambda w. x)) y) z$, which does not have naming collisions.
 
 
 \subsection{This implementation} % todo: split and move to user and dev doc
 
 In this section, we will touch on the most important differences between the
-formal system of lambda calculus, and this implementation. There have been some
+formal system of lambda calculus, and the LC language. There have been some
 ideas borrowed from C, Rust, and Haskell in order to make the language usable
 from a non-theoretical standpoint.
 
@@ -104,11 +108,10 @@ program. This introduces recursion as the main fix-point combinator.
 
 \subsubsection{Static typing} % todo: split and move to user and dev doc
 
-It was decided, that the code this compiler compiles from was going to be
-statically typed. Each term has a type that is assigned to it at compile time by
-a type inference algorithm. Types of global variables can also be specified, in
-which case the compiler checks if it matches the inferred type of the same
-variable.
+The source language is statically typed. Each term has a type that is assigned
+to it at compile time by a type inference algorithm. Types of global variables
+can also be specified, in which case the compiler checks if it matches the
+inferred type of the same variable.
 
 \pagebreak
 \section{User documentation}
@@ -160,7 +163,7 @@ it can remove the specification of important properties of functions. For this
 reason it was decided that writers of the LC language will be allowed to specify
 types if it seems important. Specifying types also has the benefit of
 constraining the domains of functions, as the type inference system might infer
-a type that is too general.
+a function domain that is too general.
 
 \subsection{Building the software}
 \subsubsection{Dependencies}
@@ -227,11 +230,11 @@ will be discussed under Command-line options.
 
 \subsection{Running the compiler}
 
-The main job of the compiler is converting from LC source code to C source code.
+The main job of the compiler is to convert from LC source code to C source code.
 Once it has the C source file, it is compiled to binary using \texttt{gcc} if no
 other command-line option is specified. The file extension of the input file
-does not matter, however in this document they will be referred to with the
-extension \texttt{.lc}. To simply compile an input file, one would run the
+does not matter, however in this document source files will be referred to with
+the extension \texttt{.lc}. To simply compile an input file, one would run the
 following:
 \begin{lstlisting}
 $ lcc hello.lc
@@ -244,15 +247,15 @@ source code it has generated as well with the default name \texttt{a.c}.
 \subsubsection{Command-line options}
 
 It is possible to give command-line options to the compiler in order to alter
-its behavior. 
+its behavior. The possible command-line options are listed below:
 
 \vspace{7pt}
 
 \begin{tabular}{l l}
     \texttt{-n}\quad& Do not run any C compiler, only compile from \\ 
                     & LC to C. \\
-    \texttt{-v}\quad& Show version and about information and exit. \\
-    \texttt{-h}\quad& Print some help text and exit. \\
+    \texttt{-v}\quad& Show version and about information then exit. \\
+    \texttt{-h}\quad& Print some help text then exit. \\
     \texttt{-o <output-exe>}\quad& Specify the name of the executable
         generated. \\
     \texttt{-O <output.c>}\quad& Specify the name of the C source generated. \\
@@ -269,7 +272,7 @@ no compilation of any kind will be performed.
 
 The LC language is a language inspired by simply typed lambda calculus.
 Expressions are similar to lambda calculus terms, they are simply typed, and
-types support parametric polymorphism. In this subsection, the key details of
+types support parametric polymorphism. In this section, the key details of
 the language will be discussed.
 
 \subsubsection{Syntax and semantics}
@@ -279,16 +282,18 @@ variables can be defined with the \texttt{:=} operator in the following way.
 \begin{lstlisting}
 globalVariable := expression
 \end{lstlisting}
-Optionally, a type wish or declaration can be added to a global definition,
-(i.e., its intended type can be specified.) For each type wish, the compiler
-checks if it can be used in place of the inferred type. To specify a type wish,
-one can use the colon (\verb$:$) operator in the following way:
+Optionally, a \emph{type wish} or declaration can be added to a global
+definition, (i.e., its intended type can be specified.) For each \emph{type
+wish}, the compiler checks if it can be used in place of the inferred type. To
+specify a type wish, one can use the colon (\verb$:$) operator in the following
+way:
 \begin{lstlisting}
-globalVariable : I32 -> I32 -> I32
+globalVariable : I32 -> U32
 globalVariable := expression
 \end{lstlisting}
-In this case, \verb$globalVariable$ is a function that takes two 32bit signed
-integer parameters, and outputs a 32bit signed integer.
+In this case, \verb$globalVariable$ is a function that takes a 32bit signed
+integer, and returns a 32bit unsigned integer. It could be, for example, an
+$abs(x)$ function.
 
 \subsubsection{Expressions}
 
@@ -304,7 +309,8 @@ All expressions can be created using six parts:
 
 \paragraph{Variables} Variables always represent function parameters. They can
 be denoted with a single ASCII character, or a string of ASCII characters. Their
-first character is always lower-case. For example, \verb$x$ or \verb$exampleVar$.
+first character is always lower-case. For example, \verb$x$ or
+\verb$exampleVar$.
 
 \paragraph{Lambdas} Lambdas represent functions. Lambdas have an expression
 body, and a parameter. Their parameter can be used inside their expression
@@ -315,7 +321,7 @@ example, \verb$\x.x$ or \verb$\a.(f a) g$.
 \paragraph{Applications} Applications represent calling functions. Applications
 always contain two expressions, The first of which is the function getting
 called and the second represents the parameter given to that function. To apply
-an expression to another in the LC language, one would write the function to be
+one expression to another in the LC language, one would write the function to be
 called first and the parameter second separated by white-space. For example,
 \verb$func param$ or \verb$func param1 param2$.
 \noindent
@@ -325,10 +331,10 @@ Note that function application is left-associative.
 somewhere else in the file. When evaluated, these references are
 substituted\footnote{On the compiler level, this substitution is implemented as
     a function call, which happens in a new scope; therefore it is not possible
-    to have, for example, free variables in global definitions.} with the
+to have, for example, free variables in global definitions.} with the
 corresponding global definitions. Global references are written in the same way
-as local variables; therefore in name-collisions, the local variable will take
-precedence.
+as local variables; therefore in name-collisions, the most local variable will
+take precedence.
 
 \paragraph{If expressions} If expressions represent the control-flow if
 primitive used in procedural languages. If expressions take three expressions:
@@ -338,10 +344,10 @@ it possible to use them in recursive functions when other lazy constructs are
 not available or necessary. \\
 For example, \verb$if condition then exprIfTrue else exprIfFalse$
 
-\paragraph{Literals} Literals represent number values in the C back-end, and the
-standard library provides basic operations on them. The following table shows
-the possible types they can have and their corresponding C type in the LC
-language.
+\paragraph{Literals} Literals represent number values in the C back-end. The
+standard library provides basic operations on literals like addition or division
+as well as comparison functions. The following table shows the possible types
+they can have and their corresponding C type in the LC language.
 \begin{center}
 \begin{tabular}{c c c}
     LC type & Type postfix & C type \\
@@ -384,7 +390,7 @@ example, \verb$42u32$ or \verb$-1i8$.
 The LC language is statically typed. This means, that all expressions have a
 set type at the end of compilation. The language uses a type inference algorithm
 that runs on all expressions to determine the appropriate type for each
-expression. Because of type inference it is not required for the programmer to
+expression. Because of type inference, it is not required for the programmer to
 specify the type of expressions; however, types of global definitions can still 
 be specified for clarification.
 
@@ -392,23 +398,23 @@ When a type is specified for a global definition, the type checker is run. The
 type checker compares the specified type and the inferred type to see if they
 are in line with each other. If the types match, the specified type is used in
 place of the inferred type. By default, the type inference algorithm tries to
-find the widest possible type for a given expression, and the type found by the
-inference algorithm can be narrowed down by specifying the type if desired. For
-example, the following program compiles:
+find the most general type for a given expression, and the type found by the
+inference algorithm can be narrowed down to be more specific by specifying the
+type if desired. For example, the following program compiles:
 \begin{lstlisting}
 f1 := \x.x
-main := f1 0i32
+main := f1 0u8
 \end{lstlisting}
 while the second one returns a type checker error:
 \begin{lstlisting}
 f1 : I8 -> I8
 f1 := \x.x
-main := f1 0i32
+main := f1 0u8
 \end{lstlisting}
 In this example, the type of the \verb$f1$ function was narrowed down when its
-type was specified, and the compiler rejected the expression that tried to apply
-a parameter to the \verb$f1$ function that was outside of its possible parameter
-types.
+type was specified. The compiler rejected the expression that tried to apply a
+\verb$U8$ parameter to the \verb$f1$ function, because the parameter could only
+be \verb$I8$ in this example.
 
 In the next paragraphs, the key components of the type system are discussed. All
 types in the language can be one of the following kinds:
@@ -456,7 +462,7 @@ following way: \verb$A + B$.
 
 The standard library provides two constructors for sum types; one that
 constructs \emph{left} elements: \verb$inl$, and one that constructs
-\emph{right} elements: \verb$inr$. Both constructors take one parameter, the
+\emph{right} elements: \verb$inr$. Both constructors take one parameter: the
 element to be contained. The type of the constructors is the following:
 \begin{lstlisting}
 inl : a -> a + b
@@ -1466,6 +1472,31 @@ Note that because global definitions are not necessarily lambdas, to call them,
 one needs to postfix \verb$_func$ to the name of the global definition, and call
 it as a function with no arguments.
 
+\subsubsection{If-expressions}
+
+If expressions achieve laziness by compiling to simple if statements in the
+generated code. To bridge the gap between statement and expression, an empty
+pointer value is created before the if statement to hold the result. Because if
+statements create new scope, the stack flag of the objects created in if
+statements has to be unset on the boundary of the scope, while setting the stack
+flag of the return object of the if expression, as it is used outside of the
+scope of the if statement.
+\begin{lstlisting}
+void* ifr;
+if(*condition){
+    // generated code if true
+    // set ifr to the return value of the generated code
+    ifr = ret;
+    // unset stack flags
+} else {
+    // generated code if false
+    // set ifr to the return value of the generated code
+    ifr = ret;
+    // unset stack flags
+}
+gc_type* obj = ifr;
+gc_set_stack(obj); // set the stack flag of ifr
+\end{lstlisting}
 
 \subsubsection{Literals}
 
@@ -1515,8 +1546,6 @@ While the Empty type is a valid type in the LC language, it is not necessary to
 implement it into the generated C code. It is impossible to create an instance
 of this type, and therefore functions on such an instance are unnecessary to
 implement.
-
-\subsubsection{If-expressions} % todo
 
 \subsubsection{The standard library}
 
