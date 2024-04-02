@@ -89,9 +89,9 @@ as the LC language is designed to be evaluated using physical hardware with
 limited resources, and as a result, LC has properties that are not present in
 lambda calculus.
 
-Throughout this document, new concepts will be described the first time they are
-used. To introduce new names for specific concepts, the new names will be
-written with an \emph{italic font} for emphasis.
+Throughout this document, new concepts are described the first time they are
+used. To introduce new names for specific concepts, the new names are written
+with an \emph{italic font} for emphasis.
 
 \subsection{Lambda Calculus}
 
@@ -131,10 +131,10 @@ $((\lambda x. (\lambda w. x)) y) z$, which does not have naming collisions.
 
 \subsection{This Implementation}
 
-In this section, we will touch on the most important differences between the
-formal system of lambda calculus, and the LC language. There have been some
-ideas borrowed from C, Rust, and Haskell in order to make the language usable
-from a non-theoretical standpoint.
+In this section, we touch on the most important differences between the formal
+system of lambda calculus, and the LC language. There have been some ideas
+borrowed from C, Rust, and Haskell in order to make the language usable from a
+non-theoretical standpoint.
 
 \subsubsection{Global variables}
 
@@ -193,18 +193,18 @@ recursion.
 \subsubsection{Type inference}
 
 The types of expressions are inferred during compilation time to ensure
-type-safety. Type inference makes the code more concise by removing the need
-to specify types. Type inference can also make the code less understandable, as
-it can remove the specification of important properties of functions. For this
-reason it was decided that writers of the LC language will be allowed to specify
-types if it seems important. Specifying types also has the benefit of
-constraining the domains of functions, as the type inference system might infer
-a function domain that is too general.
+type-safety. Type inference makes the code more concise by removing the need to
+specify types. However, type inference can also make the code less
+understandable, as it can remove the specification of important properties of
+functions. For this reason, in LC, it is possible to specify types if it seems
+necessary. Specifying types also has the benefit of constraining the domains of
+functions, as the type inference system might infer a function domain that is
+too general.
 
 \subsection{Building the Software}
 \subsubsection{Dependencies}
 
-To build the program, one would require the following packages:
+To build the program, the following packages are required:
 \begin{itemize}
     \item git
     \item stack v2.11.1 or later
@@ -227,17 +227,16 @@ appropriate directory.
 $ git clone --depth=1 \
     https://github.com/ConcreteCactus/lcc.git
 \end{lstlisting}
-This will clone the repository, which is hosted on GitHub. In order to build and
-install the compiler, one would run the following:
+This command clones the repository, which is hosted on GitHub. In order to build
+and install the compiler, the following can be run:
 \begin{lstlisting}
 $ cd lcc
 $ stack install
 \end{lstlisting}
-This will build and install the required dependencies, including ghc. The
-compiler binary is usually copied to \texttt{\$HOME/.local/bin}. Please, make
-sure the resulting binary is on the \texttt{PATH}. If the installation goes
-correctly, running \texttt{lcc -v} should show a banner similar to the
-following:
+This builds and installs the required dependencies, including ghc. The compiler
+binary is usually copied to \texttt{\$HOME/.local/bin}. Please, make sure the
+resulting binary is on the \texttt{PATH}. If the installation goes correctly,
+running \texttt{lcc -v} should show a banner similar to the following:
 
 \vspace{1em}\noindent\begin{minipage}{\textwidth}
 \begin{lstlisting}
@@ -262,7 +261,7 @@ Therefore it is recommended, to have an installed version of \texttt{gcc} on the
 \texttt{PATH}. The version \texttt{lcc} was tested with was gcc v11.4.0, however
 it is likely that compilation works on older versions as well. Alternatively, it
 is possible to specify a different C compiler with command-line arguments, which
-will be discussed under Command-line options.
+is discussed under \ref{command-line-options} Command-line options.
 
 \subsection{Running the Compiler}
 
@@ -270,8 +269,8 @@ The main job of the compiler is to convert from LC source code to C source code.
 Once it has the C source file, it is compiled to binary using \texttt{gcc} if no
 other command-line option is specified. The file extension of the input file
 does not matter, however in this document source files will be referred to with
-the extension \texttt{.lc}. To simply compile an input file, one would run the
-following:
+the extension \texttt{.lc}. To simply compile an input file, the following can
+be run:
 \begin{lstlisting}
 $ lcc hello.lc
 \end{lstlisting}
@@ -280,7 +279,7 @@ file with the default name \texttt{gcc} gives to output binaries. On Linux it is
 usually \texttt{a.out}. \texttt{lcc} produces a \texttt{.c} file containing the
 source code it has generated as well with the default name \texttt{a.c}.
 
-\subsubsection{Command-line options}
+\subsubsection{Command-line options} \label{command-line-options}
 
 It is possible to give command-line options to the compiler in order to alter
 its behavior. The possible command-line options are listed below:
@@ -308,8 +307,8 @@ no compilation of any kind will be performed.
 
 The LC language is a language inspired by simply typed lambda calculus.
 Expressions are similar to lambda calculus terms, they are simply typed, and
-types support parametric polymorphism. In this section, the key details of
-the language will be discussed.
+types support parametric polymorphism. This section discussed the key details of
+the language.
 
 \subsubsection{Syntax and semantics}
 
@@ -350,16 +349,16 @@ first character is always lower-case. For example, \verb$x$ or
 
 \paragraph{Lambdas} Lambdas represent functions. Lambdas have an expression
 body, and a parameter. Their parameter can be used inside their expression
-body. To create a lambda, one would write a backslash (\verb$\$) character
+body. To create a lambda, a backslash (\verb$\$) character can be written,
 followed by the parameter name, a dot (\verb$.$), and the expression body. For
 example, \verb$\x.x$ or \verb$\a.(f a) g$.
 
 \paragraph{Applications} Applications represent calling functions. Applications
-always contain two expressions, The first of which is the function getting
+always contain two expressions, the first of which is the function getting
 called and the second represents the parameter given to that function. To apply
-one expression to another in the LC language, one would write the function to be
-called first and the parameter second separated by white-space. For example,
-\verb$func param$ or \verb$func param1 param2$.
+one expression to another in LC, the function is written first and the parameter
+second separated by white-space. For example, \verb$func param$ or 
+\verb$func param1 param2$.
 \noindent
 Note that function application is left-associative.
 
@@ -369,8 +368,8 @@ substituted\footnote{On the compiler level, this substitution is implemented as
     a function call, which happens in a new scope; therefore it is not possible
 to have, for example, free variables in global definitions.} with the
 corresponding global definitions. Global references are written in the same way
-as local variables; therefore in name-collisions, the most local variable will
-take precedence.
+as local variables; therefore in name-collisions, the most local variable takes
+precedence.
 
 \paragraph{If expressions} If expressions represent the control-flow if
 primitive used in procedural languages. If expressions take three expressions:
@@ -384,6 +383,8 @@ For example, \verb$if condition then exprIfTrue else exprIfFalse$
 standard library provides basic operations on literals like addition or division
 as well as comparison functions. The following table shows the possible types
 they can have and their corresponding C type in the LC language.
+\begin{figure}[ht]
+\setstretch{1.2}
 \begin{center}
 \begin{tabular}{c c c}
     LC type & Type postfix & C type \\
@@ -399,22 +400,26 @@ they can have and their corresponding C type in the LC language.
     \verb$Bool$ & \verb$bool$ & \verb$bool$
 \end{tabular}
 \end{center}
+\caption{The table of the possible type specifying postfixes.}
+\label{fig:type-specifying-postfix-table}
+\end{figure}
 There are four different ways to write literals. To write a character literal,
-one would write the desired character between two single quotes. Escape
-sequences are not supported. For example, \verb$'a'$ or \verb$' '$.
+the desired character is written between two single quotes. Escape sequences are
+not supported. For example, \verb$'a'$ or \verb$' '$.
 
-With the exception of characters, in the LC language, it is required to use a
-type specifying postfix when writing literals. To write a hexadecimal number,
-one would prefix it with \verb$0x$ and write the desired value with the
-characters \verb$0$-\verb$9$ and \verb$a$-\verb$f$. Hexadecimal numbers need to
-be postfixed with an underscore (\verb$_$) and the desired type postfix shown in
-the table above. Only unsigned integers, characters, and booleans can be written
-in this form. For example, \verb$0x1_u8$ or \verb$0xdeadbeef_u32$.
+With the exception of characters, LC requires literals to be postfixed with a
+type specifier. To write a hexadecimal number, a string of characters
+\verb$0$-\verb$9$ and \verb$a$-\verb$f$ can be used prefixed with \verb$0x$,
+postfixed with an underscore (\verb$_$), and the corresponding type specifier
+shown in table \ref{fig:type-specifying-postfix-table}. Only unsigned integers,
+characters, and booleans can be written in this form. For example, \verb$0x1_u8$
+or \verb$0xdeadbeef_u32$.
 
-In order to write a floating point number, one would write the whole part of the
-number in decimal form, optionally include the fractional part separated by a
-dot (\verb$.$) character, then write the postfix \verb$f32$ or \verb$f64$. For
-example, \verb$0f32$ or \verb$3.14f64$.
+In order to write a floating point number, the whole part of the number is
+written in decimal form, optionally with the fractional part separated by a dot
+(\verb$.$) character. To floating point number literals, the two possible
+postfixes (i.e. \verb$f32$ or \verb$f64$) can be directly appended. For example,
+\verb$0f32$ or \verb$3.14f64$.
 
 Decimal numbers can be written similarly to floating point ones with the
 exception that decimal numbers can not have a fractional part. Decimal numbers
@@ -493,7 +498,7 @@ as it starts with a lowercase letter. For example, \verb$a$ or
 \emph{left} and \emph{right}. \emph{Left} elements always contain an element of
 one type, while \emph{right} elements always contain an element of a different
 type. To specify a sum type with type \verb$A$ and \verb$B$ as \emph{left} and
-\emph{right} types, one would use the plus-sign (\verb$+$) operator in the
+\emph{right} types, the plus-sign (\verb$+$) operator is used in the
 following way: \verb$A + B$.
 
 The standard library provides two constructors for sum types; one that
@@ -504,13 +509,12 @@ element to be contained. The type of the constructors is the following:
 inl : a -> a + b
 inr : b -> a + b
 \end{lstlisting}
-Because of this, elements of sum types can either be
-\emph{left} or \emph{right} elements. To look into an element of a sum type, one
-would use the \verb$case$ function. This function takes three parameters: the
-element of the sum type, a function in case it is a left element, and a function
-in case it is a right element. The return value of the \verb$case$ function is
-the return value of the two functions given to it. The \verb$case$ function has
-the following type:
+Because of this, elements of sum types can either be \emph{left} or \emph{right}
+elements. To look into an element of a sum type, the \verb$case$ function can be
+used. This function takes three parameters: the element of the sum type, a
+function in case it is a left element, and a function in case it is a right
+element. The return value of the \verb$case$ function is the return value of the
+two functions given to it. The \verb$case$ function has the following type:
 \begin{lstlisting}
 case : a + b -> (a -> c) -> (b -> c) -> c
 \end{lstlisting}
@@ -518,9 +522,9 @@ case : a + b -> (a -> c) -> (b -> c) -> c
 \paragraph{Product types} Product types are types whose elements contain two
 different elements of two different types: a \emph{first} element and a
 \emph{second} element. To specify that an expression has a product type with
-\verb$A$ and \verb$B$ as the types for its \emph{first} and \emph{second}
-elements, one would use the multiplication (\verb$*$) operator in the following
-way: \verb$A * B$.
+\verb$A$ and \verb$B$ for the types of its \emph{first} and \emph{second}
+elements, the multiplication (\verb$*$) operator is used in the following way:
+\verb$A * B$.
 
 The standard library provides one constructor to create elements of product
 types, the \verb$tuple$ function. It takes two parameters and returns an element
@@ -623,11 +627,11 @@ mul_f64 : F64 -> F64 -> F64
 div_f64 : F64 -> F64 -> F64
 \end{lstlisting}
 In other words the \verb$add_$, \verb$sub_$, \verb$mul_$, and \verb$div_$
-functions postfixed with the type postfix are implemented for every type. They
-use the usual \verb$+$, \verb$-$, \verb$*$, and \verb$/$ operators in the C
-back-end. This means, for instance, that the \verb$div_u8$ function would divide
-the same way the C (\verb$/$) operator would. For example, \verb$div_u8 5u8 2u8$
-would return \verb$2u8$.
+functions, postfixed with the corresponding type postfix, are implemented for
+every type. They use the usual \verb$+$, \verb$-$, \verb$*$, and \verb$/$
+operators in the C back-end. This means, for instance, that the \verb$div_u8$
+function divides the same way the C (\verb$/$) operator does. For example,
+\verb$div_u8 5u8 2u8$ returns \verb$2u8$.
 
 \paragraph{Comparison operators} The following numeric comparison operators are
 implemented: $=$, $\le$, $<$, $\ge$, $>$, and $\ne$. In the LC language, they
@@ -650,9 +654,9 @@ These implementations also use the underlying C comparison operators: \verb$==$,
 with the casting functions provided by the standard library. The name of every
 casting function starts with the name of the type to be cast from, and ends with
 the name of the type to be cast to, infixed with the word \verb$To$. For example
-the function that casts from \verb$F32$ to \verb$U8$ would be named
-\verb$f32Tou8$. All casting functions take a single parameter, the element of
-the type to be cast from, and return the element of the type to be cast to.
+the function that casts from \verb$F32$ to \verb$U8$ is named \verb$f32Tou8$.
+All casting functions take a single parameter: the element of the type to be
+cast from, and return the element of the type to be cast to.
 \begin{lstlisting}
 u8Tou16   : U8 -> U16
 i32Tou16  : I32 -> U16
@@ -662,14 +666,14 @@ f32Tochar : F32 -> Char
 
 \paragraph{IO functions} The IO functions provided by the standard library are
 impure functions that enable the program to read from standard in, and write to
-standard out. To print to the standard out, one would use one of the
-\verb$print_$ functions postfixed with the type of the value to be printed. Not
-all primitive types have print functions, namely 128bit types are not supported.
+standard out. To print to the standard out, one of the \verb$print_$ functions
+postfixed with the type of the value to be printed can be used. Not all
+primitive types have print functions, namely 128bit types are not supported.
 
 Print functions take two parameters. The first parameter is the value to be
 printed to \verb$stdout$ and the second value is the return value, since print
 functions do not return any value in the C language. Therefore the type
-definition of a print function that prints, for example, characters would be the
+definition of a print function that prints, for example, characters is the
 following:
 \begin{lstlisting}
 print_char : Char -> a -> a 
@@ -694,10 +698,10 @@ readfile := if iseq_i32 getchar eof
     then emptyList 
     else cons (i32ToChar getchar) readfile
 \end{lstlisting}
-However, using \verb$getchar$ twice in this manner will execute its side-effect
+However, using \verb$getchar$ twice in this manner executes its side-effect
 twice as well, which means that the character appended to the character list
 will be different from the character used in the if condition. This function
-will return only every second character in a file, which is not the expected
+returns only every second character in a file, which is not the expected
 behavior.
 
 To overcome this issue, one can define the \verb$let$ function used in some of
@@ -737,11 +741,10 @@ exfalso   : Empty -> a
 
 \subsubsection{A note on white-space}
 
-To break an expression down into multiple lines, one would insert end of line
-characters inside the white-space between expression parts. Lines that are part
-of a previous expression have to start with some sort of white-space, in order
-for the compiler to differentiate between continued expressions and new
-definitions.
+To break an expression down into multiple lines, end of line characters can be
+inserted inside the white-space between expression parts. Lines that are part of
+a previous expression have to start with some sort of white-space, in order for
+the compiler to differentiate between continued expressions and new definitions.
 \lstset{showspaces=true}
 \begin{lstlisting}
 adder := \a. \b.
@@ -757,8 +760,8 @@ When a program compiled by \verb$lcc$ starts, the \verb$main$ function is
 evaluated. Since the return value of the main function is used as the exit code
 of the program, the main function can only have type \verb$U8$.
 
-It is allowed to compile a program without a main function, however running the
-resulting binary will simply exit with exit code 0.
+It is allowed to compile a program without a main function, however the
+resulting binary will simply exit with exit code 0 when run.
 
 \subsubsection{Compilation errors}
 
@@ -809,19 +812,19 @@ codes. A type error can have one of the following kinds:
 \subsection{Example Programs}
 \lstset{numbers=left}
 
-In this section, some example programs will be discussed, so that it is easier
-to understand the language.
+In this section, some example programs are discussed so that it is easier to
+understand the language.
 
 \subsubsection{A Hello World program}
 
 A simple hello world program would be the following:
 \lstinputlisting{../examplePrograms/hello.lc}
 
-When run, this program would print the string \verb$hello world$ to the standard
+When run, this program prints the string \verb$hello world$ to the standard
 output, then exit. In order to write a string of characters to the standard
-output, one would need to first define a function that can take a list of
+output, the \verb$printList$ function is defined. It can take a list of
 characters, and compose a new function that prints the characters in the list
-one by one. This is the task of the \verb$printList$ function.
+one by one.
 
 The \verb$printList$ function first does a case study on the head of the input
 list. If the list is not empty, the first element is printed, then
@@ -882,7 +885,7 @@ zeroes in the following way:
 <cell>11<cell>11<cell>11...11<cell>
 \end{lstlisting}
 Where each \verb$<cell>$ defines one state transition. To encode more than one
-cell, one would need to separate them with two ones.
+cell, they need to be separated with two ones.
 
 A \verb$<cell>$ can be encoded in the following way:
 \begin{lstlisting}
@@ -1008,7 +1011,7 @@ users of the language should not need to use the developer documentation.
 
 The compiler can be broken down into four parts: Lexer, Syntax checker, Semantic
 analyzer, and Code Generator. These four parts represent the four steps in
-compilation, which will be discussed in detail in the following sections.
+compilation, which is discussed in detail in the following sections.
 
 \begin{figure}[h]
 \includegraphics[width=0.8\textwidth]{high-level-architecture.diag.pdf}
@@ -1159,7 +1162,7 @@ and \verb$NormType$. \verb$Type$ is used prominently in the type inference
 algorithm, as \verb$Type$ represents a type that is part of a larger
 \emph{context,} while \verb$NormType$ is a type that has no \emph{context;} it
 contains all the type information of a global definition in itself. This will be
-discussed in the type inference section in more detail.
+discussed in the \ref{type-inference} Type Inference section in more detail.
 
 \subsubsection{Dependency List}
 
@@ -1198,7 +1201,7 @@ example, when the input is an acyclic graph, the output would be the following.
     \node (h3) at (5,2.3) {output};
 \end{tikzpicture}
 \end{center}
-While for an input graph with a cycle, the algorithm would return
+While for an input graph with a cycle, the algorithm returns
 \begin{center}
 \begin{tikzpicture}[->]
     \node (a) at (1,3) {A};
@@ -1223,8 +1226,7 @@ compute the output, four steps are taken:
     \item Build an $n \times n$ binary $G$ matrix, where $n$ is the number of
         nodes in the graph, and $G_{i,j}$ is $1$, if there is an arrow pointing
         from the $i$th node to the $j$th node, $0$ otherwise. (The diagonal only
-        contains ones.) The matrix of the above graph would be the
-        following:
+        contains ones.) The matrix of the above graph is the following:
 \begin{center}
 \begin{tikzpicture}[->]
     \node (a) at (1,3) {A};
@@ -1335,15 +1337,15 @@ are binary or-ed together.
 \end{tikzpicture}
 \end{center}
 The same operation is done on the two corresponding columns of the matrix, as
-the nodes that depended on either $A$ or $B$ will need to depend on $C$.
+the nodes that depended on either $A$ or $B$ will need to depend on $C$ as well.
 
 \item Once all the cycles are merged, the ordering of the dependency list can be
     constructed. This can be done by finding the individual leaves of the tree,
     removing them from the graph, adding them to the ordering, and repeating
     this operation until the graph is empty. It is possible to use the
-    dependency matrix for this purpose, as leaves in the graph will have exactly
-    one $1$s in their row. Removing a leaf is simulated by removing its
-    corresponding row and column from the matrix.
+    dependency matrix for this purpose, as leaves in the graph have exactly
+    one $1$s in their row. When a leaf is removed, its corresponding row and
+    column is removed from the matrix.
 \end{enumerate}
 
 \subsubsection{The framework of type inference and type checking}
@@ -1386,7 +1388,7 @@ substitutes the generic types in the given type with the values of the keys
 found in the \verb$ReconcileEnv$. This function does not change the state,
 therefore it is safe to use without requiring an update.
 
-\subsubsection{Type inference}
+\subsubsection{Type inference} \label{type-inference}
 
 The most important function related to type inference is \verb$inferFromExprS$.
 It is a stateful function, that takes a list of already resolved definitions, an
@@ -1552,7 +1554,7 @@ a := <some definition>
 b := <some definition>
 test := a b
 \end{lstlisting}
-would compile to
+compiles to
 \begin{lstlisting}
 void* test_func() {
     closure* v1 = a_func();
