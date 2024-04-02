@@ -90,20 +90,20 @@ the inner lambda term will result in $((\lambda x. (\lambda w. x)) y) z$, which
 does not have naming collisions.
 
 
-\subsection{This implementation} % todo: split and move to user and dev doc
+\subsection{This implementation}
 
 In this section, we will touch on the most important differences between the
 formal system of lambda calculus, and this implementation. There have been some
 ideas borrowed from C, Rust, and Haskell in order to make the language usable
 from a non-theoretical standpoint.
 
-\subsubsection{Global variables} % todo: split and move to user and dev doc
+\subsubsection{Global variables}
 
 In order to make the language more usable, much like in Haskell, it is possible
 to create global definitions for terms, that can be used in other parts of the
 program. This introduces recursion as the main fix-point combinator.
 
-\subsubsection{Static typing} % todo: split and move to user and dev doc
+\subsubsection{Static typing}
 
 It was decided, that the code this compiler compiles from was going to be
 statically typed. Each term has a type that is assigned to it at compile time by
@@ -1132,7 +1132,7 @@ following.
     \node (d) at (1,1) {D};
     \draw (a) to (b);
     \draw (b) to (c);
-    \draw (c) to (d); % todo: find out why it isn't drawing arrows
+    \draw (c) to (d);
 
     \node (o) at (8,2) {$[D,C,B,A]$};
     \node (h1) at (4,2) {};
@@ -1151,7 +1151,7 @@ While for an input graph with cycles the algorithm would return
     \draw (a) to (b);
     \draw (b) to (c);
     \draw (c) to (d);
-    \draw (d) to (b);
+    \draw[line width=0.2mm] (d) to (b);
 
     \node (o) at (8,2) {$[[D,C,B],A]$};
     \node (h1) at (4,2) {};
