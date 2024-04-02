@@ -4,8 +4,11 @@
 \usepackage{listings}
 \usepackage{setspace}
 \usepackage{graphicx}
+<<<<<<< HEAD
 \usepackage{titling}
+=======
 \usepackage{amsmath}
+>>>>>>> 37ec8edf9facb580398e7e3ea23d35d5e942d1c9
 \usepackage{tikz}
 \usetikzlibrary{matrix}
 
@@ -93,7 +96,7 @@ Throughout this document, new concepts will be described the first time they are
 used. To introduce new names for specific concepts, the new names will be
 written with an \emph{italic font} for emphasis.
 
-\subsection{Lambda Calculus}
+\subsection{Lambda calculus}
 
 Lambda calculus is a mathematical system in which we are able to define any
 computation that can be defined with a Turing machine. This is achieved using
@@ -129,7 +132,7 @@ x)) y) z$. Replacing $y$ with $w$ in the inner lambda term will result in
 $((\lambda x. (\lambda w. x)) y) z$, which does not have naming collisions.
 
 
-\subsection{This Implementation}
+\subsection{This implementation}
 
 In this section, we will touch on the most important differences between the
 formal system of lambda calculus, and the LC language. There have been some
@@ -150,9 +153,9 @@ can also be specified, in which case the compiler checks if it matches the
 inferred type of the same variable.
 
 \pagebreak
-\section{User Documentation}
+\section{User documentation}
 
-\subsection{The Goal of The Project}
+\subsection{The goal of the project}
 
 The main goal of the project is to implement a compiler for a language based on
 simply typed lambda calculus. It should be able to infer as well as check the
@@ -161,7 +164,7 @@ be Turing-complete. Additionally, the language should have some way of
 communicating with the outside world and therefore some input-output system is
 necessary.
 
-\subsection{Methods Used}
+\subsection{Methods used}
 
 \subsubsection{Garbage collection}
 
@@ -201,7 +204,7 @@ types if it seems important. Specifying types also has the benefit of
 constraining the domains of functions, as the type inference system might infer
 a function domain that is too general.
 
-\subsection{Building the Software}
+\subsection{Building the software}
 \subsubsection{Dependencies}
 
 To build the program, one would require the following packages:
@@ -264,7 +267,7 @@ it is likely that compilation works on older versions as well. Alternatively, it
 is possible to specify a different C compiler with command-line arguments, which
 will be discussed under Command-line options.
 
-\subsection{Running the Compiler}
+\subsection{Running the compiler}
 
 The main job of the compiler is to convert from LC source code to C source code.
 Once it has the C source file, it is compiled to binary using \texttt{gcc} if no
@@ -304,7 +307,7 @@ its behavior. The possible command-line options are listed below:
 no C compiler will be run. Also note that when using \texttt{-v} or \texttt{-h},
 no compilation of any kind will be performed. 
 
-\subsection{The LC Language}
+\subsection{The LC language}
 
 The LC language is a language inspired by simply typed lambda calculus.
 Expressions are similar to lambda calculus terms, they are simply typed, and
@@ -806,7 +809,7 @@ codes. A type error can have one of the following kinds:
     \item When a condition of an if expression is not a boolean.
 \end{itemize}
 
-\subsection{Example Programs}
+\subsection{Example programs}
 \lstset{numbers=left}
 
 In this section, some example programs will be discussed, so that it is easier
@@ -999,12 +1002,12 @@ symmetrical.
 \lstset{numbers=left}
 
 \pagebreak
-\section{Developer Documentation}
+\section{Developer documentation}
 
 This part of the documentation is intended for developers of the compiler, and
 users of the language should not need to use the developer documentation.
 
-\subsection{Project Structure}
+\subsection{Project structure}
 
 The compiler can be broken down into four parts: Lexer, Syntax checker, Semantic
 analyzer, and Code Generator. These four parts represent the four steps in
@@ -1035,7 +1038,7 @@ src/
 |-MyModule.hs -> Exposes external functions
 \end{lstlisting}
 
-\subsection{Lexer and Syntax Checker}
+\subsection{Lexer and Syntax checker}
 
 \begin{figure}[t]
 \includegraphics[width=0.8\textwidth]{syntax-checker.diag.pdf}
@@ -1100,7 +1103,7 @@ All \verb$Program$, \verb$ProgramPart$, \verb$Expression$, and \verb$Type$ have
 a corresponding parser defined in the Syntactic Analyzer along with all
 constructors of Expression and Type.
 
-\subsection{Semantic Analyzer}
+\subsection{Semantic analyzer}
 
 Once the syntax-tree is created, the Semantic Analyzer can start processing it.
 The Semantic Analyzer is responsible for six tasks:
@@ -1757,7 +1760,7 @@ program. These tests can only pass if
 \textbf{Note:} Some tests test for compilation errors. Those tests pass if there
 \emph{is} a compilation error.
 
-\subsection{The Utility Module}
+\subsection{The Utility module}
 
 There is a Utility module imported into most other modules. The Utility module
 defines utility functions and data-types that are either not specific to any module, or they
