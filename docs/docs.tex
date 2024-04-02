@@ -5,6 +5,7 @@
 \usepackage{setspace}
 \usepackage{graphicx}
 \usepackage{titling}
+\usepackage{amsmath}
 \usepackage{tikz}
 \usetikzlibrary{matrix}
 
@@ -128,20 +129,20 @@ x)) y) z$. Replacing $y$ with $w$ in the inner lambda term will result in
 $((\lambda x. (\lambda w. x)) y) z$, which does not have naming collisions.
 
 
-\subsection{This implementation} % todo: split and move to user and dev doc
+\subsection{This implementation}
 
 In this section, we will touch on the most important differences between the
 formal system of lambda calculus, and the LC language. There have been some
 ideas borrowed from C, Rust, and Haskell in order to make the language usable
 from a non-theoretical standpoint.
 
-\subsubsection{Global variables} % todo: split and move to user and dev doc
+\subsubsection{Global variables}
 
 In order to make the language more usable, much like in Haskell, it is possible
 to create global definitions for terms, that can be used in other parts of the
 program. This introduces recursion as the main fix-point combinator.
 
-\subsubsection{Static typing} % todo: split and move to user and dev doc
+\subsubsection{Static typing}
 
 The source language is statically typed. Each term has a type that is assigned
 to it at compile time by a type inference algorithm. Types of global variables
@@ -1188,7 +1189,7 @@ example, when the input is an acyclic graph, the output would be the following.
     \node (d) at (1,1) {D};
     \draw (a) to (b);
     \draw (b) to (c);
-    \draw (c) to (d); % todo: find out why it isn't drawing arrows
+    \draw (c) to (d);
 
     \node (o) at (8,2) {$[D,C,B,A]$};
     \node (h1) at (4,2) {};
@@ -1207,7 +1208,7 @@ While for an input graph with a cycle, the algorithm would return
     \draw (a) to (b);
     \draw (b) to (c);
     \draw (c) to (d);
-    \draw (d) to (b);
+    \draw[line width=0.2mm] (d) to (b);
 
     \node (o) at (8,2) {$[[D,C,B],A]$};
     \node (h1) at (4,2) {};
@@ -1217,7 +1218,7 @@ While for an input graph with a cycle, the algorithm would return
 \end{tikzpicture}
 \end{center}
 In this case, the nodes $D$,$C$, and $B$ are merged into one cycle. In order to
-compute the output, three steps are taken:
+compute the output, four steps are taken:
 \begin{enumerate}
     \item Build an $n \times n$ binary $G$ matrix, where $n$ is the number of
         nodes in the graph, and $G_{i,j}$ is $1$, if there is an arrow pointing
@@ -1233,7 +1234,7 @@ compute the output, three steps are taken:
     \draw (a) to (b);
     \draw (b) to (c);
     \draw (c) to (d);
-    \draw (d) to (b);
+    \draw[line width=0.2mm] (d) to (b);
 
     \node[matrix of math nodes] at (9, 2.2) {
           &[.5em] A & B & C & D\\[.5em]
@@ -1267,7 +1268,7 @@ compute the output, three steps are taken:
     \draw[<-, line width=0.4mm] (8.93,2.7) to (8.93,1.3);
     \draw (8.7,1.07) to (7.3, 1.07);
     \draw[<-, line width=0.44mm] (8.7,0.93) to (7.3,0.93);
-    \draw (7.25, 1.35) to (8.65, 2.75);
+    \draw[line width=0.2mm] (7.25, 1.35) to (8.65, 2.75);
     \draw[<-, line width=0.4mm] (7.35, 1.25) to (8.75, 2.65);
 
     \node[matrix of math nodes] at (1, 2.2) {
@@ -1288,7 +1289,61 @@ compute the output, three steps are taken:
     from the direct dependencies. This can be used to efficiently find
     dependency cycles: The $i$th and $j$th nodes are in a cycle if and only if
     $G'_{i,j} \land G'_{j,i}$.
-    \item Merge all the nodes that are in a dependency cycle.
+
+    \item Merge all the nodes that are in a dependency cycle. To merge two
+        nodes, the corresponding dependency matrix is recomputed. The $G''$
+        $(n-1)\times(n-1)$ dependency matrix can be recomputed using the
+        following formula:
+\[
+    G''_{k,l} = 
+    \begin{cases} 
+        1 & k = l \\
+        G'_{i,l+1} \lor G'_{j,l+1} & k = j - 1 \land l \ge i \\
+        G'_{i,l} \lor G'_{j,l} & k = j - 1 \land l < i \\
+        G'_{k+1,i} \lor G'_{k+1,j} & l = j - 1 \land k \ge i \\
+        G'_{k,i} \lor G'_{k,j} & k = j - 1 \land k < i \\
+        G'_{k+1,l+1} & k \ge i \land l \ge i \\
+        G'_{k+1,l} & k \ge i \land l < i \\
+        G'_{k,l+1} & k < i \land l \ge i \\
+        G'_{k,l} & k < i \land l < i \\
+    \end{cases}
+\]
+where $G''$ is the recomputed matrix, $G'$ is the previous $n \times n$ matrix,
+and $i,j$ are the indices of the two nodes to be merged, and $i < j$. There is
+an intuitive description of this operation: If two nodes, for example, $A$ and
+$B$ are merged into one, (i.e., they are treated as one node from thereon), the
+merged node $C$ will depend on all the nodes that either $A$ or $B$ depended on.
+For this reason, the rows corresponding to $A$ and $B$ in the initial matrix,
+are binary or-ed together.
+\begin{center}
+\begin{tikzpicture}
+    \node[matrix of math nodes] (f) at (1, 2) {
+          &[.5em] & A & \rightarrow & B \\[.5em]
+          & 1 & 1 & 1 & 1\\
+        A & 0 & 1 & 1 & 1\\
+\downarrow & 0 & 1 & 1 & 1\\
+        B & 0 & 1 & 1 & 1\\
+    };
+    \node[matrix of math nodes] (t) at (7, 2) {
+          &[.5em] &   & C \\[.5em]
+          & 1 & 1 & 1\\
+          & 0 & 1 & 1\\
+        C & 0 & 1 & 1\\
+    };
+    \draw[->] (3,2) to (5,2);
+    \node (o) at (4,2.2) {merge};
+\end{tikzpicture}
+\end{center}
+The same operation is done on the two corresponding columns of the matrix, as
+the nodes that depended on either $A$ or $B$ will need to depend on $C$.
+
+\item Once all the cycles are merged, the ordering of the dependency list can be
+    constructed. This can be done by finding the individual leaves of the tree,
+    removing them from the graph, adding them to the ordering, and repeating
+    this operation until the graph is empty. It is possible to use the
+    dependency matrix for this purpose, as leaves in the graph will have exactly
+    one $1$s in their row. Removing a leaf is simulated by removing its
+    corresponding row and column from the matrix.
 \end{enumerate}
 
 \subsubsection{The framework of type inference and type checking}
