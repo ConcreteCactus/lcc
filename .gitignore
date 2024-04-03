@@ -10,6 +10,9 @@ docs/*.synctex.gz
 docs/*.toc
 docs/*.latex
 docs/*.diag.tex
+docs/*.bbl
+docs/*.blg
+docs/*.out
 
 examplePrograms/*.c
 examplePrograms/*.out
