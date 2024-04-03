@@ -85,16 +85,10 @@ calculus gives a good foundation for programming language development.
 
 \subsection{Terminology}
 
-The name of the compiler described in this document is referred to by the name
-\verb$lcc$, while its source language is named LC or the LC language. It is
-important to make the distinction between lambda calculus and the LC language,
-as the LC language is designed to be evaluated using physical hardware with
-limited resources, and as a result, LC has properties that are not present in
-lambda calculus.
-
-Throughout this document, new concepts are described the first time they are
-used. To introduce new names for specific concepts, the new names are written
-with an \emph{italic font} for emphasis.
+The name of the compiler described in this document named \verb$lcc$, while its
+source language is named LC or the LC language. Throughout this document, when a
+specific concept is introduced, it is written with an \emph{italic font} for
+emphasis.
 
 \subsection{Lambda Calculus}
 
@@ -103,7 +97,7 @@ computation that can be defined with a Turing machine. This is achieved using
 function application and substitution on lambda terms. A lambda term in the
 simplest form of lambda calculus is built up of three parts:
 \begin{itemize}
-    \item $(x)$ is a variable that can hold a value.
+    \item $(x)$ is a variable.
     \item $(\lambda x. F)$ is a lambda that can represent a function, where $x$
         is the function parameter and $F$ is another term that may or 
         may not contain $x$.
@@ -118,7 +112,7 @@ can reduce a function application from the form $(\lambda x. F)\:A$ to the
 form $F[x := (A)]$, where the $F[x := (A)]$ denotes a new term that is the same
 as $F$ except each $x$ variable is replaced with the $(A)$ term.
 
-$\beta$-reduction in this form, can introduce naming collisions in the system.
+$\beta$-reduction in this form can introduce naming collisions in the system.
 For example, the term $((\lambda x. (\lambda y. x)) y) z$ would reduce to
 $(\lambda y. y) z$ and then $z$. If we instead used $w$ for the parameter of the
 inner lambda, $((\lambda x. (\lambda w. x)) y) z$ would reduce to $(\lambda w.
@@ -143,7 +137,7 @@ non-theoretical standpoint.
 
 In order to make the language more usable, much like in Haskell, it is possible
 to create global definitions for terms, that can be used in other parts of the
-program. This introduces recursion as the main fix-point combinator.
+program. This introduces recursion as the main way of creating repeating logic.
 
 \subsubsection{Static typing}
 
@@ -207,7 +201,7 @@ too general.
 \subsection{Building the Software}
 \subsubsection{Dependencies}
 
-To build the program, the following packages are required:
+The following packages are required to build the program:
 \begin{itemize}
     \item git
     \item stack v2.11.1 or later
@@ -351,7 +345,7 @@ first character is always lower-case. For example, \verb$x$ or
 \verb$exampleVar$.
 
 \paragraph{Lambdas} Lambdas represent functions. Lambdas have an expression
-body, and a parameter. Their parameter can be used inside their expression
+body and a parameter. Their parameter can be used inside their expression
 body. To create a lambda, a backslash (\verb$\$) character can be written,
 followed by the parameter name, a dot (\verb$.$), and the expression body. For
 example, \verb$\x.x$ or \verb$\a.(f a) g$.
@@ -431,7 +425,7 @@ example, \verb$42u32$ or \verb$-1i8$.
 
 \subsubsection{Types}
 
-The LC language is statically typed. This means, that all expressions have a
+The LC language is statically typed. This means that all expressions have a
 set type at the end of compilation. The language uses a type inference algorithm
 that runs on all expressions to determine the appropriate type for each
 expression. Because of type inference, it is not required for the programmer to
@@ -829,8 +823,8 @@ output, the \verb$printList$ function is defined. It can take a list of
 characters, and compose a new function that prints the characters in the list
 one by one.
 
-The \verb$printList$ function first does a case study on the head of the input
-list. If the list is not empty, the first element is printed, then
+The \verb$printList$ function first does a case analysis on the head of the
+input list. If the list is not empty, the first element is printed, then
 \verb$printList$ is called recursively on the remaining list. If the list is
 empty, the identity function is returned to align with the type of the
 \verb$printList$ function.
