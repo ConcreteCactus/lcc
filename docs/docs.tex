@@ -1717,7 +1717,7 @@ Standard Library module and allowing the programmer to focus on the definition.
 
 \subsection{Tests}
 
-To validate that the compiler works as expected, automated tests are used. There
+To validate that the compiler works as expected, tests are used. There
 are two types of tests for \verb$lcc$.
 \begin{itemize}
     \item \textbf{Unit tests} are designed to focus on single parts of the program.
@@ -1725,6 +1725,9 @@ are two types of tests for \verb$lcc$.
     \item \textbf{End-to-end tests} are designed to test every part of the
         system, (i.e. parsing, syntax checking, semantics checking, and code
         generation). 
+    \item \textbf{Manual tests} are run by the developer to validate some change
+        in the compiler. Manual tests are often converted to end-to-end tests
+        once the test passes.
 \end{itemize}
 Note that the following Haskell dependencies are required to compile and run
 tests:
@@ -1741,6 +1744,7 @@ At the time of writing, all tests are passing.
 
 \subsubsection{Unit tests}
 
+% todo: write more
 Unit tests are divided into four categories: syntactic analyzer tests, semantic
 analyzer tests, dependency list tests, and type tests.
 
@@ -1760,6 +1764,24 @@ program. These tests can only pass if
 \end{itemize}
 \textbf{Note:} Some tests test for compilation errors. Those tests pass if there
 \emph{is} a compilation error.
+
+\subsubsection{Manual tests}
+
+Manual testing primarily involves four steps: compiling specific source code to
+active a feature in the language, running the compiled binary, interacting with
+the running program, and seeing if both the compiler and the compiled program
+produces the expected behaviour. Because of the lack of a
+graphical-user-interface, it is relatively simple to convert manual tests into
+end-to-end tests, which is often done to continuously verify non-trivial
+features.
+
+\subsubsection{Problems found during testing} %todo
+
+Some of the most 
+
+\paragraph{Infinite recursion}
+\paragraph{Double-free on if-expression returns}
+\paragraph{Inaccurate dependency list}
 
 \subsection{The Utility Module}
 
