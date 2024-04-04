@@ -870,7 +870,7 @@ the exit code 1, meaning the operator was not recognized; 2, meaning the second
 digit was not in the 0-9 range; or 3, meaning the first digit was not in the 0-9
 range.
 
-\subsubsection{A Turing-machine simulator}
+\subsubsection{A Turing-machine simulator} \label{turing-machine-simulator}
 
 One way to show that a programming language is Turing-complete is to show that
 it can simulate a Turing machine. A program in the LC language that simulates a
@@ -1778,18 +1778,45 @@ features.
 \subsubsection{Problems found during testing} %todo
 
 Some of the most elusive errors in the compiler were found during manual
-testing.
+testing. These errors are usually noticed long after they are introduced, and
+they are either especially difficult to investigate or especially difficult to
+resolve. In this subsection, two of such errors are discussed.
 
-\paragraph{Double-free on if-expression returns}
-\paragraph{Inaccurate dependency list}
+\paragraph{Early free on if-expression return objects.} This issue was found
+during the development of the \ref{turing-machine-simulator} Turing machine
+simulator example program. It was especially difficult to investigate, as it
+seemed to be a type-system issue, while in reality, it was an error in the
+garbage-collector. The error was observed during the execution of
+the Turing machine in the form of segmentation faults. After examining the fault
+with both \verb$valgrind$ and \verb$gdb$, it was found that an object with the
+wrong type was being applied to a function, (i.e. a closure object was applied
+to a function that expected a literal object), resulting in an invalid memory
+read.
+
+At first, it seemed unlikely that the problem was a garbage-collector issue, as
+neither the function, nor its parameter had any uninitialized or corrupt fields.
+After carefully examining both the type inference logic and the Turing machine
+simulator, the type system issue was ruled out. It was found that the function
+should be receiving the object with the right type, which implied that the
+literal object was \emph{lost} before the application could be evaluated.
+
+After further investigation, it was concluded, that the literal that should be
+applied to the function was freed early, and its memory location was reallocated
+for a closure with the exact same pointer and size. The original object was
+freed because its stack flag was not managed properly. It was returned by an
+if expression, which left its stack flag unset. While the stack flag was unset,
+the object was freed by the garbage collector and the error was observed.
+
+\paragraph{Inaccurate dependency list.} Dependency lists are responsible for
+calculating the order in which global definition types are inferred.
 
 \subsection{The Utility Module}
 
-There is a Utility module imported into most other modules. The Utility module
-defines utility functions and data-types that are either not specific to any module, or they
-are used in more than one module. (e.g. \verb$State$ is used in the Semantic
-Analyzer and the Code Generator, however it is not specific to either of the two
-modules.)
+There is a module name \verb$Util$ imported into most other modules. This module
+defines utility functions and data-types that are either not specific to any
+module, or they are used in more than one module. (e.g. \verb$State$ is used in
+the Semantic Analyzer and the Code Generator, however it is not specific to
+either of the two modules.)
 
 \bibliographystyle{plain}
 \bibliography{refs}
