@@ -1798,7 +1798,7 @@ neither the function, nor its parameter had any uninitialized or corrupt fields.
 After carefully examining both the type inference logic and the Turing machine
 simulator, the type system issue was ruled out. It was found that the function
 should be receiving the object with the right type, which implied that the
-literal object was \emph{lost} before the application could be evaluated.
+literal object was somehow replaced before the application could be evaluated.
 
 After further investigation, it was concluded, that the literal that should be
 applied to the function was freed early, and its memory location was reallocated
@@ -1808,12 +1808,29 @@ if expression, which left its stack flag unset. While the stack flag was unset,
 the object was freed by the garbage collector and the error was observed.
 
 \paragraph{Inaccurate dependency list.} Dependency lists are responsible for
-calculating the order in which global definition types are inferred.
+calculating the order in which global definition types are inferred. If the type
+of a global definition was inferred before all of its dependencies, the
+resulting type would be overly general, (i.e. type information would be lost).
+This error was observed after the type checking of the \verb$main$ function was
+implemented.
+
+While in the case of the early free error, it was difficult to investigate the
+cause of the issue and it was simple to implement a fix. In the case of this
+error, it was the opposite. The dependency list had an incorrect implementation,
+which caused the main function to be type inferred before its dependencies,
+resulting in the main function having an incorrect type which then triggered the
+type check to fail on the main function.
+
+When this error was discovered, the dependency list had a significantly simpler
+algorithm resembling a modified insertion sort. This however, proved to be
+insufficient in properly determining the order of elements in which there are no
+forward dependencies. The current implementation of the dependency list aims to
+fix the shortcomings of the previous one, thereby resolving the issue.
 
 \subsection{The Utility Module}
 
 There is a module name \verb$Util$ imported into most other modules. This module
-defines utility functions and data-types that are either not specific to any
+defines utility functions and data types that are either not specific to any
 module, or they are used in more than one module. (e.g. \verb$State$ is used in
 the Semantic Analyzer and the Code Generator, however it is not specific to
 either of the two modules.)
