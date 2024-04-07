@@ -6,17 +6,14 @@ docs.pdf: high-level-architecture.diag.pdf \
 		  syntax-checker.diag.pdf \
 		  semantic-analyzer.diag.pdf \
 		  code-generator.diag.pdf \
+		  testing-methodology.diag.pdf \
 		  docs.tex
 	latexmk -pdf docs.tex
 	latexmk -c
 
-%.diag.pdf: %.diag.tex
-	latexmk -pdf $<
-	latexmk -c
-
-%.diag.tex: %.diag.plantuml
-	plantuml -tlatex $<
+%.diag.pdf: %.diag.plantuml
+	plantuml -tpdf -SdefaultFontName="CMU Serif" $<
 
 clean:
 	latexmk -c
-	rm *.diag.tex *.pdf *.dvi
+	rm *.diag.tex *.diag.pdf *.dvi

@@ -1,0 +1,24 @@
+@startuml
+
+(Write change) as wf
+(Investigate failure) as if
+
+(Write unit test) as wut
+(Write end-to-end test) as wet
+
+(Run manual test) as rmt
+(Run automated test) as rt
+
+(Continue development) as pd
+
+wf -d-> wut : Small function
+wf -d-> rmt : Large feature
+rmt -u-> if : Test fails
+rmt -d-> wet : Test passes
+wet -d-> rt
+wut --d-> rt
+rt -u-> if : Test fails
+rt -d-> pd : Test passes
+if -l-> wf
+
+@enduml
