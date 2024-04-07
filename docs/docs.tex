@@ -1758,13 +1758,15 @@ are two types of tests for \verb$lcc$.
 Note that the following Haskell dependencies are required to compile and run
 tests:
 \begin{itemize}
-    \item \verb$hspec$ is the testing framework.
+    \item \verb$hspec$ is the testing framework. \cite{lib-hspec}
     \item \verb$hspec-expectations$ is required for some utility functions.
+        \cite{lib-hspec-expectations}
+
     \item \verb$process$ is used to run \verb$gcc$, \verb$valgrind$, and the
-        compiled binary.
+        compiled binary. \cite{lib-process}
     \item \verb$temporary$ is used to create temporary directories to store
-        compilation results.
-    \item \verb$QuickCheck$ is used for some random tests.
+        compilation results. \cite{lib-temporary}
+    \item \verb$QuickCheck$ is used for some random tests. \cite{lib-quickcheck}
 \end{itemize}
 At the time of writing, all tests are passing.
 
