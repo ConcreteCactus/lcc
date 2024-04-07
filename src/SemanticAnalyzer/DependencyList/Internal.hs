@@ -53,7 +53,7 @@ mkDependencyMatrix items dependsOn
     stepsNeeded =
         fst $ head $
             dropWhile ((< n) . snd) $
-                map (\m -> (m, (m ^ (2 :: Int) + m) `div` 2)) [1 ..]
+                map (\m -> (m, (m ^ (2 :: Int) - m) `div` 2)) [1 ..]
 
 mergeCycles :: (Eq a) => DependencyMatrix a -> DependencyMatrix a
 mergeCycles depMat = mergeCyclesIter depMat startingN 1 2

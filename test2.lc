@@ -1,1 +1,0 @@
-main := print_i32 (add_i32 1i32 2i32) 0i8
