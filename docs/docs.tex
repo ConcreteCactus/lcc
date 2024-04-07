@@ -77,8 +77,8 @@ language inspired by simply typed lambda calculus into C code.
 \subsection{Motivation}
 
 Programming languages and their compilers are possibly the most important set of
-tools that a programmer interacts with. Therefore it is essential to get to know
-them in detail. A wider understanding of programming languages would allow more
+tools a programmer interacts with. Therefore it is essential to get to know them
+in detail. A wider understanding of programming languages would allow more
 efficient research into developing languages that have more sophisticated
 semantic analyzers, type systems, and code generation algorithms. One way of
 getting to know how programming languages work is to develop one, and lambda
@@ -308,7 +308,7 @@ no compilation of any kind will be performed.
 
 The LC language is a language inspired by simply typed lambda calculus.
 Expressions are similar to lambda calculus terms, they are simply typed, and
-types support parametric polymorphism. This section discussed the key details of
+types support parametric polymorphism. This section discusses the key details of
 the language.
 
 \subsubsection{Syntax and semantics}
@@ -348,16 +348,16 @@ be denoted with a single ASCII character, or a string of ASCII characters. Their
 first character is always lower-case. For example, \verb$x$ or
 \verb$exampleVar$.
 
-\paragraph{Lambdas} Lambdas represent functions. Lambdas have an expression
+\paragraph{Lambdas} Lambdas represent functions. They have an expression
 body and a parameter. Their parameter can be used inside their expression
 body. To create a lambda, a backslash (\verb$\$) character can be written,
 followed by the parameter name, a dot (\verb$.$), and the expression body. For
 example, \verb$\x.x$ or \verb$\a.(f a) g$.
 
-\paragraph{Applications} Applications represent calling functions. Applications
-always contain two expressions, the first of which is the function getting
-called and the second represents the parameter given to that function. To apply
-one expression to another in LC, the function is written first and the parameter
+\paragraph{Applications} Applications represent calling functions. They always
+contain two expressions, the first of which is the function getting called and
+the second represents the parameter given to that function. To apply one
+expression to another in LC, the function is written first and the parameter
 second separated by white-space. For example, \verb$func param$ or 
 \verb$func param1 param2$.
 \noindent
@@ -1015,7 +1015,7 @@ analyzer, and Code Generator. These four parts represent the four steps in
 compilation, which is discussed in detail in the following sections.
 
 \begin{figure}[h]
-\includegraphics[width=0.8\textwidth]{high-level-architecture.diag.pdf}
+\includegraphics[width=0.6\textwidth]{high-level-architecture.diag.pdf}
 \centering
 \caption{High level modules in the compiler.}
 \end{figure}
@@ -1297,7 +1297,7 @@ compute the output, four steps are taken:
     $G'_{i,j} \land G'_{j,i}$.
 
     The composition matrix can be computed using several methods. For example,
-    an intuitive way, is to use the $(n-1)$th power of the matrix, as the
+    one intuitive way is to use the $(n-1)$th power of the matrix, as the
     longest path can only contain $n$ nodes, and $(n-1)$ edges: $G^{(n-1)} =
     G'$.
 
@@ -1744,7 +1744,7 @@ Standard Library module and allowing the programmer to focus on the definition.
 \subsection{Tests}
 
 To validate that the compiler works as expected, tests are used. There
-are two types of tests for \verb$lcc$.
+are two types of automated tests for \verb$lcc$.
 \begin{itemize}
     \item \textbf{Unit tests} are designed to focus on single parts of the program.
         They are used to test small but non-trivial features.
