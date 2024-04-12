@@ -72,7 +72,7 @@
 \section{Introduction}
 
 This is the user and development documentation of a compiler that compiles a
-language inspired by simply typed lambda calculus into C code.
+language inspired by prenex polymorphic lambda calculus into C code.
 
 \subsection{Motivation}
 
@@ -156,9 +156,9 @@ inferred type of the same variable.
 \subsection{The Goal of The Project}
 
 The main goal of the project is to implement a compiler for a language based on
-simply typed lambda calculus. It should be able to infer as well as check the
-types of expressions. Resource and time limitations aside, the language should
-be Turing-complete. Additionally, the language should have some way of
+lambda calculus. It should be able to infer as well as check the types of
+expressions. Resource and time limitations aside, the language should be
+Turing-complete. Additionally, the language should have some way of
 communicating with the outside world and therefore some input-output system is
 necessary.
 
@@ -306,8 +306,8 @@ no compilation of any kind will be performed.
 
 \subsection{The LC Language}
 
-The LC language is a language inspired by simply typed lambda calculus.
-Expressions are similar to lambda calculus terms, they are simply typed, and
+The LC language is a language inspired by typed lambda calculus. Expressions are
+similar to lambda calculus terms, their types are resolved at compile time, and
 types support parametric polymorphism. This section discusses the key details of
 the language.
 
@@ -1168,13 +1168,12 @@ discussed in the \ref{type-inference} Type Inference section in more detail.
 
 \subsubsection{Dependency List} \label{dependency-list}
 
-A dependency list is a list in which the elements are ordered such that no
-elements \emph{depend} on any of the ones that are ordered later in the list. It
-is a datatype that can be constructed using a list and a \emph{dependency
-function}
-which, given an element of the list, returns all the elements that the given
-element depends on. The dependency list allows dependency cycles, in which case
-it arranges all the elements in a cycle into a single node.
+A \emph{dependency list} is a list in which the elements are ordered such that
+no elements \emph{depend} on any of the ones that are ordered later in the list.
+It is a datatype that can be constructed using a list and a \emph{dependency
+function} which, given an element of the list, returns all the elements that the
+given element depends on. The dependency list allows dependency cycles, in which
+case it arranges all the elements in a cycle into a single node.
 
 The dependency list is used by the Semantic Analyzer to determine the order in
 which the global definitions need to be type inferred. If there are any
@@ -1257,10 +1256,10 @@ compute the output, four steps are taken:
 \end{center}
     \item Using repeated matrix multiplications\footnote{In this case, the
         formula for a matrix multiplication is $G'_{i,j} = \lor^n_{k=1} (G_{i,k}
-    \land G_{k,j})$}, compute the $G'$
-    \emph{composition matrix}; that is, the matrix where all the arrow
-    compositions are present with the initial arrows. The composition matrix
-    and the corresponding graph of the above example is the following:
+    \land G_{k,j})$}, compute the $G'$ \emph{transitive closure} of the $G$
+    matrix; that is, compute the matrix where all the arrow compositions are
+    present with the initial arrows. The matrix and graph of the
+    \emph{transitive closure} of the above example is the following:
 \begin{center}
 \begin{tikzpicture}[->]
     \node (a) at (7,3) {A};
@@ -1290,18 +1289,20 @@ compute the output, four steps are taken:
     \node (h3) at (4.7,2.3) {graph};
 \end{tikzpicture}
 \end{center}
-    The composition matrix has an important property: it shows not just the
+    The transitive closure has an important property: it shows not just the
     direct dependencies of a node, but all the subsequent dependencies resulting
-    from the direct dependencies. This can be used to efficiently find
-    dependency cycles: The $i$th and $j$th nodes are in a cycle if and only if
-    $G'_{i,j} \land G'_{j,i}$.
+    from the direct dependencies. Cycles in the initial graph will form strongly
+    connected components in the transitive closure. This can be used to
+    efficiently find dependency cycles: The $i$th and $j$th nodes are in a cycle
+    if and only if $G'_{i,j} \land G'_{j,i}$.
 
-    The composition matrix can be computed using several methods. For example,
-    one intuitive way is to use the $(n-1)$th power of the matrix, as the
-    longest path can only contain $n$ nodes, and $(n-1)$ edges: $G^{(n-1)} =
-    G'$.
+    The matrix of the transitive closure can be computed using several methods.
+    For example, one intuitive way is to use the $(n-1)$th power of the matrix,
+    as the longest path can only contain $n$ nodes, and $(n-1)$ edges:
+    $G^{(n-1)} = G'$. This approach is similar to the Floyd-Warshall Algorithm.
+    \cite{floyd-warshall-algorithm}
 
-    However, there is a more optimal way of finding the composition matrix. By
+    However, there is a more optimal way of finding the transitive closure. By
     repeatedly squaring the initial matrix instead of taking its $(n-1)$th
     power. That is, there is a sequence of matrices $G_m$, where $G_m =
     (G_{m-1})^2$ and $G_0 = G$. It is possible to show, that $\exists o \ge 0$,
@@ -1318,7 +1319,8 @@ compute the output, four steps are taken:
         \frac{o(o-1)}{2} \ge n - 1
     \]
 
-    \item Merge all the nodes that are in a dependency cycle. To merge two
+    \item Merge all the nodes that are in a dependency cycle. In other words,
+        compute the condensation graph \cite{condensation-graph}. To merge two
         nodes, the corresponding dependency matrix is recomputed. The $G''$
         $(n-1)\times(n-1)$ dependency matrix can be recomputed using the
         following formula:
@@ -1791,7 +1793,7 @@ end-to-end test, and added to the test suite. Then, the whole test suite
 is executed to ensure that the code change does not break other previously
 written tests. If all tests pass, the development continues to the next code
 change. In case, at some point, a failing test is found, the failure is
-investigated, and a new code change is created which is tested in the same way.
+investigated, and a new code change is created and tested in the same way.
 
 \subsubsection{Unit tests}
 
@@ -1887,6 +1889,31 @@ defines utility functions and data types that are either not specific to any
 module, or they are used in more than one module. (e.g. \verb$State$ is used in
 the Semantic Analyzer and the Code Generator, however it is not specific to
 either of the two modules.)
+
+\section{Conclusion}
+
+Programming languages are important tools for programmers and it is useful to
+learn about them in detail. While the task of implementing one may seem daunting
+at first, as with most programming projects, breaking down the problem into
+smaller and smaller sub-problems can help achieve the end goal.
+
+During the development of this project it became immensely helpful to take the
+time to properly outline the scope of the project, (i.e. to decide what features
+to include and not to include). A project with a scope too large might not be
+finished in time, while a project with a scope too small may not be challenging
+enough. For example, earlier in development there was a plan to include a REPL
+with the compiler, however it was decided that implementing a REPL alongside the
+code generator would result in an exceedingly long development time.
+
+While some features were excluded during the development of the compiler, in the
+future, it is possible that they get revisited alongside with a couple of new
+ones. These features include adding more functionality to the type system by
+implementing ad hoc polymorphism or even dependent types, improving on the
+performance of the garbage collector by implementing a more powerful garbage
+collection algorithm, or even eliminating the need for a garbage collector
+entirely by having a Rust-like memory management system. Reducing the number of
+function calls by inlining function definitions could also be a good performance
+improvement.
 
 \bibliographystyle{plain}
 \bibliography{refs}
