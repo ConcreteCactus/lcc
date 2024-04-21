@@ -1418,6 +1418,10 @@ substitutes the generic types in the given type with the values of the keys
 found in the \verb$ReconcileEnv$. This function does not change the state,
 therefore it is safe to use without requiring an update.
 
+While the type system of LC is not strictly the Hindley-Milner type system, the
+method of type inference in LC is similar to the ones used with Hindley-Milner.
+\cite{hindley-milner}
+
 \subsubsection{Type inference} \label{type-inference}
 
 The most important function related to type inference is \verb$inferFromExprS$.
